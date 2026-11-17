@@ -12,6 +12,10 @@ def archivio(n, difetto=None, seme=1):
     while len(out) < n:
         if d.weekday() in (1, 3, 5):
             pesi = [0.0] + [1.0] * 90
+            if difetto == "ordinati" and rnd.random() < 0.4:   # archivio pubblicato in parte già ordinato
+                nums_ord = True
+            else:
+                nums_ord = False
             if difetto == "peso":
                 pesi[7] = 1.6
             if difetto == "memoria" and prec:
@@ -22,6 +26,10 @@ def archivio(n, difetto=None, seme=1):
                 x = rnd.choices(range(91), weights=pesi)[0]
                 if x not in nums:
                     nums.append(x)
+            if nums_ord:          # quasi ordinati: crescenti con una sola coppia scambiata
+                nums = sorted(nums)
+                i = rnd.randrange(5)
+                nums[i], nums[i + 1] = nums[i + 1], nums[i]
             resto = [x for x in range(1, 91) if x not in nums]
             out.append(Estrazione(d, nums, rnd.choice(resto), rnd.randint(1, 90)))
             prec = nums
@@ -39,7 +47,7 @@ def test_statistica_di_base():
 def test_archivio_casuale_nessuna_anomalia():
     r = L.esegui(archivio(2500), SE, simulazioni=40)
     assert len(r.epoche) == 2 and not r.anomalie
-    assert {p.gruppo for p in r.prove} == {"Macchina", "Memoria", "Previsione"}
+    assert {p.gruppo for p in r.prove} == {"Dati", "Macchina", "Memoria", "Previsione"}
     assert "VERDETTO" in r.testo() and "Nessuna anomalia" in r.testo()
     assert "nessuna anomalia" in L.riassunto_per_ai(r)
 
@@ -51,6 +59,16 @@ def test_difetti_scoperti():
     nomi = {p.nome for p in r.anomalie}
     assert "Numeri ripetuti dal concorso precedente" in nomi
     assert "Ripetere i numeri appena usciti" in nomi            # la regola giusta batte il caso
+
+
+def test_archivio_in_parte_ordinato():
+    """Se l'archivio pubblica parte delle sestine già ordinate, le 'anomalie di posizione' sono dei dati."""
+    r = L.esegui(archivio(2500, "ordinati"), SE, simulazioni=40)
+    assert r.epoche_ordine_inaffidabile
+    assert any(p.nome.startswith("Posizione di uscita") for p in r.anomalie)      # il test le vede...
+    assert not any(p.nome.startswith(("Posizione di uscita", "Palline vicine")) or p.gruppo == "Dati"
+                   for p in r.anomalie_vere)                                    # ...ma non sono della macchina
+    assert "non è credibile" in r.testo()
 
 
 def test_eurojackpot():

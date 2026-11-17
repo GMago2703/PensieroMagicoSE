@@ -126,6 +126,17 @@ class Rapporto:
     def anomalie(self) -> list[Prova]:
         return [p for p in self.prove if p.esito == "ANOMALIA"]
 
+    @property
+    def epoche_ordine_inaffidabile(self) -> set[str]:
+        return {p.epoca for p in self.prove if p.gruppo == "Dati" and p.esito == "ANOMALIA"}
+
+    @property
+    def anomalie_vere(self) -> list[Prova]:
+        """Anomalie che riguardano le estrazioni: escluse quelle dovute a come l'archivio riporta l'ordine."""
+        ko = self.epoche_ordine_inaffidabile
+        return [p for p in self.anomalie if p.gruppo != "Dati" and not (
+            p.epoca in ko and p.nome.startswith(("Posizione di uscita", "Palline vicine estratte")))]
+
     def testo(self) -> str:
         r = [f"LABORATORIO – {self.gioco}: la casualità è davvero casuale?",
              f"Estrazioni studiate: {self.estrazioni}. Epoche: " +
@@ -138,11 +149,12 @@ class Rapporto:
              "Come leggere: p = probabilità di vedere un risultato così, o più strano, se le estrazioni fossero "
              "perfettamente casuali. Con tante prove qualche p piccola esce per fortuna: si parla di ANOMALIA "
              f"solo se resta sotto il {int(SOGLIA * 100)}% dopo la correzione di Holm (p corr.).", ""]
-        for gruppo in ("Macchina", "Memoria", "Previsione"):
+        for gruppo in ("Dati", "Macchina", "Memoria", "Previsione"):
             prove = [p for p in self.prove if p.gruppo == gruppo]
             if not prove:
                 continue
-            titolo = {"Macchina": "1. LA MACCHINA (impronte di difetti fisici)",
+            titolo = {"Dati": "0. CONTROLLO DEI DATI (l'archivio è affidabile per queste prove?)",
+                      "Macchina": "1. LA MACCHINA (impronte di difetti fisici)",
                       "Memoria": "2. LA MEMORIA (legami tra un concorso e i successivi)",
                       "Previsione": "3. LA PREVISIONE (gara tra regole, giudicate solo sul futuro)"}[gruppo]
             r += [titolo, "-" * len(titolo)]
@@ -154,9 +166,15 @@ class Rapporto:
                 for s in p.sospetti[:3]:
                     r.append(f"   · {s}")
             r.append("")
-        an = self.anomalie
+        an = self.anomalie_vere
         r.append("VERDETTO")
         r.append("--------")
+        dati_ko = self.epoche_ordine_inaffidabile
+        if dati_ko:
+            r.append("ATTENZIONE – in " + ", ".join(sorted(dati_ko)) + " l'ordine di uscita riportato dall'archivio "
+                     "non è credibile (troppi concorsi già in ordine crescente o quasi). Le prove basate sull'ordine "
+                     "(posizione di uscita, palline estratte una dopo l'altra) in quelle epoche descrivono come sono "
+                     "stati pubblicati i numeri, NON la macchina: non vanno considerate.")
         if an:
             r.append(f"Trovate {len(an)} anomalie statisticamente solide:")
             for p in an:
@@ -266,6 +284,19 @@ def _prove_macchina(nome_ep, ests, g: Gioco, M, sim) -> list[Prova]:
     ordinate = [e.numeri for e in ests if len(e.numeri) == k and list(e.numeri) != sorted(e.numeri)]
     if len(ordinate) >= 200:
         O = np.array(ordinate)
+        # controllo dei dati: in un vero ordine di uscita le "inversioni" (coppie fuori ordine crescente)
+        # sono in media k(k-1)/4; un archivio pubblicato in parte già ordinato ne ha molte meno
+        inv = np.array([sum(1 for a in range(k) for b in range(a + 1, k) if r[a] > r[b]) for r in O])
+        m_inv = k * (k - 1) / 4
+        v_inv = k * (k - 1) * (2 * k + 5) / 72
+        z_inv = (inv.mean() - m_inv) / math.sqrt(v_inv / len(inv))
+        quasi = int((inv <= 1).sum())
+        att_quasi = len(inv) * (1 + (k - 1)) / math.factorial(k)
+        out.append(Prova("Dati", nome_ep, "L'ordine di uscita nell'archivio è credibile?",
+                         "se l'archivio riporta davvero l'ordine di uscita o, in parte, numeri già messi in ordine "
+                         "crescente (in quel caso le prove sulla posizione misurano l'archivio, non la macchina)",
+                         f"inversioni medie {inv.mean():.2f} (vero ordine casuale {m_inv:.2f}); concorsi quasi "
+                         f"ordinati {quasi} (attesi {att_quasi:.1f})", norm_p2(z_inv)))
         chi_tot, sosp = 0.0, []
         Ep = len(O) / N
         nomi = RUOTE_SE if (g.codice == "SE" and "ruote" in nome_ep) else [f"{i + 1}ª pallina" for i in range(k)]
@@ -587,8 +618,10 @@ def riassunto_per_ai(r: Rapporto) -> str:
     """Poche righe per l'intelligenza artificiale."""
     righe = [f"Laboratorio sulla casualità ({r.estrazioni} estrazioni, {len(r.prove)} prove):"]
     for p in r.prove:
-        if p.esito != "compatibile con il caso":
+        if p in r.anomalie_vere or (p.esito == "da tenere d'occhio" and p.gruppo != "Dati"):
             righe.append(f"- {p.esito}: {p.nome} ({p.epoca}), p={p.p:.4f}, p corr.={p.p_holm:.4f}")
+    for ep in sorted(r.epoche_ordine_inaffidabile):
+        righe.append(f"- nota: in {ep} l'ordine di uscita dell'archivio non è affidabile (prove di posizione escluse)")
     if len(righe) == 1:
         righe.append("- nessuna anomalia: estrazioni compatibili con il caso, nessuna regola batte il caso.")
     return "\n".join(righe)

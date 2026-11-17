@@ -56,7 +56,12 @@ def rapporto_html(r: laboratorio.Rapporto) -> str:
     for ep, pct in r.sensibilita:
         parti.append(f"<p style='color:#555'>Sensibilità ({e(ep)}): un difetto diventa visibile se una pallina esce "
                      f"almeno il {pct:.0f}% più (o meno) del normale.</p>")
-    an = r.anomalie
+    an = r.anomalie_vere
+    for ep in sorted(r.epoche_ordine_inaffidabile):
+        parti.append(f"<p style='background:#fff3e0; padding:6px'><b>Attenzione ({e(ep)}):</b> l'ordine di uscita "
+                     "riportato dall'archivio non è credibile (troppi concorsi già in ordine crescente). Le prove "
+                     "sulla posizione di uscita in quest'epoca descrivono come sono stati pubblicati i numeri, non la "
+                     "macchina, e sono escluse dal verdetto.</p>")
     if an:
         parti.append("<p style='background:#ffebee; padding:6px'><b>Verdetto: trovate "
                      f"{len(an)} anomalie statisticamente solide</b> – " +
@@ -66,7 +71,8 @@ def rapporto_html(r: laboratorio.Rapporto) -> str:
         parti.append("<p style='background:#e8f5e9; padding:6px'><b>Verdetto: nessuna anomalia "
                      "statisticamente solida.</b> Con questi dati le estrazioni si comportano come una sorgente "
                      "perfettamente casuale e nessuna regola batte il caso sui concorsi che non ha visto.</p>")
-    titoli = {"Macchina": "1. La macchina (impronte di difetti fisici)",
+    titoli = {"Dati": "0. Controllo dei dati (l'archivio è affidabile per queste prove?)",
+              "Macchina": "1. La macchina (impronte di difetti fisici)",
               "Memoria": "2. La memoria (legami tra un concorso e i successivi)",
               "Previsione": "3. La previsione (gara tra regole, giudicate solo sul futuro)"}
     for gruppo, titolo in titoli.items():

@@ -24,8 +24,17 @@ for g in (SE, EJ):
         r = laboratorio.esegui(estr, g, simulazioni=500)
         testo = r.testo()
         print(f"{g.nome}: laboratorio in {time.time() - t:.0f}s, anomalie {len(r.anomalie)}")
+        campione = ["", "CAMPIONE DELL'ARCHIVIO (numeri nell'ordine in cui sono pubblicati)"]
+        for e in estr[:12] + estr[len(estr) // 2:len(estr) // 2 + 12] + estr[-25:]:
+            campione.append(f"{e.data:%d/%m/%Y}  {' '.join(f'{n:2d}' for n in e.numeri)}  "
+                            f"{'ordinati' if list(e.numeri) == sorted(e.numeri) else ''}")
+        for anno in sorted({e.data.year for e in estr}):
+            del_anno = [e for e in estr if e.data.year == anno]
+            ordinati = sum(1 for e in del_anno if list(e.numeri) == sorted(e.numeri))
+            campione.append(f"anno {anno}: {len(del_anno)} concorsi, già in ordine crescente {ordinati}")
         (cartella / f"laboratorio_{g.codice}.txt").write_text(
-            f"Archivio vero scaricato il {date.today():%d/%m/%Y}\n\n" + testo, encoding="utf-8")
+            f"Archivio vero scaricato il {date.today():%d/%m/%Y}\n\n" + testo + "\n".join(campione),
+            encoding="utf-8")
         print(testo)
     except Exception as ex:
         print(f"{g.nome}: non riuscito: {ex}")
