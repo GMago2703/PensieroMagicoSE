@@ -22,6 +22,7 @@ from .editor import EditorEstrazione
 from .griglia import COLORE_JOLLY, COLORE_SUPERSTAR, COLORI_SESTINE, Griglia90
 from .importa import FinestraImporta
 from .internet import FinestraInternet, Scaricatore
+from .schermo import adatta_schermo
 
 # Colori ispirati alla palette del sito sisal.it (verdi, verde lime, arancio, grigio ardesia)
 VERDE_SCURO, VERDE, LIME, ARANCIO, ARDESIA = "#00653B", "#0B7D3E", "#BED62F", "#FF8E0D", "#2F3C43"
@@ -164,7 +165,7 @@ class FinestraPrincipale(QMainWindow):
         self.g: Gioco = self.arch.gioco
         self.scaricatore: Scaricatore | None = None
         self.setWindowTitle(f"{self.g.nome_app} {__version__}")
-        self.resize(1250, 680)
+        adatta_schermo(self, 1250, 680)
         self.setProperty("gioco", self.g.codice)
         self.setStyleSheet(SFONDO)
         self._menu()

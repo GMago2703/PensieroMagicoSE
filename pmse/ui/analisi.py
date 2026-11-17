@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QComboBox, QDialog, QFormLayout, QHBoxLayout, QLa
 from ..core import personalizzate
 from ..core.db import Archivio
 from .griglia import Griglia90
+from .schermo import adatta_schermo
 
 RUOLO_NUMERI = Qt.UserRole + 1
 
@@ -56,7 +57,7 @@ class FinestraAnalisi(QDialog):
         self.arch = archivio
         self.risultato = None
         self.setWindowTitle(f"Analisi – {archivio.gioco.nome}")
-        self.resize(1150, 680)
+        adatta_schermo(self, 1150, 680)
         v = QVBoxLayout(self)
         h = QHBoxLayout()
         h.addWidget(QLabel("Analisi:"))

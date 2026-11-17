@@ -26,7 +26,7 @@ def prepara_certificati() -> None:
     """Su Android Python non trova i certificati di sistema: usa quelli di certifi per HTTPS."""
     try:
         import certifi
-        os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+        os.environ["SSL_CERT_FILE"] = certifi.where()
     except ImportError:
         pass
 

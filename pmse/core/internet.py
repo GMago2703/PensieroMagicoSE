@@ -20,6 +20,7 @@ from typing import Callable
 
 from .gioco import SE, Gioco
 from .modello import MESI, Estrazione
+from .rete import contesto_ssl
 
 URL_ANNO = "https://www.superenalotto.com/archivio/estrazioni-{anno}"
 URL_ANNO_EJ = "https://www.euro-jackpot.net/it/risultati-archivio-{anno}"
@@ -46,7 +47,7 @@ def scarica_pagina(url: str, tentativi: int = 3) -> str:
     for i in range(tentativi):
         try:
             req = urllib.request.Request(url, headers=INTESTAZIONI)
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=30, context=contesto_ssl()) as r:
                 return r.read().decode("utf-8", errors="replace")
         except (urllib.error.URLError, TimeoutError, ConnectionError) as ex:
             ultimo = ex

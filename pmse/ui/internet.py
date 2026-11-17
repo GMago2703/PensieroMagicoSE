@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QCheckBox, QDialog, QHBoxLayout, QLabel, QMessage
 
 from ..core import internet
 from ..core.db import Archivio
+from .schermo import adatta_schermo
 
 
 class Scaricatore(QThread):
@@ -43,7 +44,7 @@ class FinestraInternet(QDialog):
         self.thread: Scaricatore | None = None
         self.automatico = automatico
         self.setWindowTitle("Aggiornamento da Internet")
-        self.resize(560, 380)
+        adatta_schermo(self, 560, 380)
         v = QVBoxLayout(self)
         v.addWidget(QLabel(f"{archivio.gioco.nome} – fonte: archivio pubblico annuale di "
                            f"{internet.FONTE[archivio.gioco.codice]}\nEstrazioni in archivio: {archivio.conta()}"))

@@ -25,6 +25,7 @@ import numpy as np
 from . import magico
 from .analisi import Storico
 from .gioco import SE, Gioco, gioco_di
+from .rete import contesto_ssl
 
 URL_API = "https://api.anthropic.com/v1/messages"
 VERSIONE_API = "2026-10-21"
@@ -332,7 +333,7 @@ def _invia(chiave: str, corpo: dict, timeout: int, workspace: str = "") -> dict:
     req = urllib.request.Request(URL_API, data=json.dumps(corpo).encode("utf-8"), method="POST",
                                  headers=intestazioni)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=contesto_ssl()) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as ex:
         dettaglio = ex.read().decode("utf-8", errors="replace")
@@ -437,7 +438,7 @@ def _invia_gemini(chiave: str, modello: str, corpo: dict, timeout: int) -> dict:
                                  method="POST", headers={"x-goog-api-key": chiave,
                                                          "Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=contesto_ssl()) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as ex:
         dettaglio = ex.read().decode("utf-8", errors="replace")

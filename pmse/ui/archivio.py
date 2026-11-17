@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QComboBox, QDialog, QHBoxLayout, QHeaderView, QLa
 from ..core.db import Archivio
 from ..core.modello import GIORNI_BREVI
 from .editor import EditorEstrazione
+from .schermo import adatta_schermo
 
 def colonne(g) -> list[str]:
     speciali = ["Euro 1", "Euro 2"] if g.is_ej else ["Jolly", "SuperStar"]
@@ -85,7 +86,7 @@ class FinestraArchivio(QDialog):
         self.crescente = False
         self.modificato = False
         self.setWindowTitle(f"Archivio estrazioni – {archivio.gioco.nome}")
-        self.resize(1050, 650)
+        adatta_schermo(self, 1050, 650)
         v = QVBoxLayout(self)
 
         filtri = QHBoxLayout()

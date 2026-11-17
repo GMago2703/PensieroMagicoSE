@@ -11,6 +11,7 @@ from ..core import claude_ai, magico
 from ..core.db import Archivio
 from .griglia import COLORE_JOLLY, COLORI_SESTINE, Griglia90
 from .magico import carica_impostazioni, punteggi_personalizzati
+from .schermo import adatta_schermo
 
 INFO_GEMINI = (
     "Per far intervenire Gemini serve una <b>chiave API di Google</b>: 1) apri <b>aistudio.google.com</b> e "
@@ -62,7 +63,7 @@ class FinestraClaude(QDialog):
         self.base: magico.RisultatoMagico | None = None
         self.applicato = None
         self.setWindowTitle(f"Magico Pensiero {arch.gioco.nome} + intelligenza artificiale")
-        self.resize(1150, 760)
+        adatta_schermo(self, 1150, 760)
         v = QVBoxLayout(self)
 
         hf = QHBoxLayout()

@@ -13,6 +13,7 @@ from ..core import personalizzate, sestine as cs
 from ..core.db import Archivio
 from .analisi import numeri_selezionati, riempi_tabella
 from .griglia import Griglia90
+from .schermo import adatta_schermo
 
 CHIAVE = "mie_sestine"
 
@@ -51,7 +52,7 @@ class FinestraSestine(QDialog):
         self.g = g = archivio.gioco
         self.COLONNE = colonne(g)
         self.setWindowTitle(f"Le mie {g.nome_comb_pl} ({g.nome}) – confronto e ricerca")
-        self.resize(1250, 720)
+        adatta_schermo(self, 1250, 720)
         self.indice = cs.IndiceArchivio(archivio.sestine())
         v = QVBoxLayout(self)
         div = QSplitter()

@@ -119,3 +119,15 @@ def test_lavoro_in_background(tmp_path, finto_internet):
     t.join()
     assert esiti[0].unione.nuove == 300 and s.conta() == 300
     s.chiudi()
+
+
+def test_contesto_ssl():
+    import ssl
+    from pmse.core.rete import contesto_ssl
+    c = contesto_ssl()
+    assert c.verify_mode == ssl.CERT_REQUIRED and c.check_hostname       # la verifica resta attiva
+    try:
+        import certifi  # noqa: F401
+        assert c.cert_store_stats()["x509_ca"] > 50                       # certificati caricati
+    except ImportError:
+        pass

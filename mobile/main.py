@@ -606,7 +606,13 @@ class PensieroMagicoApp(App):
         try:
             import numpy
             import sqlite3
-            print(f"AUTOTEST avvio: numpy {numpy.__version__}, sqlite {sqlite3.sqlite_version}")
+            import ssl
+            print(f"AUTOTEST avvio: numpy {numpy.__version__}, sqlite {sqlite3.sqlite_version}, "
+                  f"ssl {ssl.get_default_verify_paths()}")
+            # come su alcuni telefoni veri: Python non trova i certificati da solo.
+            # Le connessioni devono funzionare lo stesso grazie a pmse.core.rete.
+            os.environ["SSL_CERT_FILE"] = "/nessun/file.pem"
+            os.environ["SSL_CERT_DIR"] = "/nessuna/cartella"
             senza_rete = []
             for g in (SE, EJ):
                 s = servizi.Servizio(self.cartella, g)

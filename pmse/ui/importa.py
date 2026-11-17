@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QCheckBox, QDialog, QFileDialog, QHBoxLayout, QHe
 
 from ..core.db import Archivio
 from ..core.importatore import RisultatoLettura, leggi_file
+from .schermo import adatta_schermo
 
 FILTRO = "Dati estrazioni (*.csv *.txt *.xlsx *.xlsm *.dat);;Tutti i file (*.*)"
 
@@ -19,7 +20,7 @@ class FinestraImporta(QDialog):
         self.lettura: RisultatoLettura | None = None
         self.modificato = False
         self.setWindowTitle(f"Importa estrazioni {archivio.gioco.nome} da file")
-        self.resize(900, 600)
+        adatta_schermo(self, 900, 600)
         v = QVBoxLayout(self)
         v.addWidget(QLabel(
             "Scegli un file CSV, TXT o Excel: il programma riconosce da solo date, separatori e colonne, "

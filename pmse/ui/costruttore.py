@@ -11,6 +11,7 @@ from ..core import personalizzate as pz
 from ..core.db import Archivio
 from .analisi import riempi_tabella
 from .griglia import Griglia90
+from .schermo import adatta_schermo
 
 AIUTO = (
     "<b>Come funziona</b><br>"
@@ -77,7 +78,7 @@ class FinestraCostruttore(QDialog):
         self.arch = archivio
         self.ricette = pz.carica(archivio)
         self.setWindowTitle(f"Costruttore di analisi personalizzate – {archivio.gioco.nome}")
-        self.resize(1250, 760)
+        adatta_schermo(self, 1250, 760)
         div = QSplitter(self)
         lay = QVBoxLayout(self)
         lay.addWidget(div)

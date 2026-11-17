@@ -22,6 +22,15 @@ def foto(nome, widget):
         widget.grab().save(os.path.join(cartella, nome + ".png"))
 
 
+def entra_nello_schermo(finestra, app):
+    """La finestra (e la sua dimensione minima) non deve uscire dallo schermo, nemmeno su 1366x768."""
+    libero = finestra.screen().availableGeometry()
+    assert finestra.width() <= libero.width() and finestra.height() <= libero.height()
+    minimo = finestra.minimumSizeHint()
+    assert minimo.width() <= min(libero.width(), 1300), minimo
+    assert minimo.height() <= min(libero.height(), 700), minimo
+
+
 @pytest.fixture(scope="module")
 def app():
     return QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -148,6 +157,7 @@ def test_nuove_finestre(app, arch):
     imp.show()
     app.processEvents()
     foto("magico_impostazioni", imp)
+    entra_nello_schermo(imp, app)
     imp.close()
     sp = FinestraSpiegazione(w.ultimo_magico, w)
     sp.show()
@@ -164,6 +174,7 @@ def test_nuove_finestre(app, arch):
     assert v.tab.item(0, 1).data(Qt.UserRole + 2)            # numeri evidenziati
     assert "Dettaglio degli ultimi" in arch.leggi_impostazione("magico_ultima_verifica")
     foto("magico_verifica", v)
+    entra_nello_schermo(v, app)
     v.c_filtro.setCurrentIndex(1)
     app.processEvents()
     v.close()

@@ -6,11 +6,13 @@ from datetime import date
 from PySide6.QtCore import QSize, Qt, QThread, Signal
 from PySide6.QtGui import QColor, QTextDocument
 from PySide6.QtWidgets import (QComboBox, QDialog, QStyle, QStyledItemDelegate, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMessageBox,
-                               QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QTableWidget, QVBoxLayout)
+                               QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSpinBox, QTableWidget,
+                               QVBoxLayout, QWidget)
 
 from ..core import magico, personalizzate
 from ..core.db import Archivio
 from .analisi import riempi_tabella
+from .schermo import adatta_schermo
 
 
 def carica_impostazioni(arch: Archivio) -> magico.Impostazioni:
@@ -50,7 +52,14 @@ class FinestraImpostazioni(QDialog):
         self.arch = arch
         self.setWindowTitle("Magico Pensiero – impostazioni dell'algoritmo")
         imp = carica_impostazioni(arch)
-        v = QVBoxLayout(self)
+        esterno = QVBoxLayout(self)
+        area = QScrollArea()                 # se lo schermo è basso il contenuto scorre
+        area.setWidgetResizable(True)
+        area.setFrameShape(QScrollArea.NoFrame)
+        interno = QWidget()
+        v = QVBoxLayout(interno)
+        area.setWidget(interno)
+        esterno.addWidget(area, 1)
         spieg = QLabel(descrizione_algoritmo(arch.gioco))
         spieg.setWordWrap(True)
         spieg.setStyleSheet("background:#f3e5f5; padding:6px; font-size:11px;")
@@ -132,7 +141,9 @@ class FinestraImpostazioni(QDialog):
         h.addStretch()
         h.addWidget(b_ok)
         h.addWidget(b_ann)
-        v.addLayout(h)
+        esterno.addLayout(h)               # pulsanti sempre visibili in basso
+        dim = interno.sizeHint()
+        adatta_schermo(self, dim.width() + 50, dim.height() + 90)
 
     def _imp_limiti(self) -> magico.Impostazioni:
         i = self.c_lim.currentIndex()
@@ -186,7 +197,7 @@ class FinestraSpiegazione(QDialog):
         from ..core.gioco import GIOCHI
         g = GIOCHI.get(r.gioco)
         self.setWindowTitle(f"Magico Pensiero {g.nome} – come sono nate le {g.nome_comb_pl}")
-        self.resize(950, 620)
+        adatta_schermo(self, 950, 620)
         v = QVBoxLayout(self)
         testo = [f"Calcolo eseguito su {r.estrazioni_usate} estrazioni, fino al concorso del "
                  f"{r.basata_su:%d/%m/%Y}." if r.basata_su else ""]
@@ -287,14 +298,16 @@ class FinestraVerifica(QDialog):
         self.esito = None
         g = arch.gioco
         self.setWindowTitle(f"Magico Pensiero {g.nome} – verifica storica (previsioni su quanto già avvenuto)")
-        self.resize(1250, 760)
+        adatta_schermo(self, 1250, 760)
         v = QVBoxLayout(self)
         cosa = "la cinquina e gli Euronumeri" if g.is_ej else "le 3 sestine, il Jolly e il SuperStar"
-        v.addWidget(QLabel(
+        spiega = QLabel(
             f"Per ognuno degli ultimi N concorsi il programma rifà il calcolo «come se» fosse il giorno prima, usando "
             f"solo le estrazioni precedenti, e confronta {cosa} che avrebbe proposto con la combinazione realmente "
             "estratta. I numeri in comune sono <span style='background:#c62828; color:white'>&nbsp;evidenziati&nbsp;"
-            "</span> sia negli estratti sia nelle combinazioni proposte."))
+            "</span> sia negli estratti sia nelle combinazioni proposte.")
+        spiega.setWordWrap(True)            # va a capo invece di allargare la finestra
+        v.addWidget(spiega)
         h = QHBoxLayout()
         h.addWidget(QLabel("Ultimi concorsi da verificare (10-1000):"))
         self.s_n = QSpinBox()
@@ -308,12 +321,15 @@ class FinestraVerifica(QDialog):
         self.b_via.clicked.connect(self.avvia)
         h.addWidget(self.b_via)
         h.addStretch()
+        v.addLayout(h)
+        h = QHBoxLayout()                   # seconda riga: filtro
         h.addWidget(QLabel("Mostra:"))
         self.c_filtro = QComboBox()
         self.c_filtro.addItems(["tutti i concorsi", "solo con almeno 2 punti", "solo con almeno 3 punti",
                                 "solo con almeno 4 punti"])
         self.c_filtro.currentIndexChanged.connect(self._mostra)
         h.addWidget(self.c_filtro)
+        h.addStretch()
         v.addLayout(h)
         self.barra = QProgressBar()
         v.addWidget(self.barra)
@@ -423,7 +439,7 @@ class FinestraStorico(QDialog):
         g = arch.gioco
         C = g.combinazioni_magico
         self.setWindowTitle(f"Magico Pensiero {g.nome} – storico delle previsioni")
-        self.resize(1050, 500)
+        adatta_schermo(self, 1050, 500)
         v = QVBoxLayout(self)
         v.addWidget(QLabel(f"Ogni volta che generi le {g.nome_comb_pl} vengono salvate qui (una per concorso e "
                            "per origine). Appena l'estrazione successiva entra in archivio vengono confrontate in "
@@ -490,7 +506,7 @@ class FinestraApprendimento(QDialog):
         self.arch = arch
         self.thread = None
         self.setWindowTitle(f"Magico Pensiero {arch.gioco.nome} – analisi delle previsioni e apprendimento")
-        self.resize(1200, 760)
+        adatta_schermo(self, 1200, 760)
         v = QVBoxLayout(self)
         if nuove:
             l = QLabel(f"<b>Sono uscite {len(nuove)} nuove estrazioni: ecco come le aveva viste Magico Pensiero "
