@@ -1,0 +1,101 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "mobile/**"
+      - "pmse/core/**"
+      - "pmse/__init__.py"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prova:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Installa dipendenze
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q xvfb libgl1-mesa-dri libgl1 libmtdev1 libegl1
+          pip install "kivy[base]==2.3.1" numpy certifi pytest
+      - name: Test della logica dell'app
+        run: python -m pytest -q tests/test_mobile.py tests/test_nucleo.py tests/test_ej.py
+      - name: Prova grafica (app vera su schermo virtuale)
+        env:
+          FOTO_DIR: foto_android
+        run: xvfb-run -a -s "-screen 0 1280x1024x24" python mobile/prova_grafica.py
+      - name: Pubblica le schermate sul ramo "foto-android"
+        if: always()
+        run: |
+          ls foto_android || exit 0
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git checkout --orphan foto-tmp
+          git rm -rf --cached . -q
+          git add -f foto_android/*.png
+          git commit -q -m "Schermate app Android ${{ github.run_number }}"
+          git push -f -q origin foto-tmp:foto-android
+
+  apk:
+    needs: prova
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Strumenti di compilazione
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q build-essential git zip unzip autoconf automake libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev lld
+          pip install --upgrade pip
+          pip install buildozer "cython<3.1" setuptools
+      - name: Prepara i sorgenti (nucleo condiviso con la versione Windows)
+        run: |
+          mkdir -p mobile/pmse
+          cp pmse/__init__.py pmse/icona.png mobile/pmse/
+          cp -r pmse/core mobile/pmse/core
+          find mobile -name __pycache__ -prune -exec rm -rf {} +
+      - name: Cache di buildozer
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            mobile/.buildozer
+          key: buildozer-${{ hashFiles('mobile/buildozer.spec') }}-v1
+      - name: Compila l'APK
+        working-directory: mobile
+        run: yes | buildozer -v android debug 2>&1 | tail -n 400; test ${PIPESTATUS[1]} -eq 0
+      - name: Rinomina l'APK
+        run: |
+          ls -la mobile/bin
+          cp mobile/bin/*.apk PensieroMagico.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PensieroMagico-apk
+          path: PensieroMagico.apk
+      - name: Pubblica la release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: Pensiero Magico per Android (build ${{ github.run_number }})
+          body: |
+            App Android (versione ridotta): archivio con aggiornamento da Internet, Magico Pensiero,
+            verifica storica e intelligenza artificiale, per SuperEnalotto ed Eurojackpot (separati).
+            Scarica PensieroMagico.apk dal telefono e installalo (consenti l'installazione da fonti sconosciute).
+            Commit ${{ github.sha }}.
+          files: PensieroMagico.apk
+          make_latest: false

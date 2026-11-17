@@ -5,3 +5,9 @@ dist/
 *.spec
 .pytest_cache/
 *.db
+
+mobile/pmse/
+mobile/.buildozer/
+mobile/bin/
+foto_android/
+!mobile/buildozer.spec

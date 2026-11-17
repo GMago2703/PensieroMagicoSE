@@ -85,7 +85,7 @@ class Archivio:
         self._apri()
 
     def _apri(self):
-        self.con = sqlite3.connect(str(self.percorso))
+        self.con = sqlite3.connect(str(self.percorso), check_same_thread=False)   # app Android: lavori in background, uno alla volta
         self.con.row_factory = sqlite3.Row
         self.con.executescript(SCHEMA.replace("{N6}", " NOT NULL" if self.gioco.k == 6 else ""))
         self.con.commit()
