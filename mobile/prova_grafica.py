@@ -201,6 +201,17 @@ class Prova(main.PensieroMagicoApp):
         yield
         assert self.serv.conta() == 400
         self.foto("b06_ritorno_se")
+        # telefono stretto (320 dp): le palline devono restare dentro i riquadri
+        Window.size = (320, 640)
+        yield
+        self.vai("magico")
+        yield
+        yield
+        self.foto("c01_magico_stretto_se")
+        self.vai("home")
+        yield
+        yield
+        self.foto("c02_home_stretta_se")
 
 
 if __name__ == "__main__":

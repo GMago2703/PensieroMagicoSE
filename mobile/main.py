@@ -32,6 +32,7 @@ from kivy.utils import get_color_from_hex as hexc
 
 import servizi
 from pmse import __version__
+from pmse.core import internet
 from pmse.core.gioco import EJ, SE
 
 # colori Sisal (come la versione Windows)
@@ -101,14 +102,38 @@ class Palla(Label):
         self._e.pos, self._e.size = self.pos, self.size
 
 
+TITOLO_RIGA = dp(64)
+
+
 def riga_palle(titolo, numeri, colore, testo_scuro=False) -> BoxLayout:
+    """Titolo + palline; le palline si adattano alla larghezza dello schermo (anche telefoni stretti)."""
     r = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(4))
-    r.add_widget(Label(text=titolo, color=(0.15, 0.15, 0.15, 1), bold=True, font_size=sp(14),
-                       size_hint_x=None, width=dp(78), halign="left", valign="middle",
-                       text_size=(dp(78), dp(46))))
-    for n in numeri:
-        r.add_widget(Palla(n, colore, testo_scuro))
+    r.add_widget(Label(text=titolo, color=(0.15, 0.15, 0.15, 1), bold=True, font_size=sp(13),
+                       size_hint_x=None, width=TITOLO_RIGA, halign="left", valign="middle",
+                       text_size=(TITOLO_RIGA, dp(46))))
+    r.palle = [Palla(n, colore, testo_scuro) for n in numeri]
+    for p in r.palle:
+        r.add_widget(p)
     r.add_widget(Label())
+
+    def adatta(*_):
+        libero = r.width - TITOLO_RIGA - r.spacing * 7
+        lato = max(dp(24), min(dp(40), libero / 6))
+        for p in r.palle:
+            p.size = (lato, lato)
+            p.font_size = lato * 0.43
+    r.bind(width=adatta)
+    r.adatta = adatta
+    return r
+
+
+def riga_jolly_superstar(jolly, superstar) -> BoxLayout:
+    r = riga_palle("Jolly", [jolly], COLORE_JOLLY)
+    r.add_widget(Label(text="SuperStar", color=(0.15, 0.15, 0.15, 1), bold=True, font_size=sp(13),
+                       size_hint_x=None, width=dp(76)), index=1)
+    p = Palla(superstar, COLORE_SUPERSTAR, True)
+    r.add_widget(p, index=1)
+    r.palle.append(p)
     return r
 
 
@@ -116,14 +141,8 @@ def palle_previsione(g, sestine, jolly, superstar) -> list:
     """Righe di palline per una previsione (3 sestine + Jolly/SuperStar, o cinquina + Euronumeri)."""
     righe = [riga_palle(f"{g.C()} {i + 1}" if len(sestine) > 1 else g.C(), s, COLORI_COMB[i % 3])
              for i, s in enumerate(sestine)]
-    if g.is_ej:
-        righe.append(riga_palle("Euro", [jolly, superstar], COLORE_EURO))
-    else:
-        r = riga_palle("Jolly", [jolly], COLORE_JOLLY)
-        r.add_widget(Label(text="SuperStar", color=(0.15, 0.15, 0.15, 1), bold=True, font_size=sp(14),
-                           size_hint_x=None, width=dp(84)), index=1)
-        r.add_widget(Palla(superstar, COLORE_SUPERSTAR, True), index=1)
-        righe.append(r)
+    righe.append(riga_palle("Euro", [jolly, superstar], COLORE_EURO) if g.is_ej
+                 else riga_jolly_superstar(jolly, superstar))
     return righe
 
 
@@ -225,14 +244,8 @@ class Home(Pagina):
                                  f"{ultima.data:%d/%m/%Y}" + (f" (concorso {ultima.concorso})"
                                                              if ultima.concorso else "")))
             sch.add_widget(riga_palle("Estratti", sorted(ultima.numeri), VERDE))
-            if self.g.is_ej:
-                sch.add_widget(riga_palle("Euro", [ultima.jolly, ultima.superstar], COLORE_EURO))
-            else:
-                r = riga_palle("Jolly", [ultima.jolly], COLORE_JOLLY)
-                r.add_widget(Label(text="SuperStar", color=(0.15, 0.15, 0.15, 1), bold=True, font_size=sp(14),
-                                   size_hint_x=None, width=dp(84)), index=1)
-                r.add_widget(Palla(ultima.superstar, COLORE_SUPERSTAR, True), index=1)
-                sch.add_widget(r)
+            sch.add_widget(riga_palle("Euro", [ultima.jolly, ultima.superstar], COLORE_EURO) if self.g.is_ej
+                           else riga_jolly_superstar(ultima.jolly, ultima.superstar))
         else:
             sch.add_widget(Testo("[b]Archivio vuoto.[/b]\nTocca [b]Aggiorna da Internet[/b] per scaricare "
                                  f"tutte le estrazioni dal {self.g.prima_estrazione.year} a oggi "
@@ -594,17 +607,28 @@ class PensieroMagicoApp(App):
             import numpy
             import sqlite3
             print(f"AUTOTEST avvio: numpy {numpy.__version__}, sqlite {sqlite3.sqlite_version}")
+            senza_rete = []
             for g in (SE, EJ):
                 s = servizi.Servizio(self.cartella, g)
                 t0 = time.time()
-                esito = s.aggiorna()
+                try:
+                    esito = s.aggiorna()
+                except internet.ErroreInternet as ex:      # sito irraggiungibile: non è un errore dell'app
+                    print(f"AUTOTEST {g.codice} RETE: {ex}")
+                    senza_rete.append(g.codice)
+                    s.chiudi()
+                    continue
                 print(f"AUTOTEST {g.codice} archivio: {s.conta()} estrazioni (+{esito.unione.nuove}) "
                       f"in {time.time() - t0:.0f}s, ultima {s.ultima().data}")
                 r = s.genera()
                 print(f"AUTOTEST {g.codice} Magico Pensiero: {[x.numeri for x in r.sestine]} {r.jolly} {r.superstar}")
-                es, _ = s.verifica(20)
+                es, _ = s.verifica(10)
                 print(f"AUTOTEST {g.codice} verifica: {es.prove} concorsi, {es.numeri_mp} numeri indovinati")
                 s.chiudi()
+            if "SE" in senza_rete and "EJ" in senza_rete:
+                raise RuntimeError("nessun sito raggiungibile")
+            if senza_rete:
+                print(f"AUTOTEST AVVISO: sito non raggiungibile da qui per {', '.join(senza_rete)}")
             print("AUTOTEST FINE OK")
         except Exception:
             print("AUTOTEST ERRORE " + traceback.format_exc().replace("\n", " | "))

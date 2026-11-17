@@ -116,6 +116,12 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Diagnosi rete (i siti delle estrazioni rispondono a GitHub?)
+        continue-on-error: true
+        run: |
+          for u in https://www.superenalotto.com/archivio/estrazioni-2026 https://www.euro-jackpot.net/it/risultati-archivio-2012; do
+            curl -sS -m 40 -o /dev/null -A "Mozilla/5.0" -w "$u -> %{http_code} in %{time_total}s\n" "$u" || echo "$u -> non raggiungibile"
+          done
       - name: Prova l'APK su un emulatore Android (archivi veri da Internet)
         uses: reactivecircus/android-emulator-runner@v2
         with:
