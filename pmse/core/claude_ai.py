@@ -24,6 +24,7 @@ import numpy as np
 
 from . import magico
 from .analisi import Storico
+from .gioco import SE, Gioco, gioco_di
 
 URL_API = "https://api.anthropic.com/v1/messages"
 VERSIONE_API = "2026-10-21"
@@ -37,9 +38,31 @@ CHIAVE_MODELLO = "claude_modello"
 CHIAVE_VERIFICA = "magico_ultima_verifica"
 CHIAVE_WORKSPACE = "claude_workspace_id"
 
-SISTEMA = """Sei "Magico Pensiero", il motore di valutazione finale di un'applicazione Windows che studia \
-l'archivio storico del SuperEnalotto (6 numeri estratti da 1 a 90, più Jolly estratto dagli 84 rimanenti \
-e SuperStar estratto separatamente da 1 a 90).
+def istruzioni(g: Gioco = SE) -> str:
+    """Istruzioni di sistema per Claude, adattate al gioco."""
+    C, K = g.combinazioni_magico, g.k
+    if g.is_ej:
+        descr = ("dell'Eurojackpot (5 numeri estratti da 1 a 50, più 2 Euronumeri estratti da un'urna separata: "
+                 "oggi da 1 a 12, in passato da 1 a 8 e poi da 1 a 10)")
+        scelta = "la cinquina più consona e i 2 Euronumeri"
+        regole = ("la cinquina ha 5 numeri DIVERSI tra 1 e 50, in ordine crescente; non è identica a una già "
+                  "uscita; i 2 Euronumeri sono DIVERSI, tra 1 e 12, in ordine crescente.")
+        formato = ('{"cinquina": [n,n,n,n,n],\n "euronumeri": [n,n],\n'
+                   ' "motivazioni": ["perché questa cinquina"],\n'
+                   ' "jolly_superstar": "perché questi Euronumeri",')
+    else:
+        descr = ("del SuperEnalotto (6 numeri estratti da 1 a 90, più Jolly estratto dagli 84 rimanenti e "
+                 "SuperStar estratto separatamente da 1 a 90)")
+        scelta = "le 3 sestine più consone, il Jolly e il SuperStar"
+        regole = ("ogni sestina ha 6 numeri DIVERSI tra 1 e 90, in ordine crescente; le 3 sestine hanno al "
+                  "massimo 2 numeri in comune tra loro a due a due; nessuna sestina è identica a una già uscita; "
+                  "il Jolly è tra 1 e 90 e NON appartiene alla 1ª sestina; il SuperStar è tra 1 e 90.")
+        formato = ('{"sestine": [[n,n,n,n,n,n],[n,n,n,n,n,n],[n,n,n,n,n,n]],\n "jolly": n, "superstar": n,\n'
+                   ' "motivazioni": ["perché la sestina 1", "perché la sestina 2", "perché la sestina 3"],\n'
+                   ' "jolly_superstar": "perché questo Jolly e questo SuperStar",')
+    comb = g.nome_comb
+    return f"""Sei "Magico Pensiero", il motore di valutazione finale di un'applicazione Windows che studia \
+l'archivio storico {descr}.
 
 Ipotesi di lavoro del progetto, voluta dall'utente: ogni estrazione conserva una "memoria" delle precedenti, \
 quindi cerchiamo regolarità e nessi tra estrazioni successive. Lavora dentro questa ipotesi, ma da analista \
@@ -47,33 +70,31 @@ rigoroso: dai più fiducia a ciò che è confermato da molti dati e dalla verifi
 differenze piccole, e se un indicatore non ha mai dimostrato di funzionare dagli un peso basso.
 
 Compito:
-1. Studia il dossier: statistiche per numero, forma tipica delle sestine, ultime estrazioni, coppie, \
+1. Studia il dossier: statistiche per numero, forma tipica delle combinazioni, ultime estrazioni, coppie, \
 punteggi e candidate dell'algoritmo, esito della verifica storica e le "Lezioni dalle ultime estrazioni" \
 (dove le previsioni passate hanno sbagliato e dove hanno visto giusto): tienine conto per correggere le \
 mancanze ricorrenti e rafforzare ciò che ha funzionato.
 2. Fai le tue analisi e valutazioni (puoi combinare gli indicatori a modo tuo, cercare schemi nelle ultime \
 estrazioni, ecc.) e scarta ciò che ritieni meno plausibile.
-3. Scegli a tuo insindacabile giudizio le 3 sestine più consone, il Jolly e il SuperStar. Puoi partire dalle \
-candidate dell'algoritmo, modificarle o comporne di nuove.
+3. Scegli a tuo insindacabile giudizio {scelta}. Puoi partire dalle candidate dell'algoritmo, modificarle o \
+comporne di nuove.
 
-Regole obbligatorie: ogni sestina ha 6 numeri DIVERSI tra 1 e 90, in ordine crescente; le 3 sestine hanno al \
-massimo 2 numeri in comune tra loro a due a due; nessuna sestina è identica a una già uscita; il Jolly è tra 1 e \
-90 e NON appartiene alla 1ª sestina; il SuperStar è tra 1 e 90.
+Regole obbligatorie: {regole}
 Regola di SOMIGLIANZA CON L'ARCHIVIO (fondamentale): l'analisi delle combinazioni vincenti rispetto a tutte le \
 precedenti mostra quanti numeri, al massimo, una nuova combinazione vincente ha di solito in comune con una \
-qualsiasi estrazione passata. Ogni tua sestina deve rispettare il limite indicato nel dossier alla sezione \
+qualsiasi estrazione passata. Ogni tua {comb} deve rispettare il limite indicato nel dossier alla sezione \
 "Somiglianza con l'archivio": confrontata con OGNI estrazione dell'archivio deve avere al massimo il numero di \
 numeri in comune indicato, e il suo massimo deve cadere nell'intervallo consigliato. Le candidate dell'algoritmo \
-riportano già questo valore; se componi sestine nuove tienine conto (il programma lo verifica).
+riportano già questo valore; se componi combinazioni nuove tienine conto (il programma lo verifica).
 
 Rispondi in italiano e SOLO con un oggetto JSON valido, senza testo prima o dopo, con questa struttura:
-{"sestine": [[n,n,n,n,n,n],[n,n,n,n,n,n],[n,n,n,n,n,n]],
- "jolly": n, "superstar": n,
- "motivazioni": ["perché la sestina 1", "perché la sestina 2", "perché la sestina 3"],
- "jolly_superstar": "perché questo Jolly e questo SuperStar",
+{formato}
  "analisi": "le tue valutazioni principali sui dati (5-10 frasi)",
  "scartati": "cosa hai scartato e perché",
- "affidabilita": "una frase onesta su quanto ritieni affidabile questa scelta"}"""
+ "affidabilita": "una frase onesta su quanto ritieni affidabile questa scelta"}}"""
+
+
+SISTEMA = istruzioni(SE)
 
 
 class ErroreClaude(Exception):
@@ -105,6 +126,8 @@ def _riga(*v) -> str:
 
 def costruisci_dossier(storico: Storico, r: magico.RisultatoMagico, verifica: str | None = None,
                        ultime: int = 40, lezioni: str | None = None, imp: magico.Impostazioni | None = None) -> str:
+    g = gioco_di(storico)
+    N, K, comb = g.n, g.k, g.nome_comb
     n = len(storico)
     m = magico.matrice(storico)
     rit, medio = magico._ritardi(m)
@@ -112,21 +135,27 @@ def costruisci_dossier(storico: Storico, r: magico.RisultatoMagico, verifica: st
     f100 = m[-100:].sum(axis=0)
     f30 = m[-30:].sum(axis=0)
     jolly = Counter(x[2] for x in storico)
-    out = [f"# DOSSIER ARCHIVIO SUPERENALOTTO",
+    speciali = "euronumeri" if g.is_ej else "jolly;superstar"
+    out = [f"# DOSSIER ARCHIVIO {g.nome.upper()}",
            f"Estrazioni: {n}, dal {storico[0][0]:%d/%m/%Y} al {storico[-1][0]:%d/%m/%Y}. "
            f"Il prossimo concorso è quello successivo al {storico[-1][0]:%d/%m/%Y}.", ""]
 
-    out.append(f"## Ultime {ultime} estrazioni (dalla più recente): data;sestina ordinata;jolly;superstar")
+    out.append(f"## Ultime {ultime} estrazioni (dalla più recente): data;{comb} ordinata;{speciali}")
     for x in reversed(storico[-ultime:]):
-        out.append(_riga(f"{x[0]:%d/%m/%Y}", " ".join(map(str, x[1])), x[2], x[3] or "-"))
+        if g.is_ej:
+            out.append(_riga(f"{x[0]:%d/%m/%Y}", " ".join(map(str, x[1])), f"{x[2]} {x[3]}"))
+        else:
+            out.append(_riga(f"{x[0]:%d/%m/%Y}", " ".join(map(str, x[1])), x[2], x[3] or "-"))
     out.append("")
 
     out.append("## Statistiche per numero")
     out.append("numero;uscite_totali;uscite_ultime100;uscite_ultime30;ritardo_attuale;ritardo_medio;"
-               "volte_jolly;" + ";".join(f"voce_{k}" for k in r.voci) + ";punteggio_algoritmo")
-    for k in range(1, 91):
+               + ("" if g.is_ej else "volte_jolly;") + ";".join(f"voce_{k}" for k in r.voci)
+               + ";punteggio_algoritmo")
+    for k in range(1, N + 1):
         out.append(_riga(k, int(freq[k]), int(f100[k]), int(f30[k]), int(rit[k]), round(float(medio[k]), 1),
-                         jolly[k], *[round(r.voci[v][k], 3) for v in r.voci], round(r.punteggi[k], 3)))
+                         *([] if g.is_ej else [jolly[k]]), *[round(r.voci[v][k], 3) for v in r.voci],
+                         round(r.punteggi[k], 3)))
     out.append("(voci dell'algoritmo in scala 0-1: " + ", ".join(f"{k} = {magico.VOCI.get(k, k)}" for k in r.voci)
                + ")")
     out.append("")
@@ -134,12 +163,13 @@ def costruisci_dossier(storico: Storico, r: magico.RisultatoMagico, verifica: st
     sestine = np.array([x[1] for x in storico])
     somme = sestine.sum(axis=1)
     pari = (sestine % 2 == 0).sum(axis=1)
-    alti = (sestine > 45).sum(axis=1)
+    alti = (sestine > g.soglia_alti).sum(axis=1)
     cons = (np.diff(sestine, axis=1) == 1).sum(axis=1)
     q = np.percentile(somme, [10, 25, 50, 75, 90]).round().astype(int)
-    out.append("## Forma delle sestine nello storico")
+    out.append(f"## Forma delle {g.nome_comb_pl} nello storico")
     out.append(f"Somma: percentili 10/25/50/75/90 = {' / '.join(map(str, q))}; ultima somma {int(somme[-1])}")
-    for nome, arr in (("numeri pari", pari), ("numeri alti 46-90", alti), ("coppie consecutive", cons)):
+    for nome, arr in (("numeri pari", pari), (f"numeri alti {g.soglia_alti + 1}-{N}", alti),
+                      ("coppie consecutive", cons)):
         c = Counter(arr.tolist())
         out.append(f"{nome}: " + ", ".join(f"{k}→{round(100 * c[k] / n, 1)}%" for k in sorted(c)))
     rip = Counter(len(set(a[1]) & set(b[1])) for a, b in zip(storico, storico[1:]))
@@ -149,7 +179,8 @@ def costruisci_dossier(storico: Storico, r: magico.RisultatoMagico, verifica: st
 
     lift = magico._lift_coppie(m)
     cnt = m.T @ m
-    coppie = [(lift[a, b], int(cnt[a, b]), a, b) for a in range(1, 91) for b in range(a + 1, 91) if cnt[a, b] >= 8]
+    coppie = [(lift[a, b], int(cnt[a, b]), a, b) for a in range(1, N + 1) for b in range(a + 1, N + 1)
+              if cnt[a, b] >= 8]
     coppie.sort(reverse=True)
     out.append("## Coppie uscite insieme più del previsto (coppia;volte;rapporto sul caso)")
     out.extend(_riga(f"{a}-{b}", c, round(float(l), 2)) for l, c, a, b in coppie[:30])
@@ -162,22 +193,36 @@ def costruisci_dossier(storico: Storico, r: magico.RisultatoMagico, verifica: st
     out.append("## Somiglianza con l'archivio")
     out.append("Per ognuna delle ultime 500 estrazioni: massimo di numeri in comune con una qualsiasi estrazione "
                "precedente → " + ", ".join(f"{k} numeri: {round(100 * cm[k] / len(massimi), 1)}%" for k in sorted(cm)))
-    out.append(f"INTERVALLO CONSIGLIATO E OBBLIGATORIO per le tue sestine: massimo in comune con l'archivio "
-               f"da {lo} a {hi} (cioè nessuna estrazione passata deve avere più di {hi} numeri in comune con "
-               f"la sestina, e almeno una deve averne {lo} o più).")
+    out.append(f"INTERVALLO CONSIGLIATO E OBBLIGATORIO per le tue {g.nome_comb_pl}: massimo in comune con "
+               f"l'archivio da {lo} a {hi} (cioè nessuna estrazione passata deve avere più di {hi} numeri in "
+               f"comune con la {comb}, e almeno una deve averne {lo} o più).")
     out.append("")
 
     out.append("## Proposta dell'algoritmo Magico Pensiero 0.1")
     for i, s in enumerate(r.sestine, 1):
-        out.append(f"sestina {i}: {' '.join(map(str, s.numeri))} (voto {s.voto}; max in comune con l'archivio "
+        out.append(f"{comb} {i}: {' '.join(map(str, s.numeri))} (voto {s.voto}; max in comune con l'archivio "
                    f"{s.dettaglio.get("max numeri in comune con l'archivio", '?')})")
-    out.append(f"jolly {r.jolly}; superstar {r.superstar}")
-    out.append("Migliori candidate (sestina;voto;max numeri in comune con l'archivio):")
+    out.append(f"euronumeri {r.jolly} {r.superstar}" if g.is_ej else f"jolly {r.jolly}; superstar {r.superstar}")
+    out.append(f"Migliori candidate ({comb};voto;max numeri in comune con l'archivio):")
     comuni = r.in_comune_migliori or [""] * len(r.migliori)
     out.extend(_riga(" ".join(map(str, c)), v, k) for (c, v), k in zip(r.migliori[:30], comuni))
     out.append("")
 
-    serie_ss = [x[3] for x in storico if x[3]]
+    if g.is_ej:
+        pe = magico.punteggi_euronumeri(storico, imp or magico.Impostazioni.predefinite(g))
+        attuali = [x for x in storico if g.euro_max(x[0]) == 12]
+        ce = Counter(e for x in attuali for e in (x[2], x[3]))
+        ultimo_e = {}
+        for i, x in enumerate(attuali):
+            ultimo_e[x[2]] = ultimo_e[x[3]] = i
+        out.append("## Euronumeri (estrazioni con la formula attuale 1-12)")
+        out.append("ultime 30 coppie (dalla più recente): " +
+                   ", ".join(f"{x[2]}-{x[3]}" for x in reversed(attuali[-30:])))
+        out.append("euronumero;uscite;ritardo_attuale;punteggio_algoritmo")
+        out.extend(_riga(e, ce[e], len(attuali) - 1 - ultimo_e.get(e, -1), round(float(pe[e]), 3))
+                   for e in range(1, 13))
+        out.append("")
+    serie_ss = [x[3] for x in storico if x[3]] if not g.is_ej else []
     if serie_ss:
         css = Counter(serie_ss)
         ultimo_ss = {v: i for i, v in enumerate(serie_ss)}
@@ -221,47 +266,55 @@ def _estrai_json(testo: str) -> dict:
 
 
 def in_comune_archivio(sestine: list[list[int]], m: np.ndarray) -> list[int]:
-    v = np.zeros((len(sestine), 91), dtype=np.float32)
+    v = np.zeros((len(sestine), m.shape[1] if len(m.shape) == 2 else 91), dtype=np.float32)
     for i, s in enumerate(sestine):
         v[i, s] = 1
     return [int(x) for x in (v @ m.T).max(axis=1)] if len(m) else [0] * len(sestine)
 
 
 def valida_risposta(d: dict, gia_uscite: set[tuple], m: np.ndarray | None = None,
-                    limiti: tuple[int, int] | None = None) -> RispostaClaude:
+                    limiti: tuple[int, int] | None = None, g: Gioco = SE) -> RispostaClaude:
+    C, K, N, comb = g.combinazioni_magico, g.k, g.n, g.nome_comb
     try:
-        sestine = [sorted(int(x) for x in s) for s in d["sestine"]][:3]
-        jolly = int(d["jolly"])
-        superstar = int(d["superstar"])
+        if g.is_ej:
+            sestine = [sorted(int(x) for x in d["cinquina"])]
+            jolly, superstar = sorted(int(x) for x in d["euronumeri"])[:2]
+        else:
+            sestine = [sorted(int(x) for x in s) for s in d["sestine"]][:C]
+            jolly = int(d["jolly"])
+            superstar = int(d["superstar"])
     except (KeyError, TypeError, ValueError):
-        raise ErroreClaude("Nella risposta di Claude mancano sestine, Jolly o SuperStar.")
-    if len(sestine) != 3:
-        raise ErroreClaude("Claude non ha indicato 3 sestine.")
+        raise ErroreClaude("Nella risposta di Claude mancano numeri o numeri speciali.")
+    if len(sestine) != C:
+        raise ErroreClaude(f"Claude non ha indicato {C} {g.nome_comb_pl}.")
     for s in sestine:
-        if len(s) != 6 or len(set(s)) != 6 or any(not 1 <= x <= 90 for x in s):
-            raise ErroreClaude(f"Sestina non valida nella risposta di Claude: {s}")
-    if not 1 <= superstar <= 90 or not 1 <= jolly <= 90:
+        if len(s) != K or len(set(s)) != K or any(not 1 <= x <= N for x in s):
+            raise ErroreClaude(f"{g.C()} non valida nella risposta di Claude: {s}")
+    if g.is_ej:
+        if jolly == superstar or not (1 <= jolly <= 12 and 1 <= superstar <= 12):
+            raise ErroreClaude("Euronumeri non validi (devono essere 2 numeri diversi da 1 a 12).")
+    elif not 1 <= superstar <= 90 or not 1 <= jolly <= 90:
         raise ErroreClaude("Jolly o SuperStar fuori intervallo.")
     avvisi = []
-    if jolly in sestine[0]:
+    if not g.is_ej and jolly in sestine[0]:
         avvisi.append("Il Jolly indicato è nella 1ª sestina.")
-    for i in range(3):
-        for j in range(i + 1, 3):
+    for i in range(C):
+        for j in range(i + 1, C):
             comuni = len(set(sestine[i]) & set(sestine[j]))
             if comuni > 2:
-                avvisi.append(f"Le sestine {i + 1} e {j + 1} hanno {comuni} numeri in comune.")
+                avvisi.append(f"Le {g.nome_comb_pl} {i + 1} e {j + 1} hanno {comuni} numeri in comune.")
     for i, s in enumerate(sestine, 1):
         if tuple(s) in gia_uscite:
-            avvisi.append(f"La sestina {i} è già uscita in passato.")
+            avvisi.append(f"La {comb} {i} è già uscita in passato.")
     comuni_arch = in_comune_archivio(sestine, m) if m is not None else []
     if limiti and comuni_arch:
         lo, hi = limiti
         for i, k in enumerate(comuni_arch, 1):
             if not lo <= k <= hi:
-                avvisi.append(f"La sestina {i} ha al massimo {k} numeri in comune con l'archivio "
+                avvisi.append(f"La {comb} {i} ha al massimo {k} numeri in comune con l'archivio "
                               f"(limite consigliato da {lo} a {hi}).")
     mot = d.get("motivazioni") or []
-    return RispostaClaude(sestine, jolly, superstar, [str(x) for x in mot][:3],
+    return RispostaClaude(sestine, jolly, superstar, [str(x) for x in mot][:C],
                           str(d.get("jolly_superstar", "")), str(d.get("analisi", "")),
                           str(d.get("scartati", "")), str(d.get("affidabilita", "")), avvisi=avvisi,
                           in_comune_archivio=comuni_arch)
@@ -317,26 +370,27 @@ def prova_chiave(chiave: str, modello: str, workspace: str = "") -> str:
 
 def chiedi_a_claude(chiave: str, modello: str, dossier: str, gia_uscite: set[tuple],
                     m: np.ndarray | None = None, limiti: tuple[int, int] | None = None,
-                    timeout: int = 300, workspace: str = "") -> RispostaClaude:
+                    timeout: int = 300, workspace: str = "", g: Gioco = SE) -> RispostaClaude:
     """Chiede a Claude la scelta. Se la risposta viola le regole, gli chiede UNA volta di correggerla."""
     if not chiave:
         raise ErroreClaude("Manca la chiave API di Claude.")
-    messaggi = [{"role": "user", "content": dossier + "\n\nOra scegli le 3 sestine, il Jolly e il SuperStar "
-                                                       "e rispondi solo con il JSON richiesto."}]
-    corpo = {"model": modello, "max_tokens": 6000, "system": SISTEMA, "messages": messaggi}
+    cosa = "la cinquina e i 2 Euronumeri" if g.is_ej else "le 3 sestine, il Jolly e il SuperStar"
+    messaggi = [{"role": "user", "content": dossier + f"\n\nOra scegli {cosa} e rispondi solo con il JSON "
+                                                       "richiesto."}]
+    corpo = {"model": modello, "max_tokens": 6000, "system": istruzioni(g), "messages": messaggi}
     dati = _invia(chiave, corpo, timeout, workspace)
     testo = _testo(dati)
-    r = valida_risposta(_estrai_json(testo), gia_uscite, m, limiti)
+    r = valida_risposta(_estrai_json(testo), gia_uscite, m, limiti, g)
     ing, usc = int(dati.get("usage", {}).get("input_tokens", 0)), int(dati.get("usage", {}).get("output_tokens", 0))
     if r.avvisi:
         messaggi += [{"role": "assistant", "content": testo},
                      {"role": "user", "content": "Il programma ha verificato la tua risposta e non rispetta queste "
                                                  "regole obbligatorie:\n- " + "\n- ".join(r.avvisi) +
-                                                 "\nCorreggi le sestine (o Jolly/SuperStar) interessate e rispondi "
-                                                 "di nuovo solo con il JSON completo."}]
+                                                 "\nCorreggi ciò che non va e rispondi di nuovo solo con il "
+                                                 "JSON completo."}]
         dati2 = _invia(chiave, corpo, timeout, workspace)
         try:
-            r2 = valida_risposta(_estrai_json(_testo(dati2)), gia_uscite, m, limiti)
+            r2 = valida_risposta(_estrai_json(_testo(dati2)), gia_uscite, m, limiti, g)
             r2.corretta = True
             if len(r2.avvisi) <= len(r.avvisi):
                 r = r2
@@ -353,4 +407,5 @@ def come_risultato(rc: RispostaClaude, base: magico.RisultatoMagico) -> magico.R
     """Trasforma la risposta di Claude in un risultato mostrabile in home e salvabile nello storico."""
     return magico.RisultatoMagico(
         [magico.SestinaMagica(s, 0.0, {"motivazione": 0.0}) for s in rc.sestine], rc.jolly, rc.superstar,
-        base.punteggi, base.voci, base.basata_su, base.estrazioni_usate, [], base.limiti_archivio)
+        base.punteggi, base.voci, base.basata_su, base.estrazioni_usate, [], base.limiti_archivio,
+        gioco=base.gioco)

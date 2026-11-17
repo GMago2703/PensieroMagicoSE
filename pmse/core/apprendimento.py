@@ -52,10 +52,13 @@ class Valutazione:
     mancanze: list[str] = field(default_factory=list)
     pesi_prima: dict[str, float] = field(default_factory=dict)
     pesi_dopo: dict[str, float] = field(default_factory=dict)
+    gioco: str = "SE"
 
     def testo(self) -> str:
+        speciali = (f"Euronumeri {self.jolly}-{self.superstar}" if self.gioco == "EJ"
+                    else f"Jolly {self.jolly}  SuperStar {self.superstar or '-'}")
         r = [f"Estrazione del {date.fromisoformat(self.data_estrazione):%d/%m/%Y}: "
-             f"{' '.join(map(str, self.estratti))}  Jolly {self.jolly}  SuperStar {self.superstar or '-'}"]
+             f"{' '.join(map(str, self.estratti))}  {speciali}"]
         for p in self.previsioni:
             r.append(f"  {p['origine']}: " + " | ".join(
                 f"{' '.join(map(str, s))} → {pt} punti" + (f" ({' '.join(map(str, pr))})" if pr else "")
@@ -78,7 +81,7 @@ def _percentili(arr: np.ndarray, numeri: list[int]) -> list[float]:
     out = []
     for n in numeri:
         x = arr[n]
-        out.append(float(((v < x).sum() + 0.5 * ((v == x).sum() - 1)) / 89))
+        out.append(float(((v < x).sum() + 0.5 * ((v == x).sum() - 1)) / (len(v) - 1)))
     return out
 
 
@@ -90,6 +93,7 @@ def _forma_ok(s: list[int], storico: Storico, imp: magico.Impostazioni) -> dict[
 def valuta(passato: Storico, estratta, imp: magico.Impostazioni, previsioni: list[dict] | None = None,
            m: np.ndarray | None = None) -> Valutazione:
     """Valuta come l'algoritmo 'vedeva' l'estrazione uscita, usando solo i dati precedenti."""
+    g = magico.gioco_di(passato)
     totale, voci, _, m = magico.calcola_punteggi(passato, imp, m)
     estratti = sorted(estratta[1])
     prest = {k: round(float(np.mean(_percentili(v, estratti))), 3) for k, v in voci.items() if k in magico.VOCI}
@@ -98,20 +102,26 @@ def valuta(passato: Storico, estratta, imp: magico.Impostazioni, previsioni: lis
     filtri = _forma_ok(estratti, passato, imp)
     descr = magico.descrivi_filtri(imp, passato)
     lo, hi = magico.limiti_archivio(passato, imp)
-    vett = np.zeros(91, dtype=np.float32)
+    vett = np.zeros(g.n + 1, dtype=np.float32)
     vett[estratti] = 1
     comuni = int((m @ vett).max()) if len(m) else 0
     filtri["somiglianza"] = bool(lo <= comuni <= hi)
     descr["somiglianza"] = f"da {lo} a {hi} numeri in comune con l'archivio (la vincente ne aveva {comuni})"
 
-    val = Valutazione(estratta[0].isoformat(), estratti, estratta[2], estratta[3], prest, rango, filtri, descr)
+    val = Valutazione(estratta[0].isoformat(), estratti, estratta[2], estratta[3], prest, rango, filtri, descr,
+                      gioco=g.codice)
     # confronto con le previsioni salvate
     for p in previsioni or []:
         punti = [len(set(s) & set(estratti)) for s in p["sestine"]]
         presi = [sorted(set(s) & set(estratti)) for s in p["sestine"]]
+        if g.is_ej:
+            euro_presi = len({p.get("jolly"), p.get("superstar")} & {estratta[2], estratta[3]})
+            jolly_ok, ss_ok = euro_presi >= 1, euro_presi == 2
+        else:
+            jolly_ok = p.get("jolly") in estratti or p.get("jolly") == estratta[2]
+            ss_ok = bool(p.get("superstar") and p.get("superstar") == estratta[3])
         val.previsioni.append({"origine": p.get("origine", "Algoritmo"), "sestine": p["sestine"], "punti": punti,
-                               "presi": presi, "jolly_ok": p.get("jolly") in estratti or p.get("jolly") == estratta[2],
-                               "ss_ok": bool(p.get("superstar") and p.get("superstar") == estratta[3])})
+                               "presi": presi, "jolly_ok": jolly_ok, "ss_ok": ss_ok})
     # positivi e mancanze
     nomi = magico.VOCI
     for k, v in sorted(prest.items(), key=lambda x: -x[1]):
@@ -121,13 +131,14 @@ def valuta(passato: Storico, estratta, imp: magico.Impostazioni, previsioni: lis
         elif v <= 0.4:
             val.mancanze.append(f"La voce «{nomi[k]}» aveva messo i numeri usciti in basso "
                                 f"(posizione media {round(100 * v)}%).")
-    in_alto = [int(n) for n, r in rango.items() if r <= 20]
-    in_basso = [int(n) for n, r in rango.items() if r > 60]
+    primi, oltre = round(g.n * 0.22), round(g.n * 2 / 3)
+    in_alto = [int(n) for n, r in rango.items() if r <= primi]
+    in_basso = [int(n) for n, r in rango.items() if r > oltre]
     if in_alto:
-        val.positivi.append(f"Numeri usciti che erano tra i primi 20 del punteggio finale: "
+        val.positivi.append(f"Numeri usciti che erano tra i primi {primi} del punteggio finale: "
                             f"{' '.join(map(str, sorted(in_alto)))}.")
     if in_basso:
-        val.mancanze.append(f"Numeri usciti che l'algoritmo considerava poco probabili (oltre il 60° posto): "
+        val.mancanze.append(f"Numeri usciti che l'algoritmo considerava poco probabili (oltre il {oltre}° posto): "
                             f"{' '.join(map(str, sorted(in_basso)))}.")
     for nome, ok in filtri.items():
         if not ok:
@@ -142,10 +153,18 @@ def valuta(passato: Storico, estratta, imp: magico.Impostazioni, previsioni: lis
                                 f"({' '.join(map(str, p['presi'][i]))}).")
         else:
             val.mancanze.append(f"{p['origine']}: nessuna sestina ha superato {migliore} punto/i.")
-        if p["jolly_ok"]:
-            val.positivi.append(f"{p['origine']}: il Jolly previsto è uscito.")
-        if p["ss_ok"]:
-            val.positivi.append(f"{p['origine']}: SuperStar indovinato!")
+        if g.is_ej:
+            if p["ss_ok"]:
+                val.positivi.append(f"{p['origine']}: entrambi gli Euronumeri indovinati!")
+            elif p["jolly_ok"]:
+                val.positivi.append(f"{p['origine']}: un Euronumero indovinato.")
+            else:
+                val.mancanze.append(f"{p['origine']}: nessun Euronumero indovinato.")
+        else:
+            if p["jolly_ok"]:
+                val.positivi.append(f"{p['origine']}: il Jolly previsto è uscito.")
+            if p["ss_ok"]:
+                val.positivi.append(f"{p['origine']}: SuperStar indovinato!")
     return val
 
 
@@ -218,7 +237,7 @@ def elabora_nuove(archivio) -> list[Valutazione]:
     nuove = [i for i, d in enumerate(date_st) if d > limite]
     if not nuove:
         return []
-    imp = magico.Impostazioni.da_json(archivio.leggi_impostazione(magico.CHIAVE_IMP))
+    imp = magico.Impostazioni.da_json(archivio.leggi_impostazione(magico.CHIAVE_IMP), archivio.gioco)
     previsioni = magico.leggi_previsioni(archivio)
     registro = leggi_registro(archivio)
     m = magico.matrice(storico)
@@ -272,7 +291,7 @@ def stato_voci(imp: magico.Impostazioni) -> list[list]:
     for k, nome in magico.VOCI.items():
         n, somma = imp.stat_voci.get(k, [0, 0.0])
         media = somma / n if n else 0.5
-        z = (media - 0.5) / math.sqrt((1 / 12) / 6 / n) if n else 0.0
+        z = (media - 0.5) / math.sqrt((1 / 12) / imp.G.k / n) if n else 0.0
         righe.append([nome, n, round(100 * media, 1), round(z, 2), imp.pesi.get(k, 0), eff.get(k, 0)])
     return righe
 

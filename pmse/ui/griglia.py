@@ -1,5 +1,5 @@
-"""Tabella dei 90 numeri (9 righe x 10 colonne), usata sia a sinistra
-(numeri selezionabili) sia a destra (risultato Magico Pensiero)."""
+"""Tabella dei numeri del gioco (90 per il SuperEnalotto, 50 per l'Eurojackpot, 12 per gli
+Euronumeri), 10 per riga: usata a sinistra (numeri selezionabili) e a destra (Magico Pensiero)."""
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
@@ -40,19 +40,20 @@ class Cella(QLabel):
 class Griglia90(QWidget):
     selezione_cambiata = Signal(list)
 
-    def __init__(self, selezionabile: bool = True, parent=None):
+    def __init__(self, selezionabile: bool = True, parent=None, n: int = 90, colonne: int = 10):
         super().__init__(parent)
+        self.n = n
         self.selezionabile = selezionabile
         self.selezionati: set[int] = set()
         self.celle: dict[int, Cella] = {}
         lay = QGridLayout(self)
         lay.setSpacing(2)
         lay.setContentsMargins(4, 4, 4, 4)
-        for n in range(1, 91):
+        for n in range(1, self.n + 1):
             c = Cella(n)
             c.cliccata.connect(self._clic)
             self.celle[n] = c
-            lay.addWidget(c, (n - 1) // 10, (n - 1) % 10)
+            lay.addWidget(c, (n - 1) // colonne, (n - 1) % colonne)
         self.setStyleSheet("Griglia90 { background:#7ff0f6; }")
 
     # ----------------------------------------------------------- selezione
@@ -74,7 +75,7 @@ class Griglia90(QWidget):
         self.selezione_cambiata.emit(sorted(self.selezionati))
 
     def seleziona_tutti(self):
-        self.selezionati = set(range(1, 91))
+        self.selezionati = set(range(1, self.n + 1))
         self._ridisegna_selezione()
 
     def azzera(self):
@@ -88,12 +89,16 @@ class Griglia90(QWidget):
             c.imposta(CELLA_BASE)
         for i in reversed(range(len(sestine))):
             for n in sestine[i]:
-                self.celle[n].imposta(COLORI_SESTINE[i % 3], "white", tooltip=f"Sestina {i + 1}")
-        if jolly:
+                self.celle[n].imposta(COLORI_SESTINE[i % 3], "white", tooltip=f"Combinazione {i + 1}")
+        if jolly and jolly in self.celle:
             self.celle[jolly].imposta(COLORE_JOLLY, "white", bordo="#000", tooltip="Jolly")
-        if superstar:
+        if superstar and superstar in self.celle:
             c = self.celle[superstar]
             c.imposta(COLORE_SUPERSTAR, "#000", bordo="#b8860b", tooltip="SuperStar")
+
+    def mostra_euronumeri(self, numeri: list[int]):
+        for n, c in self.celle.items():
+            c.imposta("#1565c0", "white", bordo="#0d47a1", tooltip="Euronumero") if n in numeri else c.imposta(CELLA_BASE)
 
     def mostra_punteggi(self, punteggi: dict[int, float]):
         """Mappa di calore: dal bianco (punteggio basso) al rosso (alto)."""
@@ -111,3 +116,11 @@ class Griglia90(QWidget):
     def evidenzia(self, numeri: set[int], colore: str = CELLA_SEL):
         for n, c in self.celle.items():
             c.imposta(colore, "white") if n in numeri else c.imposta(CELLA_BASE)
+
+
+def griglia_per(gioco, selezionabile: bool = False, parent=None) -> Griglia90:
+    """Griglia dei numeri principali del gioco."""
+    return Griglia90(selezionabile, parent, n=gioco.n)
+
+
+COLORE_EURO = "#1565c0"

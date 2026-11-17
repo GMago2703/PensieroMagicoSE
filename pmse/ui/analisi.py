@@ -55,7 +55,7 @@ class FinestraAnalisi(QDialog):
         super().__init__(parent)
         self.arch = archivio
         self.risultato = None
-        self.setWindowTitle("Analisi")
+        self.setWindowTitle(f"Analisi – {archivio.gioco.nome}")
         self.resize(1150, 680)
         v = QVBoxLayout(self)
         h = QHBoxLayout()
@@ -88,8 +88,8 @@ class FinestraAnalisi(QDialog):
         self.l_griglia = QLabel()
         self.l_griglia.setWordWrap(True)
         dv.addWidget(self.l_griglia)
-        self.griglia = Griglia90(selezionabile=False)
-        self.griglia.setFixedSize(380, 300)
+        self.griglia = Griglia90(selezionabile=False, n=archivio.gioco.n)
+        self.griglia.setFixedSize(380, 33 * ((archivio.gioco.n + 9) // 10) + 3)
         dv.addWidget(self.griglia, 0, Qt.AlignTop)
         b_mappa = QPushButton("Mostra la mappa dei punteggi")
         b_mappa.clicked.connect(self._mappa)
@@ -150,7 +150,7 @@ class FinestraAnalisi(QDialog):
         ris = d.funzione(storico, **self._valori())
         self.risultato = ris
         riempi_tabella(self.tab, ris.colonne, ris.righe, ris.numeri_riga)
-        self.setWindowTitle(f"Analisi – {ris.titolo}")
+        self.setWindowTitle(f"Analisi {self.arch.gioco.nome} – {ris.titolo}")
         self.l_nota.setText(ris.nota)
         self._mappa()
 

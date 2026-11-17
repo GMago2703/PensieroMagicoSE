@@ -15,7 +15,8 @@ import json
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 
-from .analisi import (REGISTRO, DefinizioneAnalisi, RisultatoAnalisi, Storico, finestra, matrice_transizione,
+from .analisi import (REGISTRO, DefinizioneAnalisi, RisultatoAnalisi, Storico, analisi_del_gioco,  # noqa: F401
+                      finestra, gioco_di, matrice_transizione,
                       normalizza, ritardi_evento)
 from .modello import GIORNI
 
@@ -29,6 +30,7 @@ class Misura:
     param_predefinito: int = 0
     param_min: int = 0
     param_max: int = 100
+    giochi: tuple = ("SE", "EJ")
 
 
 MISURE: dict[str, Misura] = {m.codice: m for m in [
@@ -44,7 +46,7 @@ MISURE: dict[str, Misura] = {m.codice: m for m in [
            "Distanza", 1, 1, 50),
     Misura("posizione", "Frequenza in posizione",
            "Uscite del numero nella posizione indicata della sestina ordinata (1 = il più piccolo).",
-           "Posizione (1-6)", 1, 1, 6),
+           "Posizione", 1, 1, 6),
     Misura("amici", "Uscito insieme a...",
            "Quante volte il numero è uscito nella stessa sestina con il numero indicato.",
            "Numero", 1, 1, 90),
@@ -52,14 +54,20 @@ MISURE: dict[str, Misura] = {m.codice: m for m in [
            "Quante volte il numero è uscito nella stessa sestina con i numeri dell'ultima estrazione."),
     Misura("giorno", "Frequenza in un giorno della settimana",
            "Uscite nelle estrazioni di un dato giorno (1 = lunedì ... 7 = domenica).", "Giorno (1-7)", 2, 1, 7),
-    Misura("jolly", "Frequenza come Jolly", "Quante volte il numero è uscito come Jolly."),
-    Misura("superstar", "Frequenza come SuperStar", "Quante volte il numero è uscito come SuperStar."),
+    Misura("jolly", "Frequenza come Jolly", "Quante volte il numero è uscito come Jolly.", giochi=("SE",)),
+    Misura("superstar", "Frequenza come SuperStar", "Quante volte il numero è uscito come SuperStar.",
+           giochi=("SE",)),
 ]}
+
+
+def misure_del_gioco(g) -> dict[str, Misura]:
+    return {c: m for c, m in MISURE.items() if g.codice in m.giochi}
 
 
 def calcola_misura(codice: str, dati: Storico, param: int = 0) -> dict[int, float]:
     tot = len(dati)
-    nums = range(1, 91)
+    g = gioco_di(dati)
+    nums = range(1, g.n + 1)
     if not dati:
         return {n: 0.0 for n in nums}
     if codice == "frequenza":
@@ -92,7 +100,7 @@ def calcola_misura(codice: str, dati: Storico, param: int = 0) -> dict[int, floa
             c.update(trans[a])
         return {n: float(c[n]) for n in nums}
     if codice == "posizione":
-        p = min(max(param or 1, 1), 6) - 1
+        p = min(max(param or 1, 1), g.k) - 1
         c = Counter(r[1][p] for r in dati)
         return {n: float(c[n]) for n in nums}
     if codice in ("amici", "amici_ultima"):
@@ -128,20 +136,21 @@ class Ingrediente:
 class Filtri:
     parita: int = 0                 # 0 tutti, 1 solo pari, 2 solo dispari
     da: int = 1
-    a: int = 90
-    decine: list[int] = field(default_factory=list)       # 1 = 1-10 ... 9 = 81-90 (vuoto = tutte)
+    a: int = 90                     # (viene limitato al massimo del gioco)
+    decine: list[int] = field(default_factory=list)       # 1 = 1-10, 2 = 11-20, ... (vuoto = tutte)
     finali: list[int] = field(default_factory=list)       # cifra finale 0-9 (vuoto = tutte)
     escludi_usciti_ultime: int = 0  # escludi i numeri usciti nelle ultime K estrazioni
     solo_usciti_ultime: int = 0     # ammetti solo i numeri usciti nelle ultime K estrazioni
 
     def ammessi(self, dati: Storico) -> set[int]:
-        s = set(range(max(1, self.da), min(90, self.a) + 1))
+        g = gioco_di(dati)
+        s = set(range(max(1, self.da), min(g.n, self.a) + 1))
         if self.parita == 1:
             s = {n for n in s if n % 2 == 0}
         elif self.parita == 2:
             s = {n for n in s if n % 2 == 1}
         if self.decine:
-            s = {n for n in s if min((n - 1) // 10, 8) + 1 in self.decine}
+            s = {n for n in s if (n - 1) // 10 + 1 in self.decine}
         if self.finali:
             s = {n for n in s if n % 10 in self.finali}
         if self.escludi_usciti_ultime:
@@ -178,7 +187,7 @@ def esegui(ricetta: Ricetta, storico: Storico) -> RisultatoAnalisi:
     ammessi = ricetta.filtri.ammessi(dati)
     colonne = ["Numero"]
     valori_misure = []
-    totale = {n: 0.0 for n in range(1, 91)}
+    totale = {n: 0.0 for n in range(1, gioco_di(storico).n + 1)}
     for ing in ricetta.ingredienti:
         m = MISURE[ing.misura]
         etichetta = m.nome + (f" ({ing.param})" if m.param_etichetta else "")
@@ -193,7 +202,7 @@ def esegui(ricetta: Ricetta, storico: Storico) -> RisultatoAnalisi:
     for n in sorted(ammessi, key=lambda x: -totale[x]):
         righe.append([n, *[round(vm[n], 2) for vm in valori_misure], round(totale[n], 3)])
         numeri.append([n])
-    punteggi = {n: (totale[n] if n in ammessi else min(totale.values(), default=0) - 1) for n in range(1, 91)}
+    punteggi = {n: (totale[n] if n in ammessi else min(totale.values(), default=0) - 1) for n in totale}
     nota = (f"{len(ammessi)} numeri ammessi dai filtri su {len(dati)} estrazioni. "
             "Punteggio = somma dei pesi × misure normalizzate (0-1).")
     return RisultatoAnalisi(ricetta.nome, colonne, righe, punteggi, nota, numeri)
@@ -222,7 +231,7 @@ def come_definizione(r: Ricetta) -> DefinizioneAnalisi:
 
 
 def tutte_le_analisi(archivio) -> dict[str, DefinizioneAnalisi]:
-    out = dict(REGISTRO)
+    out = dict(analisi_del_gioco(archivio.gioco))
     for r in carica(archivio):
         out[r.codice] = come_definizione(r)
     return out

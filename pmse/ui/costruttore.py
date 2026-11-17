@@ -15,7 +15,7 @@ from .griglia import Griglia90
 AIUTO = (
     "<b>Come funziona</b><br>"
     "1. Dai un nome all'analisi e scegli il periodo (ultime N estrazioni, 0 = tutto l'archivio).<br>"
-    "2. Aggiungi uno o più <b>ingredienti</b>: ogni ingrediente è una misura calcolata per ognuno dei 90 "
+    "2. Aggiungi uno o più <b>ingredienti</b>: ogni ingrediente è una misura calcolata per ognuno dei "
     "numeri (frequenza, ritardo, numeri successivi...). Il <b>peso</b> dice quanto conta: "
     "con peso negativo vengono favoriti i valori bassi (es. ritardo -1 = preferisci i numeri usciti da poco).<br>"
     "3. Con i <b>filtri</b> scegli quali numeri sono ammessi.<br>"
@@ -25,12 +25,14 @@ AIUTO = (
 
 
 class RigaIngrediente(QWidget):
-    def __init__(self, ing: pz.Ingrediente, rimuovi):
+    def __init__(self, ing: pz.Ingrediente, rimuovi, gioco=None):
         super().__init__()
+        from ..core.gioco import SE
+        self.g = gioco or SE
         h = QHBoxLayout(self)
         h.setContentsMargins(0, 0, 0, 0)
         self.c_misura = QComboBox()
-        for m in pz.MISURE.values():
+        for m in pz.misure_del_gioco(self.g).values():
             self.c_misura.addItem(m.nome, m.codice)
         self.c_misura.setCurrentIndex(max(self.c_misura.findData(ing.misura), 0))
         self.l_param = QLabel()
@@ -60,7 +62,8 @@ class RigaIngrediente(QWidget):
         self.s_param.setVisible(attivo)
         if attivo:
             self.l_param.setText(m.param_etichetta)
-            self.s_param.setRange(m.param_min, m.param_max)
+            massimo = {"posizione": self.g.k, "amici": self.g.n}.get(m.codice, m.param_max)
+            self.s_param.setRange(m.param_min, massimo)
             self.s_param.setValue(param if param else m.param_predefinito)
 
     def valore(self) -> pz.Ingrediente:
@@ -73,7 +76,7 @@ class FinestraCostruttore(QDialog):
         super().__init__(parent)
         self.arch = archivio
         self.ricette = pz.carica(archivio)
-        self.setWindowTitle("Costruttore di analisi personalizzate")
+        self.setWindowTitle(f"Costruttore di analisi personalizzate – {archivio.gioco.nome}")
         self.resize(1250, 760)
         div = QSplitter(self)
         lay = QVBoxLayout(self)
@@ -123,10 +126,11 @@ class FinestraCostruttore(QDialog):
         self.c_parita = QComboBox()
         self.c_parita.addItems(["Tutti", "Solo pari", "Solo dispari"])
         self.s_da = QSpinBox()
-        self.s_da.setRange(1, 90)
+        G = archivio.gioco
+        self.s_da.setRange(1, G.n)
         self.s_a = QSpinBox()
-        self.s_a.setRange(1, 90)
-        self.s_a.setValue(90)
+        self.s_a.setRange(1, G.n)
+        self.s_a.setValue(G.n)
         gf.addWidget(QLabel("Parità"), 0, 0)
         gf.addWidget(self.c_parita, 0, 1)
         gf.addWidget(QLabel("Numeri da"), 0, 2)
@@ -136,8 +140,8 @@ class FinestraCostruttore(QDialog):
         gf.addWidget(QLabel("Decine (nessuna = tutte)"), 1, 0)
         hd = QHBoxLayout()
         self.ck_decine = []
-        for d in range(1, 10):
-            c = QCheckBox(f"{(d - 1) * 10 + 1}-{d * 10}")
+        for d in range(1, G.decine + 1):
+            c = QCheckBox(f"{(d - 1) * 10 + 1}-{min(d * 10, G.n)}")
             self.ck_decine.append(c)
             hd.addWidget(c)
         gf.addLayout(hd, 1, 1, 1, 5)
@@ -180,8 +184,8 @@ class FinestraCostruttore(QDialog):
         dx = QWidget()
         dv = QVBoxLayout(dx)
         dv.addWidget(QLabel("<b>Anteprima del risultato</b>"))
-        self.griglia = Griglia90(selezionabile=False)
-        self.griglia.setFixedSize(330, 260)
+        self.griglia = Griglia90(selezionabile=False, n=G.n)
+        self.griglia.setFixedSize(330, 29 * G.decine)
         dv.addWidget(self.griglia)
         self.tab = QTableWidget()
         self.tab.verticalHeader().setVisible(False)
@@ -239,7 +243,7 @@ class FinestraCostruttore(QDialog):
 
     # ------------------------------------------------------------- editor
     def _aggiungi_ing(self, ing: pz.Ingrediente):
-        r = RigaIngrediente(ing, self._togli_ing)
+        r = RigaIngrediente(ing, self._togli_ing, self.arch.gioco)
         self.righe_ing.append(r)
         self.v_ing.insertWidget(self.v_ing.count() - 1, r)
 

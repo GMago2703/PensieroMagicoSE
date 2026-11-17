@@ -16,9 +16,11 @@ class Scaricatore(QThread):
     finito = Signal(list)
     errore = Signal(str)
 
-    def __init__(self, anni: list[int]):
+    def __init__(self, anni: list[int], gioco=None):
         super().__init__()
+        from ..core.gioco import SE
         self.anni = anni
+        self.gioco = gioco or SE
         self._stop = False
 
     def ferma(self):
@@ -27,7 +29,7 @@ class Scaricatore(QThread):
     def run(self):
         try:
             estr = internet.scarica_anni(self.anni, lambda m, i, n: self.avanzamento.emit(m, i, n),
-                                         lambda: self._stop)
+                                         lambda: self._stop, self.gioco)
             self.finito.emit(estr)
         except Exception as ex:  # errore di rete o di formato
             self.errore.emit(str(ex))
@@ -43,8 +45,8 @@ class FinestraInternet(QDialog):
         self.setWindowTitle("Aggiornamento da Internet")
         self.resize(560, 380)
         v = QVBoxLayout(self)
-        v.addWidget(QLabel(f"Fonte: archivio pubblico annuale di superenalotto.com\n"
-                           f"Estrazioni in archivio: {archivio.conta()}"))
+        v.addWidget(QLabel(f"{archivio.gioco.nome} – fonte: archivio pubblico annuale di "
+                           f"{internet.FONTE[archivio.gioco.codice]}\nEstrazioni in archivio: {archivio.conta()}"))
         self.barra = QProgressBar()
         v.addWidget(self.barra)
         self.log = QPlainTextEdit()
@@ -56,7 +58,7 @@ class FinestraInternet(QDialog):
         v.addWidget(self.c_avvio)
         h = QHBoxLayout()
         self.b_agg = QPushButton("🔄 Aggiorna (solo estrazioni mancanti)")
-        self.b_tutto = QPushButton("⬇ Scarica archivio completo (dal 1997)")
+        self.b_tutto = QPushButton(f"⬇ Scarica archivio completo (dal {archivio.gioco.prima_estrazione.year})")
         self.b_stop = QPushButton("Interrompi")
         self.b_chiudi = QPushButton("Chiudi")
         self.b_agg.clicked.connect(lambda: self.avvia(completo=False))
@@ -77,11 +79,11 @@ class FinestraInternet(QDialog):
         if self.thread and self.thread.isRunning():
             return
         ultima = None if completo else self.arch.ultima()
-        anni = internet.anni_da_aggiornare(ultima.data if ultima else None)
+        anni = internet.anni_da_aggiornare(ultima.data if ultima else None, self.arch.gioco)
         self._scrivi(f"Anni da controllare: {anni[0]}–{anni[-1]}" if len(anni) > 1 else f"Anno: {anni[0]}")
         self.barra.setRange(0, len(anni))
         self.barra.setValue(0)
-        self.thread = Scaricatore(anni)
+        self.thread = Scaricatore(anni, self.arch.gioco)
         self.thread.avanzamento.connect(self._avanza)
         self.thread.finito.connect(self._finito)
         self.thread.errore.connect(self._errore)

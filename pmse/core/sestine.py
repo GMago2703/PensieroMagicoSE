@@ -11,17 +11,18 @@ from datetime import date
 import numpy as np
 
 from .analisi import Storico, progressioni
+from .gioco import SE, Gioco, gioco_di
 
 
-def caratteristiche(s: list[int]) -> dict:
+def caratteristiche(s: list[int], g: Gioco = SE) -> dict:
     s = sorted(s)
-    decine = [0] * 9
+    decine = [0] * g.decine
     for n in s:
-        decine[min((n - 1) // 10, 8)] += 1
+        decine[(n - 1) // 10] += 1
     return {
         "somma": sum(s),
         "pari": sum(1 for n in s if n % 2 == 0),
-        "alti": sum(1 for n in s if n > 45),
+        "alti": sum(1 for n in s if n > g.soglia_alti),
         "consecutivi": sum(1 for x, y in zip(s, s[1:]) if y - x == 1),
         "decine_diverse": sum(1 for d in decine if d),
         "max_stessa_decina": max(decine),
@@ -33,9 +34,10 @@ def caratteristiche(s: list[int]) -> dict:
 class IndiceArchivio:
     def __init__(self, storico: Storico):
         self.storico = storico
+        self.gioco = gioco_di(storico)
         self.date: list[date] = [r[0] for r in storico]
         self.n = len(storico)
-        self.m = np.zeros((self.n, 91), dtype=np.int16)
+        self.m = np.zeros((self.n, self.gioco.n + 1), dtype=np.int16)
         self.jolly = np.zeros(self.n, dtype=np.int16)
         for i, r in enumerate(storico):
             self.m[i, r[1]] = 1
@@ -43,7 +45,7 @@ class IndiceArchivio:
         self.chiavi = {tuple(r[1]) for r in storico}
 
     def vettori(self, sestine: list[list[int]]) -> np.ndarray:
-        v = np.zeros((len(sestine), 91), dtype=np.int16)
+        v = np.zeros((len(sestine), self.gioco.n + 1), dtype=np.int16)
         for i, s in enumerate(sestine):
             v[i, s] = 1
         return v
@@ -57,8 +59,8 @@ class IndiceArchivio:
     def confronta(self, sestina: list[int]) -> "Confronto":
         s = sorted(sestina)
         p = self.punti([s])[0] if self.n else np.zeros(0, dtype=np.int16)
-        c = Confronto(sestina=s, caratteristiche=caratteristiche(s))
-        for k in range(7):
+        c = Confronto(sestina=s, caratteristiche=caratteristiche(s, self.gioco))
+        for k in range(self.gioco.k + 1):
             c.distribuzione[k] = int((p == k).sum())
         c.max_punti = int(p.max()) if self.n else 0
         if self.n:
@@ -67,8 +69,9 @@ class IndiceArchivio:
             tre = np.where(p >= 3)[0]
             c.ultima_almeno3 = self.date[tre[-1]] if len(tre) else None
             c.ritardo_almeno3 = int(self.n - 1 - tre[-1]) if len(tre) else self.n
-            cinque = np.where(p == 5)[0]
-            c.cinque_piu_jolly = int(sum(1 for i in cinque if self.jolly[i] in s))
+            if not self.gioco.is_ej:
+                cinque = np.where(p == 5)[0]
+                c.cinque_piu_jolly = int(sum(1 for i in cinque if self.jolly[i] in s))
         c.gia_uscita = tuple(s) in self.chiavi
         return c
 
@@ -106,12 +109,14 @@ class Criteri:
 
 def cerca(indice: IndiceArchivio, criteri: Criteri, quante: int = 10, seed: int | None = None,
           max_tentativi: int = 400_000, pesi: dict[int, float] | None = None) -> tuple[list[list[int]], int]:
-    """Genera sestine casuali (pesate se 'pesi' è dato) che rispettano i criteri.
-    Restituisce (sestine trovate, sestine provate)."""
+    """Genera combinazioni casuali (pesate se 'pesi' è dato) che rispettano i criteri.
+    Restituisce (combinazioni trovate, combinazioni provate)."""
+    g = indice.gioco
+    K = g.k
     rng = np.random.default_rng(seed)
     obblig = sorted(set(criteri.obbligatori))
-    pool = np.array(sorted(set(criteri.pool) - set(obblig)), dtype=np.int16)
-    da_scegliere = 6 - len(obblig)
+    pool = np.array(sorted(n for n in set(criteri.pool) - set(obblig) if 1 <= n <= g.n), dtype=np.int16)
+    da_scegliere = K - len(obblig)
     if da_scegliere < 0 or len(pool) < da_scegliere:
         return [], 0
     p = None
@@ -138,21 +143,21 @@ def cerca(indice: IndiceArchivio, criteri: Criteri, quante: int = 10, seed: int 
         provate += len(cand)
         somma = cand.sum(axis=1)
         pari = (cand % 2 == 0).sum(axis=1)
-        alti = (cand > 45).sum(axis=1)
+        alti = (cand > g.soglia_alti).sum(axis=1)
         cons = (np.diff(cand, axis=1) == 1).sum(axis=1)
         dec = (cand - 1) // 10
         max_dec = np.zeros(len(cand), dtype=np.int16)
-        for d in range(9):
+        for d in range(g.decine):
             max_dec = np.maximum(max_dec, (dec == d).sum(axis=1))
         ok = ((somma >= criteri.somma_min) & (somma <= criteri.somma_max)
               & (pari >= criteri.pari_min) & (pari <= criteri.pari_max)
               & (alti >= criteri.alti_min) & (alti <= criteri.alti_max)
               & (cons <= criteri.consecutivi_max) & (max_dec <= criteri.max_stessa_decina))
         cand = cand[ok]
-        if len(cand) and indice.n and (criteri.max_punti_archivio < 6 or criteri.min_punti_archivio > 0
+        if len(cand) and indice.n and (criteri.max_punti_archivio < K or criteri.min_punti_archivio > 0
                                        or criteri.mai_uscita):
             pm = indice.punti([list(map(int, c)) for c in cand]).max(axis=1)
-            limite = min(criteri.max_punti_archivio, 5 if criteri.mai_uscita else 6)
+            limite = min(criteri.max_punti_archivio, K - 1 if criteri.mai_uscita else K)
             cand = cand[(pm <= limite) & (pm >= criteri.min_punti_archivio)]
         for c in cand:
             t = tuple(int(x) for x in c)

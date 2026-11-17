@@ -1,4 +1,12 @@
-# Pensiero Magico SE
+# Pensiero Magico SE / Pensiero Magico EJ
+
+Un unico eseguibile con due programmi, scelti dal menu in alto a sinistra:
+- **Pensiero Magico SE** – SuperEnalotto (6 numeri su 90, Jolly, SuperStar): Magico Pensiero propone 3 sestine + Jolly + SuperStar;
+- **Pensiero Magico EJ** – Eurojackpot (5 numeri su 50 + 2 Euronumeri da 1 a 12): Magico Pensiero propone 1 cinquina + 2 Euronumeri.
+
+I due programmi hanno menu, analisi e algoritmi identici (adattati al gioco) ma sono **rigidamente separati**: cartelle dati distinte (`%APPDATA%\PensieroMagicoSE` e `%APPDATA%\PensieroMagicoEJ`), archivi, impostazioni, analisi personalizzate, previsioni, apprendimento e chiave di Claude indipendenti. Un archivio è legato al suo gioco e non può essere aperto dall'altro.
+Fonte Internet EJ: archivio annuale di euro-jackpot.net (dal 23/03/2012; Euronumeri da 1 a 8 fino al 3/10/2014, da 1 a 10 fino al 18/3/2022, poi da 1 a 12).
+
 
 Applicazione per Windows che gestisce l'archivio delle estrazioni del SuperEnalotto, esegue analisi sullo storico e, nelle prossime fasi, produrrà con l'algoritmo **Magico Pensiero** 3 sestine con Jolly e SuperStar.
 

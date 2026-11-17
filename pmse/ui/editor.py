@@ -46,11 +46,11 @@ def _pulsante_quadrato(testo: str, simbolo: str, colore: str) -> QToolButton:
 
 
 class CasellaNumero(QLineEdit):
-    """Casella grande per un numero da 1 a 90 (vuota = 0)."""
+    """Casella grande per un numero (vuota = 0)."""
 
-    def __init__(self, larghezza: int = 62):
+    def __init__(self, larghezza: int = 62, massimo: int = 90):
         super().__init__()
-        self.setValidator(QIntValidator(0, 90, self))
+        self.setValidator(QIntValidator(0, massimo, self))
         self.setMaxLength(2)
         self.setAlignment(Qt.AlignCenter)
         self.setFixedSize(larghezza, 50)
@@ -67,8 +67,8 @@ class CasellaNumero(QLineEdit):
         self.setText(str(n) if n else "")
 
 
-def _casella_numero(larghezza: int = 62) -> CasellaNumero:
-    return CasellaNumero(larghezza)
+def _casella_numero(larghezza: int = 62, massimo: int = 90) -> CasellaNumero:
+    return CasellaNumero(larghezza, massimo)
 
 
 def _etichetta(testo: str, punti: int = 13) -> QLabel:
@@ -83,7 +83,7 @@ class EditorEstrazione(QDialog):
     def __init__(self, archivio: Archivio, data_iniziale: date | None = None, nuova: bool = False, parent=None):
         super().__init__(parent)
         self.arch = archivio
-        self.setWindowTitle("Aggiornamento Archivio")
+        self.setWindowTitle(f"Aggiornamento Archivio – {archivio.gioco.nome}")
         self.date = archivio.date_ordinate()
         self.indice = -1
         self.in_inserimento = False
@@ -158,17 +158,26 @@ class EditorEstrazione(QDialog):
         v.addWidget(_etichetta("Combinazione Vincente", 14))
         h = QHBoxLayout()
         h.setSpacing(6)
-        self.s_num = [_casella_numero() for _ in range(6)]
+        g = self.arch.gioco
+        self.s_num = [_casella_numero(massimo=g.n) for _ in range(g.k)]
         for s in self.s_num:
             h.addWidget(s)
-        self.s_jolly = _casella_numero()
-        self.s_ss = _casella_numero()
-        h.addSpacing(18)
-        h.addWidget(_etichetta("Jolly", 14))
-        h.addWidget(self.s_jolly)
-        h.addSpacing(18)
-        h.addWidget(_etichetta("SuperStar", 14))
-        h.addWidget(self.s_ss)
+        if g.is_ej:          # Eurojackpot: due Euronumeri
+            self.s_jolly = _casella_numero(massimo=12)
+            self.s_ss = _casella_numero(massimo=12)
+            h.addSpacing(18)
+            h.addWidget(_etichetta("Euronumeri", 14))
+            h.addWidget(self.s_jolly)
+            h.addWidget(self.s_ss)
+        else:
+            self.s_jolly = _casella_numero()
+            self.s_ss = _casella_numero()
+            h.addSpacing(18)
+            h.addWidget(_etichetta("Jolly", 14))
+            h.addWidget(self.s_jolly)
+            h.addSpacing(18)
+            h.addWidget(_etichetta("SuperStar", 14))
+            h.addWidget(self.s_ss)
         h.addStretch()
         v.addLayout(h)
 
@@ -228,7 +237,8 @@ class EditorEstrazione(QDialog):
         self.e_data.setDate(QDate(oggi.year, oggi.month, oggi.day))
         for s in self.s_num + [self.s_jolly, self.s_ss]:
             s.setValue(0)
-        self.l_avvisi.setText("Nuova estrazione: inserisci data, 6 numeri, Jolly e SuperStar, poi premi Ok."
+        self.l_avvisi.setText(("Nuova estrazione: inserisci data, 5 numeri e i 2 Euronumeri, poi premi Ok." if self.arch.gioco.is_ej
+                               else "Nuova estrazione: inserisci data, 6 numeri, Jolly e SuperStar, poi premi Ok.")
                               + (f"  (Ultima in archivio: {ultima.data:%d/%m/%Y})" if ultima else ""))
         self.s_num[0].setFocus()
         self._aggiorna_pulsanti()
@@ -247,6 +257,7 @@ class EditorEstrazione(QDialog):
             numeri=[s.value() for s in self.s_num],
             jolly=self.s_jolly.value() or None,
             superstar=self.s_ss.value() or None,
+            gioco=self.arch.gioco,
             fonte="manuale",
         )
         if self.corrente is not None:      # conserva eventuali dati non mostrati

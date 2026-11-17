@@ -13,7 +13,20 @@ from .analisi import riempi_tabella
 
 
 def carica_impostazioni(arch: Archivio) -> magico.Impostazioni:
-    return magico.Impostazioni.da_json(arch.leggi_impostazione(magico.CHIAVE_IMP))
+    return magico.Impostazioni.da_json(arch.leggi_impostazione(magico.CHIAVE_IMP), arch.gioco)
+
+
+def descrizione_algoritmo(g) -> str:
+    testo = magico.__doc__.split("Il risultato")[0].strip()
+    if g.is_ej:
+        testo = (testo.replace("le 3 sestine con voto più alto, con al massimo 2 numeri in comune\n   tra loro. "
+                               "Jolly = miglior numero rimasto fuori dalla 1ª sestina. SuperStar =\n   stessa "
+                               "logica (eco, tendenza, maturità) applicata alla serie dei SuperStar.",
+                               "la cinquina con voto più alto. Euronumeri = i 2 con punteggio più alto\n   "
+                               "secondo eco, tendenza e maturità applicate alla serie degli Euronumeri\n   "
+                               "(formula attuale 1-12).")
+                 .replace("sestine", "cinquine").replace("sestina", "cinquina"))
+    return testo
 
 
 def punteggi_personalizzati(arch: Archivio, imp: magico.Impostazioni, storico) -> dict[str, dict[int, float]]:
@@ -37,7 +50,7 @@ class FinestraImpostazioni(QDialog):
         self.setWindowTitle("Magico Pensiero – impostazioni dell'algoritmo")
         imp = carica_impostazioni(arch)
         v = QVBoxLayout(self)
-        spieg = QLabel(magico.__doc__.split("Il risultato")[0].strip())
+        spieg = QLabel(descrizione_algoritmo(arch.gioco))
         spieg.setWordWrap(True)
         spieg.setStyleSheet("background:#f3e5f5; padding:6px; font-size:11px;")
         v.addWidget(spieg)
@@ -77,8 +90,10 @@ class FinestraImpostazioni(QDialog):
         self.s_com.setValue(imp.max_comuni)
         f2.addRow("Tendenza: ultime N estrazioni", self.s_tend)
         f2.addRow("Eco: quante estrazioni precedenti", self.s_eco)
-        f2.addRow("Nitidezza (più alta = sestine più concentrate sui numeri migliori)", self.s_nit)
-        f2.addRow("Numeri in comune ammessi tra le 3 sestine", self.s_com)
+        f2.addRow(f"Nitidezza (più alta = {arch.gioco.nome_comb_pl} più concentrate sui numeri migliori)",
+                  self.s_nit)
+        if not arch.gioco.is_ej:
+            f2.addRow("Numeri in comune ammessi tra le 3 sestine", self.s_com)
         v.addWidget(g2)
 
         g3 = QGroupBox("Somiglianza con l'archivio (numeri in comune con le estrazioni passate)")
@@ -120,8 +135,10 @@ class FinestraImpostazioni(QDialog):
 
     def _imp_limiti(self) -> magico.Impostazioni:
         i = self.c_lim.currentIndex()
-        return magico.Impostazioni(limite_archivio=0 if i == 0 else i + 2, soglia_archivio=self.s_soglia.value(),
-                                   finestra_archivio=self.s_fin.value())
+        imp = magico.Impostazioni.predefinite(self.arch.gioco)
+        imp.limite_archivio = 0 if i == 0 else i + 2
+        imp.soglia_archivio, imp.finestra_archivio = self.s_soglia.value(), self.s_fin.value()
+        return imp
 
     def _anteprima_limiti(self, *_):
         storico = self.arch.sestine()
@@ -129,12 +146,12 @@ class FinestraImpostazioni(QDialog):
             self.l_lim.setText("Archivio troppo piccolo per calcolare i limiti.")
             return
         lo, hi = magico.limiti_archivio(storico, self._imp_limiti())
-        self.l_lim.setText(f"Con queste impostazioni ogni sestina dovrà avere, con QUALSIASI estrazione passata, "
+        self.l_lim.setText(f"Con queste impostazioni ogni {self.arch.gioco.nome_comb} dovrà avere, con QUALSIASI estrazione passata, "
                            f"al massimo <b>{hi}</b> numeri in comune, e con almeno una estrazione <b>{lo}</b> o più. "
                            "(Dettagli: menu Analisi → Somiglianza con l'archivio)")
 
     def _predefiniti(self):
-        imp = magico.Impostazioni()
+        imp = magico.Impostazioni.predefinite(self.arch.gioco)
         for k, s in self.pesi.items():
             s.setValue(imp.pesi[k])
         for s in self.pers.values():
@@ -165,18 +182,26 @@ class FinestraImpostazioni(QDialog):
 class FinestraSpiegazione(QDialog):
     def __init__(self, r: magico.RisultatoMagico, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Magico Pensiero – come sono nate le sestine")
+        from ..core.gioco import GIOCHI
+        g = GIOCHI.get(r.gioco)
+        self.setWindowTitle(f"Magico Pensiero {g.nome} – come sono nate le {g.nome_comb_pl}")
         self.resize(950, 620)
         v = QVBoxLayout(self)
         testo = [f"Calcolo eseguito su {r.estrazioni_usate} estrazioni, fino al concorso del "
                  f"{r.basata_su:%d/%m/%Y}." if r.basata_su else ""]
         for i, s in enumerate(r.sestine, 1):
             det = ", ".join(f"{k} {v:.2f}" for k, v in s.dettaglio.items())
-            testo.append(f"Sestina {i}: {' '.join(map(str, s.numeri))}  — voto {s.voto:.3f} ({det})")
-        testo.append(f"Jolly: {r.jolly} (miglior numero fuori dalla 1ª sestina)    SuperStar: {r.superstar or '-'}")
+            testo.append(f"{g.C()} {i}: {' '.join(map(str, s.numeri))}  — voto {s.voto:.3f} ({det})")
+        if g.is_ej:
+            testo.append(f"Euronumeri: {r.jolly} e {r.superstar} (i 2 con punteggio più alto: eco, tendenza e "
+                         "maturità sulla serie degli Euronumeri)")
+        else:
+            testo.append(f"Jolly: {r.jolly} (miglior numero fuori dalla 1ª sestina)    "
+                         f"SuperStar: {r.superstar or '-'}")
         lo, hi = r.limiti_archivio
-        testo.append(f"Somiglianza con l'archivio: ogni sestina ha al massimo {hi} numeri in comune con qualsiasi "
-                     f"estrazione passata (e almeno {lo} con una di esse), come le combinazioni vincenti reali.")
+        testo.append(f"Somiglianza con l'archivio: ogni {g.nome_comb} ha al massimo {hi} numeri in comune con "
+                     f"qualsiasi estrazione passata (e almeno {lo} con una di esse), come le combinazioni vincenti "
+                     "reali.")
         l = QLabel("\n".join(testo))
         l.setWordWrap(True)
         v.addWidget(l)
@@ -184,7 +209,7 @@ class FinestraSpiegazione(QDialog):
         tab.verticalHeader().setVisible(False)
         voci = list(r.voci.keys())
         nomi = [magico.VOCI.get(k, k) for k in voci]
-        righe = sorted(([n, *[r.voci[k][n] for k in voci], r.punteggi[n]] for n in range(1, 91)),
+        righe = sorted(([n, *[r.voci[k][n] for k in voci], r.punteggi[n]] for n in range(1, g.n + 1)),
                        key=lambda x: -x[-1])
         riempi_tabella(tab, ["Numero", *nomi, "Punteggio finale"], righe, [[x[0]] for x in righe])
         v.addWidget(tab, 1)
@@ -210,12 +235,15 @@ class FinestraVerifica(QDialog):
         super().__init__(parent)
         self.arch = arch
         self.thread = None
-        self.setWindowTitle("Magico Pensiero – verifica storica")
+        g = arch.gioco
+        self.setWindowTitle(f"Magico Pensiero {g.nome} – verifica storica")
         self.resize(900, 640)
         v = QVBoxLayout(self)
+        cosa = "della cinquina con quelli di una cinquina scelta a caso" if g.is_ej else \
+            "delle 3 sestine con quelli di 3 sestine scelte a caso"
         v.addWidget(QLabel(
             "Rifà il calcolo «come se» fossimo prima di ognuno degli ultimi N concorsi (usando solo le estrazioni "
-            "precedenti) e confronta i punti delle 3 sestine con quelli di 3 sestine scelte a caso."))
+            f"precedenti) e confronta i punti {cosa}."))
         h = QHBoxLayout()
         h.addWidget(QLabel("Ultimi concorsi da provare:"))
         self.s_n = QSpinBox()
@@ -256,8 +284,11 @@ class FinestraVerifica(QDialog):
         righe = [[d.strftime("%d/%m/%Y"), " ".join(map(str, estr)),
                   *[" ".join(map(str, s)) for s in sest], *punti, max(punti)]
                  for d, sest, estr, punti in reversed(es.dettagli)]
-        riempi_tabella(self.tab, ["Concorso del", "Estratti", "Sestina 1", "Sestina 2", "Sestina 3",
-                                  "Punti 1", "Punti 2", "Punti 3", "Migliore"], righe)
+        g = self.arch.gioco
+        C = g.combinazioni_magico
+        nomi = [g.C()] if C == 1 else [f"{g.C()} {i}" for i in range(1, C + 1)]
+        punti = ["Punti"] if C == 1 else [f"Punti {i}" for i in range(1, C + 1)]
+        riempi_tabella(self.tab, ["Concorso del", "Estratti", *nomi, *punti, "Migliore"], righe)
 
     def closeEvent(self, ev):
         if self.thread and self.thread.isRunning():
@@ -269,11 +300,14 @@ class FinestraVerifica(QDialog):
 class FinestraStorico(QDialog):
     def __init__(self, arch: Archivio, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Magico Pensiero – storico delle previsioni")
+        g = arch.gioco
+        C = g.combinazioni_magico
+        self.setWindowTitle(f"Magico Pensiero {g.nome} – storico delle previsioni")
         self.resize(1050, 500)
         v = QVBoxLayout(self)
-        v.addWidget(QLabel("Ogni volta che generi le sestine vengono salvate qui (una per concorso). "
-                           "Appena l'estrazione successiva entra in archivio vengono confrontate in automatico."))
+        v.addWidget(QLabel(f"Ogni volta che generi le {g.nome_comb_pl} vengono salvate qui (una per concorso e "
+                           "per origine). Appena l'estrazione successiva entra in archivio vengono confrontate in "
+                           "automatico."))
         tab = QTableWidget()
         tab.verticalHeader().setVisible(False)
         date_arch = arch.date_ordinate()
@@ -285,17 +319,29 @@ class FinestraStorico(QDialog):
             sest = p["sestine"]
             if e:
                 punti = [len(set(e.numeri) & set(s)) for s in sest]
-                esito = [f"{e.data:%d/%m/%Y}: {' '.join(map(str, e.sestina))} J{e.jolly} SS{e.superstar or '-'}",
-                         *punti, "sì" if p["jolly"] in e.numeri else "no",
-                         "sì" if p.get("superstar") and p["superstar"] == e.superstar else "no"]
+                if g.is_ej:
+                    presi = len({p["jolly"], p.get("superstar")} & {e.jolly, e.superstar})
+                    esito = [f"{e.data:%d/%m/%Y}: {' '.join(map(str, e.sestina))} Euro {e.jolly} {e.superstar}",
+                             *punti, presi]
+                else:
+                    esito = [f"{e.data:%d/%m/%Y}: {' '.join(map(str, e.sestina))} J{e.jolly} "
+                             f"SS{e.superstar or '-'}", *punti, "sì" if p["jolly"] in e.numeri else "no",
+                             "sì" if p.get("superstar") and p["superstar"] == e.superstar else "no"]
             else:
-                esito = ["in attesa dell'estrazione", "", "", "", "", ""]
+                esito = ["in attesa dell'estrazione"] + [""] * (C + (1 if g.is_ej else 2))
+            speciali = [f"{p['jolly']} {p.get('superstar')}"] if g.is_ej else [p["jolly"], p.get("superstar") or "-"]
             righe.append([p.get("origine", "Algoritmo"), p.get("generata", ""),
                           dopo.strftime("%d/%m/%Y") if dopo else "",
-                          *[" ".join(map(str, s)) for s in sest], p["jolly"], p.get("superstar") or "-", *esito])
-        riempi_tabella(tab, ["Origine", "Generata il", "Dopo il concorso del", "Sestina 1", "Sestina 2", "Sestina 3",
-                             "Jolly", "SuperStar", "Estrazione successiva", "Punti 1", "Punti 2", "Punti 3",
-                             "Jolly tra i 6", "SuperStar preso"], righe)
+                          *[" ".join(map(str, s)) for s in sest], *speciali, *esito])
+        nomi = [g.C()] if C == 1 else [f"{g.C()} {i}" for i in range(1, C + 1)]
+        punti_col = ["Punti"] if C == 1 else [f"Punti {i}" for i in range(1, C + 1)]
+        if g.is_ej:
+            colonne = ["Origine", "Generata il", "Dopo il concorso del", *nomi, "Euronumeri",
+                       "Estrazione successiva", *punti_col, "Euronumeri presi"]
+        else:
+            colonne = ["Origine", "Generata il", "Dopo il concorso del", *nomi, "Jolly", "SuperStar",
+                       "Estrazione successiva", *punti_col, "Jolly tra i 6", "SuperStar preso"]
+        riempi_tabella(tab, colonne, righe)
         v.addWidget(tab, 1)
 
 
@@ -323,7 +369,7 @@ class FinestraApprendimento(QDialog):
         from PySide6.QtWidgets import QCheckBox, QSplitter
         self.arch = arch
         self.thread = None
-        self.setWindowTitle("Magico Pensiero – analisi delle previsioni e apprendimento")
+        self.setWindowTitle(f"Magico Pensiero {arch.gioco.nome} – analisi delle previsioni e apprendimento")
         self.resize(1200, 760)
         v = QVBoxLayout(self)
         if nuove:
@@ -412,7 +458,7 @@ class FinestraApprendimento(QDialog):
             self.tab.selectRow(0)
         else:
             self.testo.setPlainText("Nessuna estrazione valutata finora.\n\nDa oggi in poi, ogni volta che una "
-                                    "nuova estrazione entra in archivio, il programma la confronta con le sestine "
+                                    "nuova estrazione entra in archivio, il programma la confronta con le combinazioni "
                                     "generate e corregge l'algoritmo. Puoi anche allenarlo subito sul passato con il "
                                     "pulsante «Allena».")
         imp = carica_impostazioni(self.arch)
@@ -466,7 +512,7 @@ class FinestraApprendimento(QDialog):
                                                 "(I pesi di base restano quelli impostati.)") != QMessageBox.Yes:
             return
         imp = carica_impostazioni(self.arch)
-        base = magico.Impostazioni()
+        base = magico.Impostazioni.predefinite(self.arch.gioco)
         imp.stat_voci, imp.stat_filtri = {}, {}
         for campo in ("pari_min", "pari_max", "alti_min", "alti_max", "consecutivi_max", "somma_percentile",
                       "max_stessa_decina"):

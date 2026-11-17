@@ -202,3 +202,109 @@ def test_nuove_finestre(app, arch):
     app.processEvents()
     st.close()
     w.close()
+
+
+def test_pensiero_magico_ej(app, tmp_path):
+    """Pensiero Magico EJ: finestre adattate all'Eurojackpot e selettore in alto a sinistra."""
+    from unittest import mock
+
+    from test_ej import storico_ej
+
+    from pmse.core.db import Archivio
+    from pmse.core.gioco import EJ
+    from pmse.core import personalizzate as pz
+    from pmse.ui import finestra as fin
+    from pmse.ui.analisi import FinestraAnalisi
+    from pmse.ui.archivio import FinestraArchivio
+    from pmse.ui.claude import FinestraClaude
+    from pmse.ui.costruttore import FinestraCostruttore
+    from pmse.ui.editor import EditorEstrazione
+    from pmse.ui.importa import FinestraImporta
+    from pmse.ui.internet import FinestraInternet
+    from pmse.ui.magico import (FinestraApprendimento, FinestraImpostazioni, FinestraSpiegazione, FinestraStorico,
+                                FinestraVerifica)
+    from pmse.ui.sestine import FinestraSestine
+
+    arch = Archivio(tmp_path / "ej.db", gioco=EJ)
+    arch.unisci(storico_ej(400))
+    pz.salva_tutte(arch, [pz.esempio()])
+    w = fin.FinestraPrincipale(arch, avvio_automatico=False)
+    w.show()
+    assert w.selettore.text().startswith("🍀 Pensiero Magico EJ") or "Pensiero Magico EJ" in w.selettore.text()
+    assert len(w.p_sx.griglia.celle) == 50 and len(w.griglia_euro.celle) == 12
+    w.genera()
+    r = w.ultimo_magico
+    assert len(r.sestine) == 1 and len(r.sestine[0].numeri) == 5 and r.superstar <= 12
+    app.processEvents()
+    foto("ej_home", w)
+
+    ed = EditorEstrazione(arch, parent=w)
+    ed.show()
+    assert len(ed.s_num) == 5
+    e = ed._leggi()
+    assert e.gioco is EJ
+    app.processEvents()
+    foto("ej_aggiornamento_archivio", ed)
+    ed.close()
+    a = FinestraArchivio(arch, w)
+    a.show()
+    a.s_num.setValue(7)
+    app.processEvents()
+    foto("ej_archivio", a)
+    a.close()
+    for codice in pz.tutte_le_analisi(arch):
+        f = FinestraAnalisi(arch, codice, w)
+        f.show()
+        f.tab.selectRow(0)
+        app.processEvents()
+        if codice in ("euronumeri", "posizioni"):
+            foto("ej_analisi_" + codice, f)
+        f.close()
+    c = FinestraCostruttore(arch, w)
+    c.show()
+    assert len(c.ck_decine) == 5
+    c.close()
+    s = FinestraSestine(arch, [3, 14, 27, 38, 49], w)
+    s.show()
+    s._aggiungi_home()
+    s.schede.setCurrentIndex(1)
+    s.cerca()
+    assert s.tab_r.rowCount() == 10
+    app.processEvents()
+    foto("ej_cerca", s)
+    s.close()
+    FinestraImporta(arch, w).close()
+    FinestraInternet(arch, parent=w).close()
+    imp = FinestraImpostazioni(arch, w)
+    imp.show()
+    app.processEvents()
+    foto("ej_impostazioni", imp)
+    imp.close()
+    FinestraSpiegazione(r, w).close()
+    v = FinestraVerifica(arch, w)
+    v.s_n.setValue(30)
+    v.avvia()
+    v.thread.wait(60000)
+    app.processEvents()
+    foto("ej_verifica", v)
+    v.close()
+    cl = FinestraClaude(arch, w)
+    cl.show()
+    assert cl._prepara()
+    from pmse.core import claude_ai
+    rc = claude_ai.RispostaClaude([[3, 14, 27, 38, 49]], 4, 11, ["Motivazione di prova"], "Prova euro",
+                                  "Analisi di prova.", "", "", "claude-opus-5-5", 3000, 500)
+    cl._risposta(rc)
+    with mock.patch("pmse.ui.claude.QMessageBox.information"):
+        cl._applica()
+    app.processEvents()
+    foto("ej_claude", cl)
+    cl.close()
+    FinestraStorico(arch, w).close()
+    FinestraApprendimento(arch, parent=w).close()
+
+    # selettore: scegliendo SE si apre l'altro programma e questa finestra si chiude
+    with mock.patch.object(fin, "apri_programma") as apri:
+        w.cambia_programma("SE")
+        apri.assert_called_once_with("SE")
+    w.close()

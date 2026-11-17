@@ -15,22 +15,30 @@ from .analisi import numeri_selezionati, riempi_tabella
 from .griglia import Griglia90
 
 CHIAVE = "mie_sestine"
-COLONNE = ["Sestina", "Già uscita", "Max punti", "Volte 2", "Volte 3", "Volte 4", "Volte 5", "5+Jolly",
-           "Ultima volta ≥3", "Estrazioni da ≥3", "Somma", "Pari", "Alti", "Consecutivi", "Decine", "Sequenze"]
 
 
-def leggi_sestina(testo: str) -> list[int] | None:
+def colonne(g) -> list[str]:
+    volte = [f"Volte {p}" for p in range(2, g.k)]
+    extra = [] if g.is_ej else ["5+Jolly"]
+    return [g.C(), "Già uscita", "Max punti", *volte, *extra, "Ultima volta ≥3", "Estrazioni da ≥3", "Somma",
+            "Pari", "Alti", "Consecutivi", "Decine", "Sequenze"]
+
+
+def leggi_sestina(testo: str, g=None) -> list[int] | None:
+    from ..core.gioco import SE
+    g = g or SE
     nums = [int(x) for x in re.findall(r"\d+", testo)]
-    if len(nums) != 6 or len(set(nums)) != 6 or any(n < 1 or n > 90 for n in nums):
+    if len(nums) != g.k or len(set(nums)) != g.k or any(n < 1 or n > g.n for n in nums):
         return None
     return sorted(nums)
 
 
-def riga_confronto(c: cs.Confronto) -> list:
+def riga_confronto(c: cs.Confronto, g=None) -> list:
+    from ..core.gioco import SE
+    g = g or SE
     k = c.caratteristiche
     return [" ".join(f"{n:2d}" for n in c.sestina), "SÌ" if c.gia_uscita else "no", c.max_punti,
-            c.distribuzione.get(2, 0), c.distribuzione.get(3, 0), c.distribuzione.get(4, 0),
-            c.distribuzione.get(5, 0), c.cinque_piu_jolly,
+            *[c.distribuzione.get(p, 0) for p in range(2, g.k)], *([] if g.is_ej else [c.cinque_piu_jolly]),
             c.ultima_almeno3.strftime("%d/%m/%Y") if c.ultima_almeno3 else "mai", c.ritardo_almeno3,
             k["somma"], k["pari"], k["alti"], k["consecutivi"], k["decine_diverse"], k["sequenze"]]
 
@@ -40,22 +48,24 @@ class FinestraSestine(QDialog):
         super().__init__(parent)
         self.arch = archivio
         self.selezione_home = sorted(selezione_home or [])
-        self.setWindowTitle("Le mie sestine – confronto e ricerca")
+        self.g = g = archivio.gioco
+        self.COLONNE = colonne(g)
+        self.setWindowTitle(f"Le mie {g.nome_comb_pl} ({g.nome}) – confronto e ricerca")
         self.resize(1250, 720)
         self.indice = cs.IndiceArchivio(archivio.sestine())
         v = QVBoxLayout(self)
         div = QSplitter()
         v.addWidget(div)
         self.schede = QTabWidget()
-        self.schede.addTab(self._scheda_confronto(), "Confronta le mie sestine con l'archivio")
-        self.schede.addTab(self._scheda_ricerca(), "Cerca sestine con caratteristiche")
+        self.schede.addTab(self._scheda_confronto(), f"Confronta le mie {g.nome_comb_pl} con l'archivio")
+        self.schede.addTab(self._scheda_ricerca(), f"Cerca {g.nome_comb_pl} con caratteristiche")
         div.addWidget(self.schede)
         dx = QWidget()
         dv = QVBoxLayout(dx)
-        self.griglia = Griglia90(selezionabile=False)
-        self.griglia.setFixedSize(330, 260)
+        self.griglia = Griglia90(selezionabile=False, n=g.n)
+        self.griglia.setFixedSize(330, 29 * g.decine)
         dv.addWidget(self.griglia)
-        self.l_dett = QLabel("Fai clic su una sestina per vederne i dettagli.")
+        self.l_dett = QLabel(f"Fai clic su una {g.nome_comb} per vederne i dettagli.")
         self.l_dett.setWordWrap(True)
         self.l_dett.setTextInteractionFlags(Qt.TextSelectableByMouse)
         dv.addWidget(self.l_dett)
@@ -70,7 +80,8 @@ class FinestraSestine(QDialog):
         v = QVBoxLayout(w)
         h = QHBoxLayout()
         self.e_nuova = QLineEdit()
-        self.e_nuova.setPlaceholderText("Scrivi 6 numeri, es. 5 18 27 44 63 81")
+        self.e_nuova.setPlaceholderText("Scrivi 5 numeri, es. 5 18 27 44 49" if self.g.is_ej
+                                        else "Scrivi 6 numeri, es. 5 18 27 44 63 81")
         self.e_nuova.returnPressed.connect(self._aggiungi_testo)
         h.addWidget(self.e_nuova, 1)
         for testo, f in (("➕ Aggiungi", self._aggiungi_testo),
@@ -132,28 +143,30 @@ class FinestraSestine(QDialog):
         return aggiunte
 
     def _aggiungi_testo(self):
-        s = leggi_sestina(self.e_nuova.text())
+        s = leggi_sestina(self.e_nuova.text(), self.g)
         if not s:
-            QMessageBox.warning(self, "Sestina", "Servono 6 numeri diversi da 1 a 90.")
+            QMessageBox.warning(self, self.g.C(), f"Servono {self.g.k} numeri diversi da 1 a {self.g.n}.")
             return
         self.aggiungi([s])
         self.e_nuova.clear()
 
     def _aggiungi_home(self):
-        if len(self.selezione_home) != 6:
-            QMessageBox.information(self, "Sestina", "Seleziona esattamente 6 numeri nella tabella della home "
+        if len(self.selezione_home) != self.g.k:
+            QMessageBox.information(self, self.g.C(), f"Seleziona esattamente {self.g.k} numeri nella tabella "
+                                                       "della home "
                                                      f"(ora ne sono selezionati {len(self.selezione_home)}).")
             return
         self.aggiungi([self.selezione_home])
 
     def _da_file(self):
-        p, _ = QFileDialog.getOpenFileName(self, "File di sestine (una per riga)", "", "Testo (*.txt *.csv)")
+        p, _ = QFileDialog.getOpenFileName(self, f"File di {self.g.nome_comb_pl} (una per riga)", "",
+                                           "Testo (*.txt *.csv)")
         if not p:
             return
         with open(p, encoding="utf-8", errors="replace") as f:
-            nuove = [s for s in (leggi_sestina(r) for r in f) if s]
+            nuove = [s for s in (leggi_sestina(r, self.g) for r in f) if s]
         n = self.aggiungi(nuove)
-        QMessageBox.information(self, "Importazione", f"Sestine aggiunte: {n}")
+        QMessageBox.information(self, "Importazione", f"{self.g.C(plurale=True)} aggiunte: {n}")
 
     def _togli(self):
         righe = sorted({i.row() for i in self.lista.selectedIndexes()}, reverse=True)
@@ -164,7 +177,7 @@ class FinestraSestine(QDialog):
         self.confronta()
 
     def _svuota(self):
-        if self.mie and QMessageBox.question(self, "Svuota", "Togliere tutte le sestine dall'elenco?") \
+        if self.mie and QMessageBox.question(self, "Svuota", f"Togliere tutte le {self.g.nome_comb_pl} dall'elenco?") \
                 == QMessageBox.Yes:
             self.mie = []
             self._salva()
@@ -182,7 +195,8 @@ class FinestraSestine(QDialog):
     def confronta(self):
         conf = [self.indice.confronta(s) for s in self.mie]
         self.confronti = {tuple(c.sestina): c for c in conf}
-        riempi_tabella(self.tab_c, COLONNE, [riga_confronto(c) for c in conf], [c.sestina for c in conf])
+        riempi_tabella(self.tab_c, self.COLONNE, [riga_confronto(c, self.g) for c in conf],
+                       [c.sestina for c in conf])
 
     def _dettaglio(self, tab):
         nums = numeri_selezionati(tab)
@@ -191,7 +205,7 @@ class FinestraSestine(QDialog):
         self.griglia.evidenzia(nums)
         righe = {i.row() for i in tab.selectedItems()}
         if len(righe) != 1:
-            self.l_dett.setText(f"{len(righe)} sestine selezionate.")
+            self.l_dett.setText(f"{len(righe)} {self.g.nome_comb_pl} selezionate.")
             return
         s = sorted(tab.item(next(iter(righe)), 0).data(Qt.UserRole + 1))
         c = self.confronti.get(tuple(s)) or self.indice.confronta(s)
@@ -199,7 +213,7 @@ class FinestraSestine(QDialog):
         date_max = ", ".join(d.strftime("%d/%m/%Y") for d in c.date_max) or "-"
         self.l_dett.setText(
             f"<b>{' '.join(map(str, c.sestina))}</b><br>"
-            f"{'<b>GIÀ USCITA come sestina vincente!</b><br>' if c.gia_uscita else ''}"
+            f"{'<b>GIÀ USCITA come combinazione vincente!</b><br>' if c.gia_uscita else ''}"
             f"Massimo {c.max_punti} numeri in comune con un'estrazione (ultime volte: {date_max})<br>"
             f"Distribuzione punti sull'archivio: " +
             ", ".join(f"{p}: {c.distribuzione.get(p, 0)}" for p in range(7)) + "<br>"
@@ -220,21 +234,23 @@ class FinestraSestine(QDialog):
             return s
 
         self.c_pool = QComboBox()
-        self.c_pool.addItems(["Tutti i 90 numeri", "Solo i numeri selezionati nella home"])
+        self.c_pool.addItems([f"Tutti i {self.g.n} numeri", "Solo i numeri selezionati nella home"])
         self.e_obbl = QLineEdit()
         self.e_obbl.setPlaceholderText("es. 7 44")
         self.e_escl = QLineEdit()
-        self.e_escl.setPlaceholderText("es. 13 90")
-        self.ck_mai = QCheckBox("Mai uscita come sestina vincente")
+        self.e_escl.setPlaceholderText("es. 13 40")
+        self.ck_mai = QCheckBox("Mai uscita come combinazione vincente")
         self.ck_mai.setChecked(True)
-        self.s_maxp = spin(0, 6, 3)
-        self.s_minp = spin(0, 6, 0)
-        self.s_smin, self.s_smax = spin(21, 519, 21), spin(21, 519, 519)
-        self.s_pmin, self.s_pmax = spin(0, 6, 0), spin(0, 6, 6)
-        self.s_amin, self.s_amax = spin(0, 6, 0), spin(0, 6, 6)
-        self.s_cons = spin(0, 5, 5)
-        self.s_dec = spin(1, 6, 6)
-        self.s_comuni = spin(0, 5, 3)
+        K, N = self.g.k, self.g.n
+        smin, smax = K * (K + 1) // 2, sum(range(N - K + 1, N + 1))
+        self.s_maxp = spin(0, K, 3)
+        self.s_minp = spin(0, K, 0)
+        self.s_smin, self.s_smax = spin(smin, smax, smin), spin(smin, smax, smax)
+        self.s_pmin, self.s_pmax = spin(0, K, 0), spin(0, K, K)
+        self.s_amin, self.s_amax = spin(0, K, 0), spin(0, K, K)
+        self.s_cons = spin(0, K - 1, K - 1)
+        self.s_dec = spin(1, K, K)
+        self.s_comuni = spin(0, K - 1, min(3, K - 1))
         self.s_quante = spin(1, 500, 10)
         self.c_pesi = QComboBox()
         self.c_pesi.addItem("Nessuno (tutti i numeri hanno la stessa probabilità)", None)
@@ -255,11 +271,11 @@ class FinestraSestine(QDialog):
                   ("Almeno questi numeri in comune con ALMENO UNA estrazione passata", self.s_minp, None),
                   ("Somma da / a", self.s_smin, self.s_smax),
                   ("Numeri pari da / a", self.s_pmin, self.s_pmax),
-                  ("Numeri alti (46-90) da / a", self.s_amin, self.s_amax),
+                  (f"Numeri alti ({self.g.soglia_alti + 1}-{self.g.n}) da / a", self.s_amin, self.s_amax),
                   ("Coppie consecutive al massimo", self.s_cons, None),
                   ("Numeri della stessa decina al massimo", self.s_dec, None),
-                  ("Numeri in comune tra le sestine trovate al massimo", self.s_comuni, None),
-                  ("Quante sestine trovare", self.s_quante, None)]
+                  (f"Numeri in comune tra le {self.g.nome_comb_pl} trovate al massimo", self.s_comuni, None),
+                  (f"Quante {self.g.nome_comb_pl} trovare", self.s_quante, None)]
         for etichetta, a, b in coppie:
             gl.addWidget(QLabel(etichetta), r, 0)
             gl.addWidget(a, r, 1)
@@ -272,7 +288,7 @@ class FinestraSestine(QDialog):
         h = QHBoxLayout()
         b = QPushButton("🔎 Cerca")
         b.clicked.connect(self.cerca)
-        b2 = QPushButton("➕ Aggiungi le selezionate alle mie sestine")
+        b2 = QPushButton(f"➕ Aggiungi le selezionate alle mie {self.g.nome_comb_pl}")
         b2.clicked.connect(self._aggiungi_trovate)
         h.addWidget(b)
         h.addWidget(b2)
@@ -296,11 +312,11 @@ class FinestraSestine(QDialog):
         self.l_esito.setText(f"Limiti consigliati: da {lo} a {hi} numeri in comune con l'archivio.")
 
     def cerca(self):
-        nums = lambda t: [int(x) for x in re.findall(r"\d+", t) if 1 <= int(x) <= 90]   # noqa: E731
-        pool = self.selezione_home if self.c_pool.currentIndex() == 1 else list(range(1, 91))
+        nums = lambda t: [int(x) for x in re.findall(r"\d+", t) if 1 <= int(x) <= self.g.n]   # noqa: E731
+        pool = self.selezione_home if self.c_pool.currentIndex() == 1 else list(range(1, self.g.n + 1))
         pool = [n for n in pool if n not in set(nums(self.e_escl.text()))]
-        if len(set(pool) | set(nums(self.e_obbl.text()))) < 6:
-            QMessageBox.warning(self, "Ricerca", "Servono almeno 6 numeri disponibili "
+        if len(set(pool) | set(nums(self.e_obbl.text()))) < self.g.k:
+            QMessageBox.warning(self, "Ricerca", f"Servono almeno {self.g.k} numeri disponibili "
                                                  "(seleziona più numeri nella home o togli esclusioni).")
             return
         crit = cs.Criteri(
@@ -323,8 +339,10 @@ class FinestraSestine(QDialog):
         trovate, provate = cs.cerca(self.indice, crit, self.s_quante.value(), pesi=pesi)
         conf = [self.indice.confronta(s) for s in trovate]
         self.confronti = {**getattr(self, "confronti", {}), **{tuple(c.sestina): c for c in conf}}
-        riempi_tabella(self.tab_r, COLONNE, [riga_confronto(c) for c in conf], [c.sestina for c in conf])
-        self.l_esito.setText(f"Trovate {len(trovate)} sestine su {provate:,} provate.".replace(",", ".")
+        riempi_tabella(self.tab_r, self.COLONNE, [riga_confronto(c, self.g) for c in conf],
+                       [c.sestina for c in conf])
+        self.l_esito.setText(f"Trovate {len(trovate)} {self.g.nome_comb_pl} su {provate:,} provate."
+                             .replace(",", ".")
                              + ("" if len(trovate) == self.s_quante.value() else
                                 "  Criteri molto restrittivi: prova ad allentarli."))
 
@@ -332,8 +350,9 @@ class FinestraSestine(QDialog):
         righe = {i.row() for i in self.tab_r.selectedItems()}
         nuove = [sorted(self.tab_r.item(r, 0).data(Qt.UserRole + 1)) for r in righe]
         if not nuove:
-            QMessageBox.information(self, "Aggiungi", "Seleziona prima una o più sestine nella tabella.")
+            QMessageBox.information(self, "Aggiungi", f"Seleziona prima una o più {self.g.nome_comb_pl} nella "
+                                                      "tabella.")
             return
         n = self.aggiungi(nuove)
         self.schede.setCurrentIndex(0)
-        QMessageBox.information(self, "Aggiungi", f"Sestine aggiunte: {n}")
+        QMessageBox.information(self, "Aggiungi", f"{self.g.C(plurale=True)} aggiunte: {n}")

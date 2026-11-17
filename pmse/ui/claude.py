@@ -17,21 +17,22 @@ INFO_CHIAVE = (
     "2) apri <b>platform.claude.com/settings/keys</b> → <b>Create key</b>, dai un nome, scegli la scadenza e "
     "<b>lega la chiave a un workspace</b> (es. Default) così non serve l'ID workspace; 3) copia la chiave "
     "(inizia con <b>sk-ant-</b>), incollala qui sotto e premi <b>Prova la chiave</b>. "
-    "La chiave resta salvata solo su questo computer.")
+    "La chiave resta salvata solo su questo computer, separatamente per Pensiero Magico SE ed EJ.")
 
 
 class Interrogatore(QThread):
     finito = Signal(object)
     errore = Signal(str)
 
-    def __init__(self, chiave, modello, dossier, gia_uscite, m, limiti, workspace=""):
+    def __init__(self, chiave, modello, dossier, gia_uscite, m, limiti, workspace="", gioco=None):
         super().__init__()
         self.args = (chiave, modello, dossier, gia_uscite, m, limiti)
         self.workspace = workspace
+        self.gioco = gioco
 
     def run(self):
         try:
-            self.finito.emit(claude_ai.chiedi_a_claude(*self.args, workspace=self.workspace))
+            self.finito.emit(claude_ai.chiedi_a_claude(*self.args, workspace=self.workspace, g=self.gioco))
         except claude_ai.ErroreClaude as ex:
             self.errore.emit(str(ex))
         except Exception as ex:   # qualunque imprevisto di rete o di formato
@@ -46,7 +47,7 @@ class FinestraClaude(QDialog):
         self.risposta: claude_ai.RispostaClaude | None = None
         self.base: magico.RisultatoMagico | None = None
         self.applicato = None
-        self.setWindowTitle("Magico Pensiero + Claude (intelligenza artificiale)")
+        self.setWindowTitle(f"Magico Pensiero {arch.gioco.nome} + Claude (intelligenza artificiale)")
         self.resize(1150, 760)
         v = QVBoxLayout(self)
 
@@ -83,7 +84,9 @@ class FinestraClaude(QDialog):
         v.addLayout(h)
 
         h2 = QHBoxLayout()
-        self.b_chiedi = QPushButton("🤖  Chiedi a Claude le 3 sestine")
+        g = arch.gioco
+        self.b_chiedi = QPushButton("🤖  Chiedi a Claude cinquina ed Euronumeri" if g.is_ej
+                                    else "🤖  Chiedi a Claude le 3 sestine")
         f = self.b_chiedi.font()
         f.setBold(True)
         f.setPointSize(11)
@@ -107,8 +110,8 @@ class FinestraClaude(QDialog):
 
         h3 = QHBoxLayout()
         sx = QVBoxLayout()
-        self.griglia = Griglia90(selezionabile=False)
-        self.griglia.setFixedSize(360, 290)
+        self.griglia = Griglia90(selezionabile=False, n=g.n)
+        self.griglia.setFixedSize(360, 32 * g.decine + 2)
         sx.addWidget(self.griglia)
         self.l_sestine = QLabel()
         self.l_sestine.setFont(QFont("Consolas", 11))
@@ -118,7 +121,7 @@ class FinestraClaude(QDialog):
         h3.addLayout(sx)
         self.testo = QTextBrowser()
         self.testo.setHtml("<p>Premi <b>Chiedi a Claude</b>: il programma calcola prima la proposta "
-                           "dell'algoritmo, poi invia il dossier a Claude, che sceglie le sestine definitive.</p>"
+                           f"dell'algoritmo, poi invia il dossier a Claude, che sceglie le {g.nome_comb_pl} definitive.</p>"
                            "<p>Suggerimento: esegui prima la <i>Verifica storica</i> (menu Magico Pensiero): il "
                            "suo esito viene incluso nel dossier e aiuta Claude a capire quali indicatori hanno "
                            "funzionato.</p>")
@@ -168,7 +171,7 @@ class FinestraClaude(QDialog):
         d.setWindowTitle("Dati inviati a Claude")
         d.resize(900, 700)
         lay = QVBoxLayout(d)
-        t = QPlainTextEdit(claude_ai.SISTEMA + "\n\n" + "=" * 80 + "\n\n" + dossier)
+        t = QPlainTextEdit(claude_ai.istruzioni(self.arch.gioco) + "\n\n" + "=" * 80 + "\n\n" + dossier)
         t.setReadOnly(True)
         t.setFont(QFont("Consolas", 9))
         lay.addWidget(t)
@@ -190,7 +193,8 @@ class FinestraClaude(QDialog):
         self.barra.setVisible(True)
         self.testo.setHtml("<p>Claude sta studiando l'archivio... (di solito meno di un minuto)</p>")
         self.thread = Interrogatore(chiave, self.c_modello.currentData(), dossier, self.gia_uscite,
-                                    self.matrice, self.base.limiti_archivio, self.e_ws.text().strip())
+                                    self.matrice, self.base.limiti_archivio, self.e_ws.text().strip(),
+                                    self.arch.gioco)
         self.thread.finito.connect(self._risposta)
         self.thread.errore.connect(self._errore)
         self.thread.start()
@@ -207,11 +211,18 @@ class FinestraClaude(QDialog):
         self._fine()
         self.risposta = rc
         self.b_applica.setEnabled(True)
-        self.griglia.mostra_sestine(rc.sestine, rc.jolly, rc.superstar)
-        righe = [f"<span style='color:{COLORI_SESTINE[i]}'>■</span> Sestina {i + 1}: "
-                 f"<b>{' '.join(f'{n:2d}' for n in s)}</b>" for i, s in enumerate(rc.sestine)]
-        righe.append(f"<span style='color:{COLORE_JOLLY}'>■</span> Jolly <b>{rc.jolly}</b> &nbsp; "
-                     f"<span style='color:#b8860b'>■</span> SuperStar <b>{rc.superstar}</b>")
+        g = self.arch.gioco
+        if g.is_ej:
+            self.griglia.mostra_sestine(rc.sestine, None, None)
+            righe = [f"<span style='color:{COLORI_SESTINE[0]}'>■</span> Cinquina: "
+                     f"<b>{' '.join(f'{n:2d}' for n in rc.sestine[0])}</b>",
+                     f"<span style='color:#1565c0'>■</span> Euronumeri <b>{rc.jolly} {rc.superstar}</b>"]
+        else:
+            self.griglia.mostra_sestine(rc.sestine, rc.jolly, rc.superstar)
+            righe = [f"<span style='color:{COLORI_SESTINE[i]}'>■</span> Sestina {i + 1}: "
+                     f"<b>{' '.join(f'{n:2d}' for n in s)}</b>" for i, s in enumerate(rc.sestine)]
+            righe.append(f"<span style='color:{COLORE_JOLLY}'>■</span> Jolly <b>{rc.jolly}</b> &nbsp; "
+                         f"<span style='color:#b8860b'>■</span> SuperStar <b>{rc.superstar}</b>")
         self.l_sestine.setText("<br>".join(righe))
         esc = lambda t: t.replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br>")   # noqa: E731
         html = [f"<h3>La scelta di Claude</h3>"]
@@ -219,8 +230,10 @@ class FinestraClaude(QDialog):
         for i, (s, m, k) in enumerate(zip(rc.sestine, rc.motivazioni + [""] * 3, comuni), 1):
             extra = f" <span style='color:#555'>(max {k} numeri in comune con l'archivio)</span>" if k is not None \
                 else ""
-            html.append(f"<p><b>Sestina {i}: {' '.join(map(str, s))}</b>{extra}<br>{esc(m)}</p>")
-        html.append(f"<p><b>Jolly {rc.jolly} e SuperStar {rc.superstar}</b><br>{esc(rc.jolly_superstar)}</p>")
+            html.append(f"<p><b>{g.C()} {i}: {' '.join(map(str, s))}</b>{extra}<br>{esc(m)}</p>")
+        titolo_spec = (f"Euronumeri {rc.jolly} e {rc.superstar}" if g.is_ej
+                       else f"Jolly {rc.jolly} e SuperStar {rc.superstar}")
+        html.append(f"<p><b>{titolo_spec}</b><br>{esc(rc.jolly_superstar)}</p>")
         html.append(f"<h4>Analisi</h4><p>{esc(rc.analisi)}</p>")
         html.append(f"<h4>Scartati</h4><p>{esc(rc.scartati)}</p>")
         html.append(f"<h4>Affidabilità</h4><p>{esc(rc.affidabilita)}</p>")
@@ -246,7 +259,7 @@ class FinestraClaude(QDialog):
         magico.salva_previsione(self.arch, r, origine=f"Claude ({self.risposta.modello})")
         self.applicato = r
         self.b_applica.setEnabled(False)
-        QMessageBox.information(self, "Claude", "Sestine di Claude mostrate in home e salvate nello storico "
+        QMessageBox.information(self, "Claude", "La scelta di Claude è mostrata in home e salvata nello storico "
                                                 "delle previsioni.")
 
     def closeEvent(self, ev):

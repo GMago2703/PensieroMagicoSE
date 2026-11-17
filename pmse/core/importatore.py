@@ -4,8 +4,10 @@ Il formato viene riconosciuto da solo, riga per riga:
 - la data può essere 18/07/2026, 18-07-2026, 18.07.2026, 2026-07-18, 20260718
   oppure "18 luglio 2026" (anche con il giorno della settimana davanti);
 - separatori ammessi: ; , tab | spazi;
-- dopo la data servono almeno 7 numeri (sestina + Jolly), l'ottavo è il SuperStar
-  (0 o vuoto = assente). Un numero intero prima della data è il concorso.
+- SuperEnalotto: dopo la data servono almeno 7 numeri (sestina + Jolly), l'ottavo è il
+  SuperStar (0 o vuoto = assente);
+- Eurojackpot: dopo la data servono 7 numeri (5 numeri + 2 Euronumeri);
+- un numero intero prima della data è il concorso.
 - le righe di intestazione o con testo non riconosciuto vengono ignorate;
 - importi con virgola/punti (montepremi, quote) vengono ignorati.
 """
@@ -18,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from .gioco import SE, Gioco
 from .modello import MESI, Estrazione
 
 _MESI_RE = "|".join(MESI)
@@ -96,7 +99,7 @@ def _celle(riga: str, sep: str | None) -> list[str]:
     return riga.split()
 
 
-def interpreta_riga(riga: str, sep: str | None) -> tuple[Estrazione | None, str]:
+def interpreta_riga(riga: str, sep: str | None, g: Gioco = SE) -> tuple[Estrazione | None, str]:
     testo = riga.strip()
     if not testo:
         return None, "vuota"
@@ -130,31 +133,36 @@ def interpreta_riga(riga: str, sep: str | None) -> tuple[Estrazione | None, str]
     if d is None:
         return None, "nessuna data riconosciuta"
 
+    k = g.k
+    minimo = k + 2 if g.is_ej else k + 1        # numeri necessari dopo la data
     concorso = None
     numeri = dopo
-    if len(dopo) < 7 and len(prima) >= 7:        # numeri scritti prima della data
+    if len(dopo) < minimo and len(prima) >= minimo:   # numeri scritti prima della data
         numeri, prima = prima, []
-        if len(numeri) >= 9:                       # concorso + 6 + jolly + superstar
+        if len(numeri) >= minimo + 2:                  # concorso + numeri + speciali
             concorso, numeri = numeri[0], numeri[1:]
     elif len(prima) == 1:
         concorso = prima[0]
-    if len(numeri) < 7:
-        return None, f"servono almeno 7 numeri dopo la data (trovati {len(numeri)})"
-    sestina, jolly = numeri[:6], numeri[6]
-    superstar = numeri[7] if len(numeri) >= 8 and 1 <= numeri[7] <= 90 else None
-    # formato esportato da questa app: dopo il SuperStar c'è l'ordine di estrazione
-    if len(numeri) >= 14 and set(numeri[8:14]) == set(sestina):
-        sestina = numeri[8:14]
-    return Estrazione(data=d, numeri=sestina, jolly=jolly, superstar=superstar,
-                      concorso=concorso, fonte="file"), ""
+    if len(numeri) < minimo:
+        return None, f"servono almeno {minimo} numeri dopo la data (trovati {len(numeri)})"
+    sestina, extra1 = numeri[:k], numeri[k]
+    if g.is_ej:
+        extra2 = numeri[k + 1]
+    else:
+        extra2 = numeri[k + 1] if len(numeri) >= k + 2 and 1 <= numeri[k + 1] <= 90 else None
+    # formato esportato da questa app: dopo i numeri speciali c'è l'ordine di estrazione
+    if len(numeri) >= 2 * k + 2 and set(numeri[k + 2:2 * k + 2]) == set(sestina):
+        sestina = numeri[k + 2:2 * k + 2]
+    return Estrazione(data=d, numeri=sestina, jolly=extra1, superstar=extra2,
+                      concorso=concorso, fonte="file", gioco=g), ""
 
 
-def leggi_testo(testo: str) -> RisultatoLettura:
+def leggi_testo(testo: str, g: Gioco = SE) -> RisultatoLettura:
     righe = testo.splitlines()
     sep = _separatore(righe)
     ris = RisultatoLettura()
     for i, r in enumerate(righe, start=1):
-        e, motivo = interpreta_riga(r, sep)
+        e, motivo = interpreta_riga(r, sep, g)
         ris.righe.append(RigaLetta(i, r, e, motivo))
     return ris
 
@@ -179,24 +187,26 @@ def _testo_da_excel(percorso: Path) -> str:
     return out.getvalue()
 
 
-def leggi_file(percorso: str | Path) -> RisultatoLettura:
+def leggi_file(percorso: str | Path, g: Gioco = SE) -> RisultatoLettura:
     p = Path(percorso)
     if p.suffix.lower() in (".xlsx", ".xlsm"):
-        return leggi_testo(_testo_da_excel(p))
+        return leggi_testo(_testo_da_excel(p), g)
     grezzo = p.read_bytes()
     for codifica in ("utf-8-sig", "cp1252", "latin-1"):
         try:
-            return leggi_testo(grezzo.decode(codifica))
+            return leggi_testo(grezzo.decode(codifica), g)
         except UnicodeDecodeError:
             continue
-    return leggi_testo(grezzo.decode("latin-1", errors="replace"))
+    return leggi_testo(grezzo.decode("latin-1", errors="replace"), g)
 
 
-def esporta_csv(estrazioni: list[Estrazione], percorso: str | Path) -> None:
+def esporta_csv(estrazioni: list[Estrazione], percorso: str | Path, g: Gioco = SE) -> None:
+    k = g.k
+    speciali = ["Euro1", "Euro2"] if g.is_ej else ["Jolly", "SuperStar"]
     with open(percorso, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f, delimiter=";")
-        w.writerow(["Concorso", "Data", "N1", "N2", "N3", "N4", "N5", "N6", "Jolly", "SuperStar",
-                    "E1", "E2", "E3", "E4", "E5", "E6"])
+        w.writerow(["Concorso", "Data", *[f"N{i}" for i in range(1, k + 1)], *speciali,
+                    *[f"E{i}" for i in range(1, k + 1)]])
         for e in sorted(estrazioni, key=lambda x: x.data):
             w.writerow([e.concorso or "", e.data.strftime("%d/%m/%Y"), *e.sestina, e.jolly,
                         e.superstar or 0, *e.numeri])

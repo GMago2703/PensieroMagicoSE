@@ -18,7 +18,7 @@ class FinestraImporta(QDialog):
         self.arch = archivio
         self.lettura: RisultatoLettura | None = None
         self.modificato = False
-        self.setWindowTitle("Importa estrazioni da file")
+        self.setWindowTitle(f"Importa estrazioni {archivio.gioco.nome} da file")
         self.resize(900, 600)
         v = QVBoxLayout(self)
         v.addWidget(QLabel(
@@ -33,8 +33,9 @@ class FinestraImporta(QDialog):
         v.addLayout(h)
 
         self.tab = QTableWidget(0, 6)
-        self.tab.setHorizontalHeaderLabels(["Riga", "Data", "Sestina (ordine nel file)", "Jolly", "SuperStar",
-                                            "Stato"])
+        g = archivio.gioco
+        speciali = ["Euro 1", "Euro 2"] if g.is_ej else ["Jolly", "SuperStar"]
+        self.tab.setHorizontalHeaderLabels(["Riga", "Data", f"{g.C()} (ordine nel file)", *speciali, "Stato"])
         self.tab.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
         self.tab.verticalHeader().setVisible(False)
         v.addWidget(self.tab, 3)
@@ -63,7 +64,7 @@ class FinestraImporta(QDialog):
             return
         self.l_file.setText(percorso)
         try:
-            self.lettura = leggi_file(percorso)
+            self.lettura = leggi_file(percorso, self.arch.gioco)
         except Exception as ex:   # file illeggibile o formato non supportato
             QMessageBox.warning(self, "Errore", f"Impossibile leggere il file:\n{ex}")
             return

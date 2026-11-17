@@ -10,13 +10,18 @@ from ..core.db import Archivio
 from ..core.modello import GIORNI_BREVI
 from .editor import EditorEstrazione
 
-COLONNE = ["Pos.", "Conc.", "Data", "Giorno", "N1", "N2", "N3", "N4", "N5", "N6", "Jolly", "SuperStar",
-           "Ordine di estrazione", "Fonte"]
+def colonne(g) -> list[str]:
+    speciali = ["Euro 1", "Euro 2"] if g.is_ej else ["Jolly", "SuperStar"]
+    return ["Pos.", "Conc.", "Data", "Giorno", *[f"N{i}" for i in range(1, g.k + 1)], *speciali,
+            "Ordine di estrazione", "Fonte"]
 
 
 class ModelloArchivio(QAbstractTableModel):
-    def __init__(self):
+    def __init__(self, gioco=None):
         super().__init__()
+        from ..core.gioco import SE
+        self.g = gioco or SE
+        self.colonne = colonne(self.g)
         self.righe = []          # (pos, estrazione)
         self.evidenziato = 0
 
@@ -30,16 +35,24 @@ class ModelloArchivio(QAbstractTableModel):
         return len(self.righe)
 
     def columnCount(self, parent=QModelIndex()):
-        return len(COLONNE)
+        return len(self.colonne)
 
     def headerData(self, s, o, ruolo=Qt.DisplayRole):
         if o == Qt.Horizontal and ruolo == Qt.DisplayRole:
-            return COLONNE[s]
+            return self.colonne[s]
         return None
+
+    def _valori_numeri(self, e) -> dict[int, int]:
+        """Colonna -> numero (per evidenziare il numero cercato)."""
+        k = self.g.k
+        out = {4 + i: v for i, v in enumerate(e.sestina)}
+        out[4 + k], out[5 + k] = e.jolly, e.superstar
+        return out
 
     def data(self, idx, ruolo=Qt.DisplayRole):
         pos, e = self.righe[idx.row()]
         c = idx.column()
+        k = self.g.k
         if ruolo == Qt.DisplayRole:
             s = e.sestina
             valori = [pos, e.concorso, e.data.strftime("%d/%m/%Y"), GIORNI_BREVI[e.data.weekday()],
@@ -48,21 +61,20 @@ class ModelloArchivio(QAbstractTableModel):
             return valori[c]
         if ruolo == Qt.TextAlignmentRole:
             return Qt.AlignCenter
+        n = self.evidenziato
         if ruolo == Qt.BackgroundRole:
-            n = self.evidenziato
-            if n and ((4 <= c <= 9 and e.sestina[c - 4] == n) or (c == 10 and e.jolly == n)
-                      or (c == 11 and e.superstar == n)):
+            # per l'Eurojackpot si evidenziano solo i numeri principali (gli Euronumeri sono un'altra urna)
+            limite = 4 + k if self.g.is_ej else 6 + k
+            if n and 4 <= c < limite and self._valori_numeri(e).get(c) == n:
                 return QBrush(QColor("#1e90ff"))
-            if c == 10:
-                return QBrush(QColor("#ffe0b2"))
-            if c == 11:
-                return QBrush(QColor("#fff59d"))
+            if c == 4 + k:
+                return QBrush(QColor("#bbdefb" if self.g.is_ej else "#ffe0b2"))
+            if c == 5 + k:
+                return QBrush(QColor("#bbdefb" if self.g.is_ej else "#fff59d"))
         if ruolo == Qt.ForegroundRole:
-            n = self.evidenziato
-            if n and 4 <= c <= 11:
-                pos_val = {**{4 + i: v for i, v in enumerate(e.sestina)}, 10: e.jolly, 11: e.superstar}
-                if pos_val.get(c) == n:
-                    return QBrush(QColor("white"))
+            limite = 4 + k if self.g.is_ej else 6 + k
+            if n and 4 <= c < limite and self._valori_numeri(e).get(c) == n:
+                return QBrush(QColor("white"))
         return None
 
 
@@ -72,7 +84,7 @@ class FinestraArchivio(QDialog):
         self.arch = archivio
         self.crescente = False
         self.modificato = False
-        self.setWindowTitle("Archivio estrazioni")
+        self.setWindowTitle(f"Archivio estrazioni – {archivio.gioco.nome}")
         self.resize(1050, 650)
         v = QVBoxLayout(self)
 
@@ -88,7 +100,7 @@ class FinestraArchivio(QDialog):
         filtri.addSpacing(16)
         filtri.addWidget(QLabel("Cerca numero:"))
         self.s_num = QSpinBox()
-        self.s_num.setRange(0, 90)
+        self.s_num.setRange(0, archivio.gioco.n)
         self.s_num.setSpecialValueText("—")
         self.s_num.valueChanged.connect(self.aggiorna)
         filtri.addWidget(self.s_num)
@@ -101,7 +113,7 @@ class FinestraArchivio(QDialog):
         filtri.addWidget(self.l_info)
         v.addLayout(filtri)
 
-        self.modello = ModelloArchivio()
+        self.modello = ModelloArchivio(archivio.gioco)
         self.tabella = QTableView()
         self.tabella.setModel(self.modello)
         self.tabella.setAlternatingRowColors(True)
@@ -152,7 +164,10 @@ class FinestraArchivio(QDialog):
             righe = [r for r in righe if r[1].data.year == int(anno)]
         n = self.s_num.value()
         if n and self.c_dove.currentIndex() == 0:
-            righe = [r for r in righe if n in r[1].numeri or r[1].jolly == n or r[1].superstar == n]
+            if self.arch.gioco.is_ej:
+                righe = [r for r in righe if n in r[1].numeri]
+            else:
+                righe = [r for r in righe if n in r[1].numeri or r[1].jolly == n or r[1].superstar == n]
         if not self.crescente:
             righe.reverse()
         self.modello.carica(righe, n)

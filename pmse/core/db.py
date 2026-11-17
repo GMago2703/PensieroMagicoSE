@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 
+from .gioco import SE, Gioco, Storico
 from .modello import CATEGORIE, Estrazione, valida
 
 SCHEMA = """
@@ -24,7 +25,7 @@ CREATE TABLE IF NOT EXISTS estrazioni (
     anno        INTEGER NOT NULL,
     concorso    INTEGER,
     n1 INTEGER NOT NULL, n2 INTEGER NOT NULL, n3 INTEGER NOT NULL,
-    n4 INTEGER NOT NULL, n5 INTEGER NOT NULL, n6 INTEGER NOT NULL,
+    n4 INTEGER NOT NULL, n5 INTEGER NOT NULL, n6 INTEGER{N6},
     e1 INTEGER, e2 INTEGER, e3 INTEGER, e4 INTEGER, e5 INTEGER, e6 INTEGER,
     jolly       INTEGER NOT NULL,
     superstar   INTEGER,
@@ -47,9 +48,9 @@ CREATE TABLE IF NOT EXISTS impostazioni (
 """
 
 
-def percorso_predefinito() -> Path:
+def percorso_predefinito(gioco: Gioco = SE) -> Path:
     base = os.environ.get("APPDATA") or os.path.join(Path.home(), ".config")
-    p = Path(base) / "PensieroMagicoSE"
+    p = Path(base) / gioco.cartella          # una cartella per gioco: archivi rigidamente separati
     p.mkdir(parents=True, exist_ok=True)
     return p / "archivio.db"
 
@@ -78,24 +79,37 @@ class EsitoUnione:
 
 
 class Archivio:
-    def __init__(self, percorso: str | Path | None = None):
-        self.percorso = Path(percorso) if percorso else percorso_predefinito()
+    def __init__(self, percorso: str | Path | None = None, gioco: Gioco = SE):
+        self.gioco = gioco
+        self.percorso = Path(percorso) if percorso else percorso_predefinito(gioco)
+        self._apri()
+
+    def _apri(self):
         self.con = sqlite3.connect(str(self.percorso))
         self.con.row_factory = sqlite3.Row
-        self.con.executescript(SCHEMA)
+        self.con.executescript(SCHEMA.replace("{N6}", " NOT NULL" if self.gioco.k == 6 else ""))
         self.con.commit()
+        # ogni archivio appartiene a un solo gioco: non si possono mescolare
+        r = self.con.execute("SELECT valore FROM impostazioni WHERE chiave='gioco'").fetchone()
+        if r is None:
+            self.con.execute("INSERT INTO impostazioni VALUES ('gioco', ?)", (self.gioco.codice,))
+            self.con.commit()
+        elif r[0] != self.gioco.codice:
+            self.con.close()
+            raise ValueError(f"Questo archivio appartiene a un altro gioco ({r[0]}), non a {self.gioco.nome}.")
 
     def chiudi(self):
         self.con.close()
 
     # ------------------------------------------------------------------ lettura
     def _da_riga(self, r: sqlite3.Row, con_quote: bool = False) -> Estrazione:
-        ordine = [r["e1"], r["e2"], r["e3"], r["e4"], r["e5"], r["e6"]]
-        numeri = ordine if all(ordine) else [r["n1"], r["n2"], r["n3"], r["n4"], r["n5"], r["n6"]]
+        k = self.gioco.k
+        ordine = [r[f"e{i}"] for i in range(1, k + 1)]
+        numeri = ordine if all(ordine) else [r[f"n{i}"] for i in range(1, k + 1)]
         e = Estrazione(
             data=date.fromisoformat(r["data"]), numeri=list(numeri), jolly=r["jolly"],
             superstar=r["superstar"], concorso=r["concorso"], montepremi=r["montepremi"],
-            fonte=r["fonte"] or "", id=r["id"],
+            fonte=r["fonte"] or "", id=r["id"], gioco=self.gioco,
         )
         if con_quote:
             e.quote = self.quote(e.data)
@@ -105,14 +119,15 @@ class Archivio:
         ordine = "ASC" if crescente else "DESC"
         return [self._da_riga(r) for r in self.con.execute(f"SELECT * FROM estrazioni ORDER BY data {ordine}")]
 
-    def sestine(self) -> list[tuple[date, list[int], int, int | None, list[int]]]:
+    def sestine(self) -> Storico:
         """Accesso veloce per le analisi, in ordine crescente di data:
-        (data, sestina ordinata, jolly, superstar, numeri nell'ordine di estrazione)."""
-        out = []
+        (data, numeri ordinati, jolly/euro1, superstar/euro2, numeri nell'ordine di estrazione)."""
+        k = self.gioco.k
+        out = Storico(gioco=self.gioco)
         for r in self.con.execute("SELECT data,n1,n2,n3,n4,n5,n6,jolly,superstar,e1,e2,e3,e4,e5,e6 "
                                   "FROM estrazioni ORDER BY data"):
-            s = [r[1], r[2], r[3], r[4], r[5], r[6]]
-            ordine = [r[9], r[10], r[11], r[12], r[13], r[14]]
+            s = [r[i] for i in range(1, k + 1)]
+            ordine = [r[i] for i in range(9, 9 + k)]
             out.append((date.fromisoformat(r[0]), s, r[7], r[8], ordine if all(ordine) else list(s)))
         return out
 
@@ -144,7 +159,9 @@ class Archivio:
     # ---------------------------------------------------------------- scrittura
     def _scrivi(self, e: Estrazione, sostituisci: bool):
         s = e.sestina
-        ordine = list(e.numeri) if e.numeri != s else [None] * 6
+        ordine = list(e.numeri) if e.numeri != s else [None] * len(s)
+        s = s + [None] * (6 - len(s))
+        ordine = ordine + [None] * (6 - len(ordine))
         valori = (e.data.isoformat(), e.data.year, e.concorso, *s, *ordine, e.jolly, e.superstar,
                   e.montepremi, e.fonte, datetime.now().isoformat(timespec="seconds"))
         verbo = "INSERT OR REPLACE" if sostituisci else "INSERT"
@@ -160,6 +177,8 @@ class Archivio:
 
     def salva(self, e: Estrazione, data_originale: date | None = None) -> None:
         """Inserisce o modifica una singola estrazione (uso manuale). Solleva ValueError se non valida."""
+        if e.gioco.codice != self.gioco.codice:
+            raise ValueError("Estrazione di un altro gioco")
         errori, _ = valida(e)
         if errori:
             raise ValueError("\n".join(errori))
@@ -184,6 +203,9 @@ class Archivio:
         anni_toccati: set[int] = set()
         visti: dict[date, Estrazione] = {}
         for e in estrazioni:
+            if e.gioco.codice != self.gioco.codice:
+                esito.scartate.append((e, [f"Estrazione di un altro gioco ({e.gioco.nome})"]))
+                continue
             errori, _ = valida(e)
             if errori:
                 esito.scartate.append((e, errori))
@@ -264,11 +286,18 @@ class Archivio:
             prova.execute("SELECT COUNT(*) FROM estrazioni").fetchone()
         finally:
             prova.close()
+        prova = sqlite3.connect(str(sorgente))
+        try:
+            r = prova.execute("SELECT valore FROM impostazioni WHERE chiave='gioco'").fetchone()
+        except sqlite3.Error:
+            r = None
+        finally:
+            prova.close()
+        if r and r[0] != self.gioco.codice:
+            raise ValueError(f"Il backup appartiene a un altro gioco ({r[0]}).")
         self.con.close()
         shutil.copyfile(str(sorgente), str(self.percorso))
-        self.con = sqlite3.connect(str(self.percorso))
-        self.con.row_factory = sqlite3.Row
-        self.con.executescript(SCHEMA)
+        self._apri()
 
 
 def verifica_integrita(arch: Archivio) -> list[str]:
@@ -293,7 +322,7 @@ def verifica_integrita(arch: Archivio) -> list[str]:
             righe.append(f"Avviso  intervallo di {giorni} giorni tra {a.data:%d/%m/%Y} e {b.data:%d/%m/%Y} "
                          "(controllare se mancano concorsi)")
     senza_ss = [e for e in tutte if e.superstar is None and e.data.year >= 2007]
-    if senza_ss:
+    if senza_ss and not arch.gioco.is_ej:
         righe.append(f"Avviso  {len(senza_ss)} estrazioni dal 2007 in poi senza SuperStar")
     righe.append("")
     righe.append("Concorsi per anno:")

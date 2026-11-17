@@ -6,7 +6,9 @@ import traceback
 def main():
     from PySide6.QtWidgets import QApplication, QMessageBox
 
-    from pmse.ui.finestra import FinestraPrincipale
+    from PySide6.QtCore import QSettings
+
+    from pmse.ui.finestra import apri_programma
 
     app = QApplication(sys.argv)
     app.setApplicationName("Pensiero Magico SE")
@@ -22,8 +24,9 @@ def main():
         QMessageBox.critical(None, "Errore imprevisto", testo[-3000:])
 
     sys.excepthook = errore_non_gestito
-    w = FinestraPrincipale()
-    w.show()
+    # si riapre l'ultimo programma usato (Pensiero Magico SE o Pensiero Magico EJ)
+    ultimo = QSettings("PensieroMagico", "Avvio").value("ultimo_programma", "SE")
+    apri_programma(ultimo if ultimo in ("SE", "EJ") else "SE")
     sys.exit(app.exec())
 
 

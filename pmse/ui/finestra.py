@@ -1,16 +1,20 @@
-"""Finestra principale: a sinistra la tabella dei 90 numeri, a destra Magico Pensiero."""
+"""Finestra principale: a sinistra la tabella dei numeri del gioco, a destra Magico Pensiero.
+In alto a sinistra il selettore tra Pensiero Magico SE (SuperEnalotto) e Pensiero Magico EJ (Eurojackpot):
+i due programmi usano archivi, impostazioni e previsioni completamente separati."""
 from __future__ import annotations
 
 from datetime import date
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtGui import QAction, QFont
-from PySide6.QtWidgets import (QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
-                               QPlainTextEdit, QPushButton, QDialog, QSizePolicy, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
+                               QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QPushButton, QSizePolicy, QToolButton,
+                               QVBoxLayout, QWidget)
 
 from .. import __version__
 from ..core import internet, magico, personalizzate
 from ..core.db import Archivio, verifica_integrita
+from ..core.gioco import EJ, GIOCHI, SE, Gioco
 from ..core.importatore import esporta_csv
 from .analisi import FinestraAnalisi
 from .archivio import FinestraArchivio
@@ -22,6 +26,9 @@ from .internet import FinestraInternet, Scaricatore
 SFONDO = """
 QMainWindow { background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
               stop:0 #b8860b, stop:0.35 #f4d35e, stop:0.6 #d4a017, stop:1 #8b6508); }
+QMainWindow[gioco="EJ"] { background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+              stop:0 #0d2a6b, stop:0.4 #1f4fb0, stop:0.7 #2c6ad1, stop:1 #0a1f52); }
+QToolButton#selettore { font-weight: bold; padding: 2px 8px; }
 QFrame#pannello { background: white; border: 2px solid #555; }
 QLabel#titolo { font-family: 'Segoe UI'; font-size: 24px; font-weight: bold; }
 QPushButton[class="lato"] { text-align: left; padding: 6px 10px; font-size: 12px; min-width: 100px; }
@@ -31,8 +38,21 @@ MENU_VUOTI = ["Sistemi", "Condizioni", "Elaborazione", "Combinazioni", "Statisti
 MENU_VUOTI_DOPO = ["Stampe", "Ricevitoria", "Impostazioni"]
 
 
+FINESTRE: list = []        # riferimenti alle finestre aperte (evita che vengano distrutte)
+
+
+def apri_programma(codice: str, avvio_automatico: bool = True) -> "FinestraPrincipale":
+    """Apre Pensiero Magico SE o EJ con il proprio archivio (cartelle dati separate)."""
+    g = GIOCHI.get(codice, SE)
+    w = FinestraPrincipale(Archivio(gioco=g), avvio_automatico=avvio_automatico)
+    QSettings("PensieroMagico", "Avvio").setValue("ultimo_programma", g.codice)
+    FINESTRE.append(w)
+    w.show()
+    return w
+
+
 class Pannello(QFrame):
-    def __init__(self, titolo: str, colore_titolo: str, selezionabile: bool):
+    def __init__(self, titolo: str, colore_titolo: str, selezionabile: bool, gioco: Gioco = SE):
         super().__init__()
         self.setObjectName("pannello")
         g = QGridLayout(self)
@@ -47,8 +67,9 @@ class Pannello(QFrame):
         t.setStyleSheet(f"color:{colore_titolo};")
         t.setAlignment(Qt.AlignCenter)
         g.addWidget(t, 0, 1)
-        self.griglia = Griglia90(selezionabile=selezionabile)
-        self.griglia.setFixedSize(360, 290)        # dimensioni come nella schermata di riferimento
+        self.griglia = Griglia90(selezionabile=selezionabile, n=gioco.n)
+        righe = (gioco.n + 9) // 10
+        self.griglia.setFixedSize(360, 32 * righe + 2)   # dimensioni come nella schermata di riferimento
         g.addWidget(self.griglia, 1, 0, 1, 2)
         self.lato = QVBoxLayout()
         g.addLayout(self.lato, 0, 2, 2, 1)
@@ -69,9 +90,11 @@ class FinestraPrincipale(QMainWindow):
     def __init__(self, archivio: Archivio | None = None, avvio_automatico: bool = True):
         super().__init__()
         self.arch = archivio or Archivio()
+        self.g: Gioco = self.arch.gioco
         self.scaricatore: Scaricatore | None = None
-        self.setWindowTitle(f"Pensiero Magico SE {__version__}")
+        self.setWindowTitle(f"{self.g.nome_app} {__version__}")
         self.resize(1250, 680)
+        self.setProperty("gioco", self.g.codice)
         self.setStyleSheet(SFONDO)
         self._menu()
         self._centro()
@@ -95,8 +118,39 @@ class FinestraPrincipale(QMainWindow):
         m = self.menuBar().addMenu(nome)
         self._azione(m, "(in preparazione)", abilitata=False)
 
+    def _selettore(self):
+        """Menu in alto a sinistra: scelta tra Pensiero Magico SE e Pensiero Magico EJ."""
+        b = QToolButton(self)
+        b.setObjectName("selettore")
+        b.setText(f"🍀 {self.g.nome_app} ▾")
+        icona = QApplication.windowIcon()
+        if not icona.isNull():
+            b.setIcon(icona)
+            b.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+            b.setText(f"{self.g.nome_app} ▾")
+        b.setPopupMode(QToolButton.InstantPopup)
+        menu = QMenu(b)
+        for g in (SE, EJ):
+            a = menu.addAction(f"{g.nome_app} — {g.nome}")
+            a.setCheckable(True)
+            a.setChecked(g.codice == self.g.codice)
+            a.triggered.connect(lambda _=False, c=g.codice: self.cambia_programma(c))
+        b.setMenu(menu)
+        self.menuBar().setCornerWidget(b, Qt.TopLeftCorner)
+        self.selettore = b
+
+    def cambia_programma(self, codice: str):
+        if codice == self.g.codice:
+            return
+        if self.scaricatore and self.scaricatore.isRunning():
+            QMessageBox.information(self, "Attendi", "È in corso un aggiornamento da Internet: riprova tra poco.")
+            return
+        apri_programma(codice)
+        self.close()
+
     def _menu(self):
         mb = self.menuBar()
+        self._selettore()
         for nome in MENU_VUOTI:
             self._menu_vuoto(nome)
 
@@ -115,7 +169,8 @@ class FinestraPrincipale(QMainWindow):
 
         m = mb.addMenu("&Internet")
         self._azione(m, "Aggiorna ora (estrazioni mancanti)", lambda: self.apri_internet(False))
-        self._azione(m, "Scarica archivio completo dal 1997", lambda: self.apri_internet(True))
+        self._azione(m, f"Scarica archivio completo dal {self.g.prima_estrazione.year}",
+                     lambda: self.apri_internet(True))
         m.addSeparator()
         self.a_avvio = self._azione(m, "Aggiorna automaticamente all'avvio", self._cambia_avvio)
         self.a_avvio.setCheckable(True)
@@ -126,8 +181,9 @@ class FinestraPrincipale(QMainWindow):
         self._menu_analisi()
 
         m = mb.addMenu("&Magico Pensiero")
-        self._azione(m, "✨ Genera le 3 sestine Magico Pensiero", self.genera)
-        self._azione(m, "Come sono nate le sestine (spiegazione)...", self.spiegazione)
+        cosa = "la cinquina e gli Euronumeri" if self.g.is_ej else "le 3 sestine"
+        self._azione(m, f"✨ Genera {cosa} Magico Pensiero", self.genera)
+        self._azione(m, f"Come sono nate le {self.g.nome_comb_pl} (spiegazione)...", self.spiegazione)
         self._azione(m, "🤖 Magico Pensiero + Claude (intelligenza artificiale)...", self.claude)
         m.addSeparator()
         self._azione(m, "Impostazioni dell'algoritmo...", self.impostazioni_magico)
@@ -138,7 +194,7 @@ class FinestraPrincipale(QMainWindow):
         for nome in MENU_VUOTI_DOPO:
             self._menu_vuoto(nome)
         m = mb.addMenu("&Help")
-        self._azione(m, "Informazioni su Pensiero Magico SE", self.informazioni)
+        self._azione(m, f"Informazioni su {self.g.nome_app}", self.informazioni)
 
     # -------------------------------------------------------------- centro
     def _centro(self):
@@ -151,27 +207,40 @@ class FinestraPrincipale(QMainWindow):
         h.setSpacing(40)
         h.addStretch()
 
-        self.p_sx = Pannello("SuperEnalotto", "#d81b60", selezionabile=True)
+        g = self.g
+        self.p_sx = Pannello(g.nome, "#1565c0" if g.is_ej else "#d81b60", selezionabile=True, gioco=g)
         self.p_sx.pulsante("📚  Archivio", self.apri_archivio)
         self.p_sx.pulsante("🔍  Analisi", lambda: self.apri_analisi(None))
-        self.p_sx.pulsante("📋  Sestine", self.mie_sestine)
+        self.p_sx.pulsante(f"📋  {g.C(plurale=True)}", self.mie_sestine)
         self.p_sx.pulsante("✔  Tutti", self.p_sx.griglia.seleziona_tutti)
         self.p_sx.pulsante("🟥  Azzera", self.p_sx.griglia.azzera)
         self.p_sx.lato.addStretch()
         self.p_sx.griglia.selezione_cambiata.connect(lambda s: self.l_sel.setText(f"Numeri selezionati: {len(s)}"))
 
-        self.p_dx = Pannello("Magico Pensiero", "#6a1b9a", selezionabile=False)
+        self.p_dx = Pannello("Magico Pensiero", "#6a1b9a", selezionabile=False, gioco=g)
         self.p_dx.pulsante("✨  Genera", self.genera)
         self.p_dx.pulsante("❓  Perché", self.spiegazione)
         self.p_dx.pulsante("🤖  Claude", self.claude)
         legenda = QLabel()
-        voci = [(COLORI_SESTINE[i], f"Sestina {i + 1}") for i in range(3)] + \
-               [(COLORE_JOLLY, "Jolly"), (COLORE_SUPERSTAR, "SuperStar")]
+        if g.is_ej:
+            voci = [(COLORI_SESTINE[0], "Cinquina"), ("#1565c0", "Euronumeri")]
+        else:
+            voci = [(COLORI_SESTINE[i], f"Sestina {i + 1}") for i in range(3)] + \
+                   [(COLORE_JOLLY, "Jolly"), (COLORE_SUPERSTAR, "SuperStar")]
         legenda.setText("<br>".join(f"<span style='background:{c};'>&nbsp;&nbsp;&nbsp;&nbsp;</span> {t}"
                                     for c, t in voci))
         self.p_dx.lato.addWidget(legenda)
         self.p_dx.lato.addStretch()
-        self.l_sestine = QLabel("Le 3 sestine compariranno qui dopo l'elaborazione.")
+        self.griglia_euro = None
+        if g.is_ej:          # griglia dei 12 Euronumeri sotto quella dei numeri
+            etichetta = QLabel("<b>Euronumeri</b>")
+            self.griglia_euro = Griglia90(selezionabile=False, n=12, colonne=12)
+            self.griglia_euro.setFixedSize(360, 34)
+            self.p_dx.layout().addWidget(etichetta, 4, 0, 1, 3)
+            self.p_dx.layout().addWidget(self.griglia_euro, 5, 0, 1, 3)
+        testo = ("La cinquina e gli Euronumeri compariranno qui dopo l'elaborazione." if g.is_ej
+                 else "Le 3 sestine compariranno qui dopo l'elaborazione.")
+        self.l_sestine = QLabel(testo)
         self.l_sestine.setFont(QFont("Consolas", 11))
         self.l_sestine.setWordWrap(True)
         self.p_dx.sotto.setText("")
@@ -195,9 +264,12 @@ class FinestraPrincipale(QMainWindow):
         u = self.arch.ultima()
         self.l_arch.setText(f"Estrazioni in archivio: {n}")
         if u:
-            ss = f"  SS {u.superstar}" if u.superstar else ""
+            if self.g.is_ej:
+                spec = f"  Euro {u.jolly} {u.superstar}"
+            else:
+                spec = f"  J {u.jolly}" + (f"  SS {u.superstar}" if u.superstar else "")
             self.l_ultima.setText(f"Ultima: conc. {u.concorso}/{u.data.year} del {u.data:%d/%m/%Y} — "
-                                  f"{' '.join(map(str, u.sestina))}  J {u.jolly}{ss}")
+                                  f"{' '.join(map(str, u.sestina))}{spec}")
             prossimo = u.concorso + 1 if u.data.year == date.today().year else 1
             self.p_sx.box_conc.setText(f"Concorso N°\n<b>{prossimo}</b>".replace("\n", "<br>"))
             self.p_dx.box_conc.setText(f"per il<br><b>{prossimo}</b>")
@@ -241,10 +313,10 @@ class FinestraPrincipale(QMainWindow):
         self._dopo(dlg)
 
     def esporta(self):
-        p, _ = QFileDialog.getSaveFileName(self, "Esporta archivio", f"superenalotto_{date.today():%Y%m%d}.csv",
-                                           "CSV (*.csv)")
+        p, _ = QFileDialog.getSaveFileName(self, "Esporta archivio",
+                                           f"{self.g.nome.lower()}_{date.today():%Y%m%d}.csv", "CSV (*.csv)")
         if p:
-            esporta_csv(self.arch.tutte(), p)
+            esporta_csv(self.arch.tutte(), p, self.g)
             QMessageBox.information(self, "Esportazione", f"Esportate {self.arch.conta()} estrazioni in:\n{p}")
 
     def verifica(self):
@@ -258,8 +330,8 @@ class FinestraPrincipale(QMainWindow):
         dlg.exec()
 
     def backup(self):
-        p, _ = QFileDialog.getSaveFileName(self, "Salva backup", f"PensieroMagicoSE_backup_{date.today():%Y%m%d}.db",
-                                           "Archivio (*.db)")
+        p, _ = QFileDialog.getSaveFileName(self, "Salva backup",
+                                           f"{self.g.cartella}_backup_{date.today():%Y%m%d}.db", "Archivio (*.db)")
         if p:
             self.arch.backup(p)
             QMessageBox.information(self, "Backup", f"Backup salvato in:\n{p}")
@@ -303,7 +375,8 @@ class FinestraPrincipale(QMainWindow):
             self._azione(m, d.nome + "...", lambda _=False, c=d.codice: self.apri_analisi(c))
         m.addSeparator()
         self._azione(m, "🛠 Costruttore di analisi personalizzate...", self.costruttore)
-        self._azione(m, "📋 Le mie sestine: confronto con l'archivio e ricerca...", self.mie_sestine)
+        self._azione(m, f"📋 Le mie {self.g.nome_comb_pl}: confronto con l'archivio e ricerca...",
+                     self.mie_sestine)
 
     def costruttore(self):
         from .costruttore import FinestraCostruttore
@@ -328,6 +401,15 @@ class FinestraPrincipale(QMainWindow):
         self.mostra_magico(r)
 
     def mostra_magico(self, r, origine: str = "Proposta dell'algoritmo"):
+        if self.g.is_ej:
+            self.p_dx.griglia.mostra_sestine([s.numeri for s in r.sestine], None, None)
+            self.griglia_euro.mostra_euronumeri([r.jolly, r.superstar])
+            righe = [f"<i>{origine}</i>",
+                     f"<span style='color:{COLORI_SESTINE[0]}'>■</span> Cinquina: "
+                     f"<b>{' '.join(f'{n:2d}' for n in r.sestine[0].numeri)}</b>",
+                     f"<span style='color:#1565c0'>■</span> Euronumeri: <b>{r.jolly} {r.superstar}</b>"]
+            self.l_sestine.setText("<br>".join(righe))
+            return
         self.p_dx.griglia.mostra_sestine([s.numeri for s in r.sestine], r.jolly, r.superstar)
         righe = [f"<i>{origine}</i>"] + [f"<span style='color:{COLORI_SESTINE[i]}'>■</span> Sestina {i + 1}: "
                  f"<b>{' '.join(f'{n:2d}' for n in s.numeri)}</b>" for i, s in enumerate(r.sestine)]
@@ -381,9 +463,9 @@ class FinestraPrincipale(QMainWindow):
         FinestraStorico(self.arch, self).exec()
 
     def informazioni(self):
-        QMessageBox.about(self, "Pensiero Magico SE", (
-            f"<b>Pensiero Magico SE</b> versione {__version__}<br><br>"
-            "Archivio e analisi delle estrazioni del SuperEnalotto.<br>"
+        QMessageBox.about(self, self.g.nome_app, (
+            f"<b>{self.g.nome_app}</b> versione {__version__}<br><br>"
+            f"Archivio e analisi delle estrazioni del {self.g.nome}.<br>"
             f"Archivio dati: {self.arch.percorso}<br><br>"
             "Le estrazioni sono casuali: nessun programma può garantire vincite. Gioca responsabilmente."))
 
@@ -391,7 +473,8 @@ class FinestraPrincipale(QMainWindow):
     def _all_avvio(self):
         if self.arch.conta() == 0:
             r = QMessageBox.question(self, "Archivio vuoto", (
-                "L'archivio è vuoto.\n\nVuoi scaricare ora da Internet tutte le estrazioni dal 1997 a oggi?\n"
+                f"L'archivio {self.g.nome} è vuoto.\n\nVuoi scaricare ora da Internet tutte le estrazioni dal "
+                f"{self.g.prima_estrazione.year} a oggi?\n"
                 "(In alternativa puoi importare un file dal menu Archivio.)"))
             if r == QMessageBox.Yes:
                 self.apri_internet(True)
@@ -402,7 +485,7 @@ class FinestraPrincipale(QMainWindow):
             return
         ultima = self.arch.ultima()
         self.statusBar().showMessage("Controllo nuove estrazioni su Internet...", 0)
-        self.scaricatore = Scaricatore(internet.anni_da_aggiornare(ultima.data if ultima else None))
+        self.scaricatore = Scaricatore(internet.anni_da_aggiornare(ultima.data if ultima else None, self.g), self.g)
         self.scaricatore.finito.connect(self._aggiornato_in_background)
         self.scaricatore.errore.connect(
             lambda m: self.statusBar().showMessage("Aggiornamento automatico non riuscito (rete?)", 8000))
@@ -425,3 +508,6 @@ class FinestraPrincipale(QMainWindow):
             self.scaricatore.ferma()
             self.scaricatore.wait(3000)
         super().closeEvent(ev)
+        if self in FINESTRE:
+            FINESTRE.remove(self)
+            self.arch.chiudi()
