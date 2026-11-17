@@ -57,3 +57,14 @@ jobs:
           body: Versione generata automaticamente dal commit ${{ github.sha }}. Scarica PensieroMagicoSE.exe qui sotto.
           files: dist/PensieroMagicoSE.exe
           make_latest: true
+
+      - name: Pubblica le immagini delle finestre sul ramo "foto"
+        shell: bash
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git checkout --orphan foto-tmp
+          git rm -rf --cached . -q
+          git add -f foto/*.png
+          git commit -q -m "Immagini finestre build ${{ github.run_number }}"
+          git push -f -q origin foto-tmp:foto
