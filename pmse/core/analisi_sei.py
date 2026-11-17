@@ -186,11 +186,13 @@ def esegui(estrazioni, vinc: dict[str, Vincite], volte: int = 5000) -> RapportoS
         v = vinc[e.data.isoformat()]
         if v.p6 > 0:
             sei.append(ConcorsoSei(e.data, list(e.numeri), e.jolly, e.superstar, v.p6, v.premio6, pop.get(e.data)))
-    note = _verdetto(prove, medie)
+    sd_n = math.sqrt(len(sei_num) * (6 / 90) * (84 / 90))
+    nella_norma = freq[0][1] <= att_n + 3.2 * sd_n            # il massimo atteso tra 90 numeri
+    note = _verdetto(prove, medie, nella_norma)
     return RapportoSei(len(estrazioni), len(noti), sei, prove, medie, freq, note)
 
 
-def _verdetto(prove: list[Prova], medie) -> list[str]:
+def _verdetto(prove: list[Prova], medie, numeri_nella_norma: bool = True) -> list[str]:
     forti = [p for p in prove if p.p_holm < 0.05]
     note = []
     if not forti:
@@ -203,9 +205,18 @@ def _verdetto(prove: list[Prova], medie) -> list[str]:
             note.append("La più importante è la popolarità: il 6 arriva più spesso quando la sestina estratta "
                         "contiene numeri che molte persone giocano. Non è la macchina a 'scegliere' quelle sestine: "
                         "semplicemente, se più persone le hanno giocate, è più probabile che una di loro vinca.")
+        if any(p.nome == "Giorno della settimana" for p in forti):
+            note.append("Il 6 esce più spesso in certi giorni (soprattutto il sabato) perché quel giorno si "
+                        "giocano più schedine: più giocate, più probabilità che qualcuno abbia la sestina estratta. "
+                        "Per chi gioca la probabilità di vincere è la stessa ogni giorno.")
         if any(p.nome.startswith("Numeri da 1 a 31") for p in forti):
             note.append("Le sestine del 6 contengono più numeri da 1 a 31: è l'impronta delle date di nascita, "
                         "che molti giocatori usano.")
+    comuni = next((p for p in prove if p.nome == "Numeri in comune tra le sestine del 6"), None)
+    if comuni and comuni.p_holm >= 0.05 and numeri_nella_norma:
+        note.append("Le sestine del 6 non hanno 'variabili' in comune: tra due sestine del 6 i numeri condivisi "
+                    "sono quelli attesi dal caso, e i numeri più presenti nel gruppo non vanno oltre quanto il caso "
+                    "produce con questo numero di concorsi.")
     note.append("Conseguenza pratica: la probabilità di vincere è la stessa per ogni combinazione, ma le "
                 "combinazioni poco giocate, se escono, si dividono con meno persone.")
     return note
