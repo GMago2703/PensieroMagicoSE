@@ -5,9 +5,9 @@ from __future__ import annotations
 from datetime import date
 
 from PySide6.QtCore import QDate, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
-from PySide6.QtWidgets import (QDateEdit, QDialog, QGridLayout, QHBoxLayout, QLabel, QMessageBox, QPushButton,
-                               QSpinBox, QToolButton, QVBoxLayout)
+from PySide6.QtGui import QColor, QFont, QIcon, QIntValidator, QPainter, QPixmap
+from PySide6.QtWidgets import (QDateEdit, QDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+                               QPushButton, QToolButton, QVBoxLayout)
 
 from ..core.db import Archivio
 from ..core.modello import GIORNI, Estrazione, valida
@@ -22,7 +22,7 @@ def icona_testo(simbolo: str, colore: str) -> QIcon:
     pm = QPixmap(64, 64)
     pm.fill(Qt.transparent)
     p = QPainter(pm)
-    f = QFont("Segoe UI Symbol", 34)
+    f = QFont("Segoe UI Symbol", 40)
     f.setBold(True)
     p.setFont(f)
     p.setPen(QColor(colore))
@@ -45,18 +45,30 @@ def _pulsante_quadrato(testo: str, simbolo: str, colore: str) -> QToolButton:
     return b
 
 
-def _casella_numero(larghezza: int = 62) -> QSpinBox:
-    s = QSpinBox()
-    s.setRange(0, 90)
-    s.setSpecialValueText(" ")
-    s.setButtonSymbols(QSpinBox.NoButtons)
-    s.setAlignment(Qt.AlignCenter)
-    s.setFixedSize(larghezza, 50)
-    f = QFont("Segoe UI", 20)
-    f.setBold(True)
-    s.setFont(f)
-    s.setStyleSheet("QSpinBox { background:white; border:1px solid #888; }")
-    return s
+class CasellaNumero(QLineEdit):
+    """Casella grande per un numero da 1 a 90 (vuota = 0)."""
+
+    def __init__(self, larghezza: int = 62):
+        super().__init__()
+        self.setValidator(QIntValidator(0, 90, self))
+        self.setMaxLength(2)
+        self.setAlignment(Qt.AlignCenter)
+        self.setFixedSize(larghezza, 50)
+        f = QFont("Segoe UI", 20)
+        f.setBold(True)
+        self.setFont(f)
+        self.setStyleSheet("QLineEdit { background:white; border:1px solid #888; padding:0px; }")
+
+    def value(self) -> int:
+        t = self.text().strip()
+        return int(t) if t.isdigit() else 0
+
+    def setValue(self, n: int):
+        self.setText(str(n) if n else "")
+
+
+def _casella_numero(larghezza: int = 62) -> CasellaNumero:
+    return CasellaNumero(larghezza)
 
 
 def _etichetta(testo: str, punti: int = 13) -> QLabel:
@@ -93,8 +105,8 @@ class EditorEstrazione(QDialog):
         self.b_prec = _pulsante_quadrato("Prec.", "◀", "#1565c0")
         self.b_succ = _pulsante_quadrato("Succ.", "▶", "#1565c0")
         self.b_ultimo = _pulsante_quadrato("Ultimo", "⏭", "#1565c0")
-        self.b_agg = _pulsante_quadrato("Aggiungi", "+", "#2e7d32")
-        self.b_eli = _pulsante_quadrato("Elimina", "−", "#c62828")
+        self.b_agg = _pulsante_quadrato("Aggiungi", "✚", "#2e7d32")
+        self.b_eli = _pulsante_quadrato("Elimina", "▬", "#c62828")
         for b in (self.b_primo, self.b_prec, self.b_succ, self.b_ultimo):
             barra.addWidget(b)
         barra.addStretch()
