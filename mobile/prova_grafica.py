@@ -69,6 +69,9 @@ def finta_ai(chiave, modello, dossier, gia_uscite, m, limiti, timeout=300, g=SE)
 
 
 claude_ai.chiedi_a_gemini = finta_ai
+from pmse.core import vincite  # noqa: E402
+
+vincite.scarica = lambda date_c, *a, **k: {}          # archivio finto: niente pagine dei vincitori
 ERRORI = []
 _avviso = main.avviso
 
