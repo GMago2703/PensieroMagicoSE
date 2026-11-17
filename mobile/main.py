@@ -301,9 +301,10 @@ class Home(Pagina):
         c.add_widget(bottone("Verifica storica", lambda: self.app.vai("verifica"), ARANCIO))
         c.add_widget(bottone("Intelligenza artificiale", lambda: self.app.vai("ai"), ARANCIO))
         c.add_widget(bottone("Archivio estrazioni", lambda: self.app.vai("archivio"), VERDE))
-        c.add_widget(Label(text=f"versione {__version__} – i numeri del lotto sono casuali: gioca con "
-                                "moderazione", font_size=sp(11), color=(1, 1, 1, 0.7),
-                           size_hint_y=None, height=dp(30)))
+        piede = Testo(f"versione {__version__} – i numeri del lotto sono casuali: gioca con moderazione",
+                      (1, 1, 1, 0.7), font_size=sp(11))
+        piede.halign = "center"
+        c.add_widget(piede)
 
 
 class PaginaArchivio(Pagina):
