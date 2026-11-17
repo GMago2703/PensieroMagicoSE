@@ -115,6 +115,10 @@ class Prova(main.PensieroMagicoApp):
         yield
         yield
         self.foto("a04_archivio_se")
+        self.pagine["archivio"]._altre()
+        self.pagine["archivio"]._inverti()
+        yield
+        self.foto("a04b_archivio_crescente_se")
         self.vai("magico")
         yield
         yield

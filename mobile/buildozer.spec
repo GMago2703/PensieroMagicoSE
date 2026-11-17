@@ -8,7 +8,7 @@ source.exclude_patterns = prova_grafica.py
 source.exclude_dirs = bin, .buildozer, foto_android, __pycache__
 version.regex = __version__ = "(.*)"
 version.filename = %(source.dir)s/pmse/__init__.py
-requirements = python3,kivy==2.3.1,numpy,sqlite3,openssl,certifi
+requirements = python3,kivy==2.3.1,numpy,sqlite3,openssl,certifi,charset_normalizer==3.3.2
 icon.filename = %(source.dir)s/pmse/icona.png
 presplash.color = #00653B
 orientation = portrait

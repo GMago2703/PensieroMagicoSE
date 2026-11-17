@@ -22,8 +22,6 @@ from kivy.uix.checkbox import CheckBox
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.progressbar import ProgressBar
-from kivy.uix.recycleboxlayout import RecycleBoxLayout
-from kivy.uix.recycleview import RecycleView
 from kivy.uix.screenmanager import Screen, ScreenManager, SlideTransition
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.slider import Slider
@@ -93,7 +91,7 @@ class Palla(Label):
     def __init__(self, numero, colore, testo_scuro=False, **kw):
         super().__init__(text=str(numero) if numero else "-", bold=True, font_size=sp(17),
                          color=(0, 0, 0, 1) if testo_scuro else (1, 1, 1, 1),
-                         size_hint=(None, None), size=(dp(40), dp(40)), **kw)
+                         size_hint=(None, None), size=(dp(40), dp(40)), pos_hint={"center_y": 0.5}, **kw)
         with self.canvas.before:
             Color(*hexc(colore))
             self._e = Ellipse()
@@ -129,6 +127,16 @@ def palle_previsione(g, sestine, jolly, superstar) -> list:
     return righe
 
 
+SOSTITUZIONI = {"→": "=", "✔": "+", "✘": "-", "⚙": "*", "■": "", "—": "-", "…": "..."}
+
+
+def pulisci(t: str) -> str:
+    """Toglie i simboli che il carattere di Android (Roboto) non sa disegnare."""
+    for a, b in SOSTITUZIONI.items():
+        t = t.replace(a, b)
+    return t
+
+
 def evidenzia(numeri, presi) -> str:
     return " ".join(f"[b][color={EVIDENZIA}]{n}[/color][/b]" if n in presi else str(n) for n in numeri)
 
@@ -136,7 +144,7 @@ def evidenzia(numeri, presi) -> str:
 def avviso(titolo, testo):
     corpo = BoxLayout(orientation="vertical", padding=dp(10), spacing=dp(10))
     sv = ScrollView()
-    t = Testo(testo, colore=(1, 1, 1, 1))
+    t = Testo(pulisci(str(testo)), colore=(1, 1, 1, 1))
     sv.add_widget(t)
     corpo.add_widget(sv)
     p = Popup(title=titolo, content=corpo, size_hint=(0.92, 0.75))
@@ -243,40 +251,47 @@ class Home(Pagina):
 
 class PaginaArchivio(Pagina):
     titolo = "Archivio"
+    BLOCCO = 150
 
     def __init__(self, app, **kw):
         super().__init__(app, name="archivio", **kw)
         self.crescente = False
-        # al posto della pagina scorrevole: una lista veloce anche con migliaia di righe
-        box = self.children[0]
-        box.remove_widget(self.sv)
-        self.b_ordine = bottone("", self._inverti, VERDE, alto=dp(46))
-        box.add_widget(self.b_ordine)
-        self.lista = RecycleView(viewclass="Label")
-        lay = RecycleBoxLayout(default_size=(None, dp(34)), default_size_hint=(1, None), size_hint_y=None,
-                               orientation="vertical", padding=(dp(8), 0))
-        lay.bind(minimum_height=lay.setter("height"))
-        self.lista.add_widget(lay)
-        box.add_widget(self.lista)
 
     def _inverti(self):
         self.crescente = not self.crescente
         self.mostra()
 
     def mostra(self):
-        self.b_ordine.text = ("Ordine: dalla più vecchia" if self.crescente else "Ordine: dalla più recente") + \
-                             "  (tocca per invertire)"
-        g, righe = self.g, []
-        for e in self.s.elenco(self.crescente):
-            spec = (f"[color=90caf9]{e.jolly} {e.superstar}[/color]" if g.is_ej else
-                    f"[color=ffb74d]J {e.jolly}[/color] [color=fff176]SS {e.superstar or '-'}[/color]")
-            righe.append({"text": f"{e.data:%d/%m/%Y}   [b]{'  '.join(f'{n:2d}' for n in e.numeri)}[/b]   {spec}",
-                          "markup": True, "font_size": sp(15), "font_name": "RobotoMono-Regular",
-                          "halign": "left", "color": (1, 1, 1, 1)})
-        if not righe:
-            righe = [{"text": "Archivio vuoto: aggiorna da Internet dalla home.", "color": (1, 1, 1, 1)}]
-        self.lista.data = righe
-        self.lista.scroll_y = 1
+        c = self.corpo
+        c.clear_widgets()
+        c.add_widget(bottone(("Ordine: dalla più vecchia" if self.crescente else "Ordine: dalla più recente") +
+                             "  (tocca per invertire)", self._inverti, VERDE, alto=dp(46)))
+        self.tutte = self.s.elenco(self.crescente)
+        self.mostrate = 0
+        if not self.tutte:
+            c.add_widget(Testo("Archivio vuoto: aggiorna da Internet dalla home.", (1, 1, 1, 1)))
+            return
+        c.add_widget(Testo(f"{len(self.tutte)} estrazioni", (1, 1, 1, 0.8), font_size=sp(13)))
+        self.b_altre = bottone("", self._altre, ARANCIO, alto=dp(46))
+        self._altre()
+        self.sv.scroll_y = 1
+
+    def _altre(self):
+        g, c = self.g, self.corpo
+        if self.b_altre.parent:
+            c.remove_widget(self.b_altre)
+        righe = []
+        for e in self.tutte[self.mostrate:self.mostrate + self.BLOCCO]:
+            spec = (f"[color=90caf9]{e.jolly:2d} {e.superstar:2d}[/color]" if g.is_ej else
+                    f"[color=ffb74d]J{e.jolly:2d}[/color] [color=fff176]S{e.superstar or 0:2d}[/color]")
+            righe.append(f"{e.data:%d/%m/%y} [b]{' '.join(f'{n:2d}' for n in e.numeri)}[/b] {spec}")
+        self.mostrate += len(righe)
+        c.add_widget(Testo("\n".join(righe), (1, 1, 1, 1), font_size=sp(14), font_name="RobotoMono-Regular",
+                           line_height=1.25))
+        resto = len(self.tutte) - self.mostrate
+        if resto > 0:
+            self.b_altre.text = f"Mostra altre {min(resto, self.BLOCCO)} (ne restano {resto})"
+            c.add_widget(self.b_altre)
 
 
 class PaginaMagico(Pagina):
@@ -394,10 +409,10 @@ class PaginaVerifica(Pagina):
     def _mostra_esito(self, es, nota):
         self.esito.clear_widgets()
         sch = Scheda()
-        sch.add_widget(Testo(es.testo().replace("[", "(").replace("]", ")"), font_size=sp(13),
+        sch.add_widget(Testo(pulisci(es.testo()).replace("[", "(").replace("]", ")"), font_size=sp(13),
                              font_name="RobotoMono-Regular"))
         if nota:
-            sch.add_widget(Testo(f"[b]{nota}[/b]", font_size=sp(13)))
+            sch.add_widget(Testo(f"[b]{pulisci(nota)}[/b]", font_size=sp(13)))
         self.esito.add_widget(sch)
         g = self.g
         det = Scheda()
@@ -407,7 +422,7 @@ class PaginaVerifica(Pagina):
             presi = set(estratti)
             righe = [f"[b]{d:%d/%m/%Y}[/b]  estratti: {' '.join(map(str, estratti))}"]
             for i, (s, p) in enumerate(zip(combs, punti), 1):
-                righe.append(f"  {g.C()} {i}: {evidenzia(s, presi)}  → [b]{p}[/b]")
+                righe.append(f"  {g.C()} {i}: {evidenzia(s, presi)}  = [b]{p}[/b] punti")
             if g.is_ej:
                 righe.append(f"  Euro: {evidenzia(list(prev_sp), set(estr_sp))}  (usciti {estr_sp[0]} {estr_sp[1]})")
             else:
@@ -419,7 +434,7 @@ class PaginaVerifica(Pagina):
 
 
 class PaginaAI(Pagina):
-    titolo = "Intelligenza artificiale"
+    titolo = "AI"
 
     def __init__(self, app, **kw):
         super().__init__(app, name="ai", **kw)
@@ -470,6 +485,7 @@ class PaginaAI(Pagina):
         f = self.fornitore
         self.e_chiave.text = self.s.chiave(f)
         self.modelli = self.s.modelli(f)
+        self.modelli = [(m, d.split(" – ")[0]) for m, d in self.modelli]      # nome breve per lo schermo
         self.sp_mod.values = [d for _, d in self.modelli]
         attuale = self.s.modello(f)
         self.sp_mod.text = next((d for m, d in self.modelli if m == attuale), self.modelli[0][1])
@@ -521,7 +537,7 @@ class PaginaAI(Pagina):
             self.esito.add_widget(bottone("Usa questa scelta (salva tra le previsioni)",
                                           lambda: self._applica(rc, base, f), VERDE))
         sch2 = Scheda()
-        sch2.add_widget(Testo(servizi.descrivi_risposta(rc, base, self.g).replace("[", "(").replace("]", ")"),
+        sch2.add_widget(Testo(pulisci(servizi.descrivi_risposta(rc, base, self.g)).replace("[", "(").replace("]", ")"),
                               font_size=sp(13)))
         self.esito.add_widget(sch2)
 

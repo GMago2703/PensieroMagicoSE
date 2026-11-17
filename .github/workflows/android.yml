@@ -69,16 +69,31 @@ jobs:
           cp pmse/__init__.py pmse/icona.png mobile/pmse/
           cp -r pmse/core mobile/pmse/core
           find mobile -name __pycache__ -prune -exec rm -rf {} +
-      - name: Cache di buildozer
-        uses: actions/cache@v4
+      - name: Recupera la cache di buildozer
+        id: cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.buildozer
             mobile/.buildozer
-          key: buildozer-${{ hashFiles('mobile/buildozer.spec') }}-v1
+          key: buildozer-${{ github.run_id }}
+          restore-keys: buildozer-
       - name: Compila l'APK
         working-directory: mobile
-        run: yes | buildozer -v android debug 2>&1 | tail -n 400; test ${PIPESTATUS[1]} -eq 0
+        run: |
+          set +e
+          yes | buildozer -v android debug > buildozer.log 2>&1
+          esito=$?
+          tail -n 300 buildozer.log
+          exit $esito
+      - name: Salva la cache di buildozer (anche se la compilazione fallisce)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.buildozer
+            mobile/.buildozer
+          key: buildozer-${{ github.run_id }}
       - name: Rinomina l'APK
         run: |
           ls -la mobile/bin
