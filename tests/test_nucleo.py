@@ -268,3 +268,62 @@ def test_somiglianza(arch):
     from pmse.core.claude_ai import in_comune_archivio
     assert all(k <= 3 for k in in_comune_archivio([s.numeri for s in r.sestine], m))
     assert r.limiti_archivio[1] == 3
+
+
+def test_apprendimento(arch):
+    from pmse.core import apprendimento as ap, magico
+    tutte = storico_finto(700)
+    arch.unisci(tutte[:690])
+    assert ap.elabora_nuove(arch) == []                         # prima volta: si parte da oggi
+    r = magico.genera(arch.sestine())
+    magico.salva_previsione(arch, r)
+    arch.unisci(tutte[690:])
+    nuove = ap.elabora_nuove(arch)
+    assert len(nuove) == 10
+    v = nuove[0]
+    assert v.previsioni and v.previsioni[0]["origine"] == "Algoritmo"
+    assert set(v.prestazioni) == set(magico.VOCI)
+    assert all(0 <= x <= 1 for x in v.prestazioni.values())
+    assert sorted(int(k) for k in v.rango_finale) == v.estratti
+    assert "Estrazione del" in v.testo()
+    imp = magico.Impostazioni.da_json(arch.leggi_impostazione(magico.CHIAVE_IMP))
+    assert imp.stat_voci["eco"][0] == 10
+    assert ap.elabora_nuove(arch) == []                         # niente di nuovo
+    assert magico.leggi_previsioni(arch)[0].get("valutata")
+    assert len(ap.leggi_registro(arch)) == 10
+    assert "Valutazioni registrate: 10" in ap.riepilogo_per_claude(arch)
+    # su dati casuali i pesi effettivi restano vicini a quelli di base
+    imp2, _, fatti = ap.allena(arch.sestine(), magico.Impostazioni(), 400)
+    assert fatti == 400
+    eff = magico.pesi_effettivi(imp2)
+    assert abs(sum(eff.values()) - 1.0) < 0.01
+    assert all(0.5 * imp2.pesi[k] <= eff[k] <= 1.6 * imp2.pesi[k] for k in eff)
+    # un filtro che scarta troppe vincenti viene allentato
+    imp3 = magico.Impostazioni()
+    for _ in range(60):
+        corr = ap.aggiorna(imp3, {k: 0.5 for k in magico.VOCI}, {"decine": False, "somma": True})
+        if corr:
+            break
+    assert imp3.max_stessa_decina == 3 and corr
+
+
+def test_prova_chiave():
+    import io
+    import json
+    from unittest import mock
+
+    from pmse.core import claude_ai
+    with pytest.raises(claude_ai.ErroreClaude):
+        claude_ai.prova_chiave("abc", "claude-opus-5-5")
+
+    class R(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+    risp = {"model": "claude-opus-5-5", "content": [{"type": "text", "text": "OK"}]}
+    with mock.patch("urllib.request.urlopen", return_value=R(json.dumps(risp).encode())) as u:
+        esito = claude_ai.prova_chiave("sk-ant-prova", "claude-opus-5-5", "wrkspc_1")
+        assert u.call_args[0][0].get_header("Anthropic-workspace-id") == "wrkspc_1"
+    assert "OK" in esito

@@ -35,6 +35,7 @@ MODELLI = [
 CHIAVE_API = "claude_api_key"
 CHIAVE_MODELLO = "claude_modello"
 CHIAVE_VERIFICA = "magico_ultima_verifica"
+CHIAVE_WORKSPACE = "claude_workspace_id"
 
 SISTEMA = """Sei "Magico Pensiero", il motore di valutazione finale di un'applicazione Windows che studia \
 l'archivio storico del SuperEnalotto (6 numeri estratti da 1 a 90, più Jolly estratto dagli 84 rimanenti \
@@ -47,7 +48,9 @@ differenze piccole, e se un indicatore non ha mai dimostrato di funzionare dagli
 
 Compito:
 1. Studia il dossier: statistiche per numero, forma tipica delle sestine, ultime estrazioni, coppie, \
-punteggi e candidate dell'algoritmo, esito della verifica storica.
+punteggi e candidate dell'algoritmo, esito della verifica storica e le "Lezioni dalle ultime estrazioni" \
+(dove le previsioni passate hanno sbagliato e dove hanno visto giusto): tienine conto per correggere le \
+mancanze ricorrenti e rafforzare ciò che ha funzionato.
 2. Fai le tue analisi e valutazioni (puoi combinare gli indicatori a modo tuo, cercare schemi nelle ultime \
 estrazioni, ecc.) e scarta ciò che ritieni meno plausibile.
 3. Scegli a tuo insindacabile giudizio le 3 sestine più consone, il Jolly e il SuperStar. Puoi partire dalle \
@@ -101,7 +104,7 @@ def _riga(*v) -> str:
 
 
 def costruisci_dossier(storico: Storico, r: magico.RisultatoMagico, verifica: str | None = None,
-                       ultime: int = 40) -> str:
+                       ultime: int = 40, lezioni: str | None = None, imp: magico.Impostazioni | None = None) -> str:
     n = len(storico)
     m = magico.matrice(storico)
     rit, medio = magico._ritardi(m)
@@ -189,6 +192,14 @@ def costruisci_dossier(storico: Storico, r: magico.RisultatoMagico, verifica: st
 
     out.append("## Verifica storica dell'algoritmo")
     out.append(verifica.strip() if verifica else "Non ancora eseguita.")
+    out.append("")
+    out.append("## Lezioni dalle ultime estrazioni (confronto tra previsioni e numeri usciti)")
+    if imp is not None:
+        eff = magico.pesi_effettivi(imp)
+        out.append("Pesi effettivi attuali delle voci dopo l'apprendimento: " +
+                   ", ".join(f"{magico.VOCI[k]} {v}" for k, v in eff.items()))
+        out.append("Filtri di forma attuali: " + "; ".join(magico.descrivi_filtri(imp, storico).values()))
+    out.append(lezioni.strip() if lezioni else "Nessuna valutazione ancora disponibile.")
     return "\n".join(out)
 
 
@@ -256,12 +267,16 @@ def valida_risposta(d: dict, gia_uscite: set[tuple], m: np.ndarray | None = None
                           in_comune_archivio=comuni_arch)
 
 
-def _invia(chiave: str, corpo: dict, timeout: int) -> dict:
-    req = urllib.request.Request(URL_API, data=json.dumps(corpo).encode("utf-8"), method="POST", headers={
+def _invia(chiave: str, corpo: dict, timeout: int, workspace: str = "") -> dict:
+    intestazioni = {
         "x-api-key": chiave,
         "anthropic-version": VERSIONE_API,
         "content-type": "application/json",
-    })
+    }
+    if workspace:        # serve solo per chiavi non legate a un workspace
+        intestazioni["anthropic-workspace-id"] = workspace
+    req = urllib.request.Request(URL_API, data=json.dumps(corpo).encode("utf-8"), method="POST",
+                                 headers=intestazioni)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
@@ -271,7 +286,8 @@ def _invia(chiave: str, corpo: dict, timeout: int) -> dict:
             dettaglio = json.loads(dettaglio)["error"]["message"]
         except (ValueError, KeyError, TypeError):
             pass
-        spiegazioni = {401: "chiave API non valida", 402: "credito API esaurito",
+        spiegazioni = {400: "richiesta non accettata (se la chiave non è legata a un workspace, indica l'ID "
+                            "workspace)", 401: "chiave API non valida", 402: "credito API esaurito",
                        403: "chiave senza permessi", 404: "modello non disponibile per questa chiave",
                        429: "troppe richieste o limite di spesa raggiunto", 529: "servizio momentaneamente sovraccarico"}
         raise ErroreClaude(f"Errore {ex.code} ({spiegazioni.get(ex.code, 'errore del servizio')}): {dettaglio}")
@@ -286,16 +302,29 @@ def _testo(dati: dict) -> str:
     return testo
 
 
+def prova_chiave(chiave: str, modello: str, workspace: str = "") -> str:
+    """Piccola richiesta di prova: restituisce un messaggio di esito o solleva ErroreClaude."""
+    if not chiave:
+        raise ErroreClaude("Manca la chiave API.")
+    if not chiave.startswith("sk-ant-"):
+        raise ErroreClaude("La chiave dovrebbe iniziare con «sk-ant-»: controlla di averla copiata per intero.")
+    corpo = {"model": modello, "max_tokens": 20,
+             "messages": [{"role": "user", "content": "Rispondi soltanto: OK"}]}
+    dati = _invia(chiave, corpo, 60, workspace)
+    testo = "".join(b.get("text", "") for b in dati.get("content", []) if b.get("type") == "text").strip()
+    return f"Collegamento riuscito con {dati.get('model', modello)}. Risposta di prova: «{testo[:40]}»."
+
+
 def chiedi_a_claude(chiave: str, modello: str, dossier: str, gia_uscite: set[tuple],
                     m: np.ndarray | None = None, limiti: tuple[int, int] | None = None,
-                    timeout: int = 300) -> RispostaClaude:
+                    timeout: int = 300, workspace: str = "") -> RispostaClaude:
     """Chiede a Claude la scelta. Se la risposta viola le regole, gli chiede UNA volta di correggerla."""
     if not chiave:
         raise ErroreClaude("Manca la chiave API di Claude.")
     messaggi = [{"role": "user", "content": dossier + "\n\nOra scegli le 3 sestine, il Jolly e il SuperStar "
                                                        "e rispondi solo con il JSON richiesto."}]
     corpo = {"model": modello, "max_tokens": 6000, "system": SISTEMA, "messages": messaggi}
-    dati = _invia(chiave, corpo, timeout)
+    dati = _invia(chiave, corpo, timeout, workspace)
     testo = _testo(dati)
     r = valida_risposta(_estrai_json(testo), gia_uscite, m, limiti)
     ing, usc = int(dati.get("usage", {}).get("input_tokens", 0)), int(dati.get("usage", {}).get("output_tokens", 0))
@@ -305,7 +334,7 @@ def chiedi_a_claude(chiave: str, modello: str, dossier: str, gia_uscite: set[tup
                                                  "regole obbligatorie:\n- " + "\n- ".join(r.avvisi) +
                                                  "\nCorreggi le sestine (o Jolly/SuperStar) interessate e rispondi "
                                                  "di nuovo solo con il JSON completo."}]
-        dati2 = _invia(chiave, corpo, timeout)
+        dati2 = _invia(chiave, corpo, timeout, workspace)
         try:
             r2 = valida_risposta(_estrai_json(_testo(dati2)), gia_uscite, m, limiti)
             r2.corretta = True

@@ -179,6 +179,22 @@ def test_nuove_finestre(app, arch):
         cl._applica()
     cl.close()
     w.mostra_magico(cl.applicato, "Scelta di Claude")
+    from pmse.core import apprendimento as ap
+    from pmse.ui.magico import FinestraApprendimento
+    ap.elabora_nuove(arch)                       # avvia il conteggio "da oggi"
+    arch.unisci(storico_finto(620)[600:])        # 20 nuove estrazioni
+    nuove = ap.elabora_nuove(arch)
+    assert nuove
+    fa = FinestraApprendimento(arch, nuove, w)
+    fa.show()
+    fa.s_n.setValue(100)
+    fa._allena()
+    fa.thread.wait(60000)
+    app.processEvents()
+    fa.tab.selectRow(0)
+    app.processEvents()
+    foto("apprendimento", fa)
+    fa.close()
     st = FinestraStorico(arch, w)
     st.show()
     app.processEvents()

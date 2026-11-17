@@ -36,6 +36,7 @@ i punti ottenuti con quelli di sestine scelte a caso.
 from __future__ import annotations
 
 import json
+import math
 import zlib
 from dataclasses import asdict, dataclass, field
 from datetime import date
@@ -68,6 +69,21 @@ class Impostazioni:
     limite_archivio: int = 0
     soglia_archivio: float = 90.0       # copertura usata per il limite automatico (%)
     finestra_archivio: int = 500        # ultime estrazioni studiate per il limite automatico
+    # apprendimento: dopo ogni estrazione i pesi delle voci vengono corretti in base a come
+    # ognuna aveva "visto" i numeri usciti (vedi apprendimento.py)
+    apprendimento: bool = True
+    forza_apprendimento: float = 0.30   # quanto le prove accumulate possono spostare i pesi
+    stat_voci: dict[str, list] = field(default_factory=dict)     # voce -> [valutazioni, somma posizioni]
+    stat_filtri: dict[str, list] = field(default_factory=dict)   # filtro -> [valutazioni, vincenti scartate]
+    soglia_filtri: float = 0.25          # oltre questa quota di vincenti scartate il filtro si allenta
+    # forma delle sestine (regolata anche dall'apprendimento)
+    pari_min: int = 2
+    pari_max: int = 4
+    alti_min: int = 2
+    alti_max: int = 4
+    consecutivi_max: int = 1
+    somma_percentile: int = 10           # somma tra il percentile X e 100-X dello storico
+    max_stessa_decina: int = 2
 
     def a_json(self) -> str:
         return json.dumps(asdict(self))
@@ -206,8 +222,9 @@ def calcola_punteggi(storico: Storico, imp: Impostazioni, m: np.ndarray | None =
     }
     totale = np.zeros(91)
     somma_pesi = 0.0
+    effettivi = pesi_effettivi(imp)
     for k, v in voci.items():
-        p = float(imp.pesi.get(k, 0))
+        p = float(effettivi.get(k, 0))
         totale += p * v
         somma_pesi += abs(p)
     for nome, punteggi in (extra or {}).items():
@@ -223,10 +240,59 @@ def calcola_punteggi(storico: Storico, imp: Impostazioni, m: np.ndarray | None =
     return totale, voci, lift, m
 
 
-def _limiti_forma(m: np.ndarray, storico: Storico):
+def pesi_effettivi(imp: Impostazioni) -> dict[str, float]:
+    """Pesi impostati dall'utente corretti dall'apprendimento: ogni voce viene moltiplicata per
+    exp(forza * z), dove z misura quanto, su tutte le estrazioni valutate, la voce ha messo i numeri
+    usciti più in alto (z > 0) o più in basso (z < 0) di quanto farebbe il caso. Si conta solo la parte
+    di z oltre 1,5 (le oscillazioni dovute al caso stanno quasi sempre sotto): così il caso non fa
+    "impazzire" l'algoritmo, mentre una voce che funziona davvero guadagna peso col tempo."""
+    base = {k: float(imp.pesi.get(k, 0)) for k in VOCI}
+    if not imp.apprendimento or not imp.stat_voci:
+        return base
+    totale = sum(base.values())
+    out = {}
+    for k, w in base.items():
+        n, somma = imp.stat_voci.get(k, [0, 0.0])
+        z = 0.0
+        if n:
+            z = (somma / n - 0.5) / math.sqrt((1 / 12) / 6 / n)     # deviazioni standard dal caso
+        z = math.copysign(max(0.0, abs(z) - 1.5), z)
+        out[k] = w * math.exp(imp.forza_apprendimento * max(-3.0, min(3.0, z)))
+    f = totale / sum(out.values()) if sum(out.values()) else 1
+    return {k: round(v * f, 4) for k, v in out.items()}
+
+
+def _limiti_forma(m, storico: Storico, percentile: int = 15):
     somme = np.array([sum(r[1]) for r in storico]) if storico else np.array([273])
-    lo, hi = np.percentile(somme, [15, 85])
+    lo, hi = np.percentile(somme, [percentile, 100 - percentile])
     return int(lo), int(hi)
+
+
+FILTRI = ["pari/dispari", "alti/bassi", "consecutivi", "somma", "decine"]
+
+
+def controlla_forma(cand: np.ndarray, imp: Impostazioni, storico: Storico) -> dict[str, np.ndarray]:
+    """Per ogni filtro di forma: quali sestine lo superano."""
+    pari, alti, cons, somma, maxdec = _profilo(cand)
+    s_lo, s_hi = _limiti_forma(None, storico, imp.somma_percentile)
+    return {
+        "pari/dispari": (pari >= imp.pari_min) & (pari <= imp.pari_max),
+        "alti/bassi": (alti >= imp.alti_min) & (alti <= imp.alti_max),
+        "consecutivi": cons <= imp.consecutivi_max,
+        "somma": (somma >= s_lo) & (somma <= s_hi),
+        "decine": maxdec <= imp.max_stessa_decina,
+    }
+
+
+def descrivi_filtri(imp: Impostazioni, storico: Storico) -> dict[str, str]:
+    s_lo, s_hi = _limiti_forma(None, storico, imp.somma_percentile)
+    return {
+        "pari/dispari": f"da {imp.pari_min} a {imp.pari_max} numeri pari",
+        "alti/bassi": f"da {imp.alti_min} a {imp.alti_max} numeri alti (46-90)",
+        "consecutivi": f"al massimo {imp.consecutivi_max} coppie consecutive",
+        "somma": f"somma tra {s_lo} e {s_hi}",
+        "decine": f"al massimo {imp.max_stessa_decina} numeri nella stessa decina",
+    }
 
 
 def _superstar(storico: Storico, imp: Impostazioni) -> int | None:
@@ -259,11 +325,9 @@ def genera(storico: Storico, imp: Impostazioni | None = None,
     chiavi = rng.random((imp.candidate, 90)) ** (1.0 / (pesi / pesi.sum() * 90))
     cand = np.sort(np.argpartition(-chiavi, 5, axis=1)[:, :6] + 1, axis=1)
     cand = np.unique(cand, axis=0)
-    pari, alti, cons, somma, maxdec = _profilo(cand)
-    s_lo, s_hi = _limiti_forma(m, storico)
-    ok = ((pari >= 2) & (pari <= 4) & (alti >= 2) & (alti <= 4) & (cons <= 1)
-          & (somma >= s_lo) & (somma <= s_hi) & (maxdec <= 2))
+    ok = np.logical_and.reduce(list(controlla_forma(cand, imp, storico).values()))
     if ok.sum() < 10:      # forma troppo restrittiva per questi punteggi: allenta
+        pari, alti, cons, somma, maxdec = _profilo(cand)
         ok = (pari >= 1) & (pari <= 5) & (cons <= 2) & (maxdec <= 3)
     cand = cand[ok]
     usciti = {tuple(r[1]) for r in storico}

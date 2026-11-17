@@ -41,7 +41,7 @@ class FinestraImpostazioni(QDialog):
         spieg.setWordWrap(True)
         spieg.setStyleSheet("background:#f3e5f5; padding:6px; font-size:11px;")
         v.addWidget(spieg)
-        g = QGroupBox("Pesi delle voci (0 = ignora)")
+        g = QGroupBox("Pesi di base delle voci (0 = ignora; l'apprendimento li corregge automaticamente)")
         f = QFormLayout(g)
         self.pesi = {}
         for k, nome in magico.VOCI.items():
@@ -148,13 +148,13 @@ class FinestraImpostazioni(QDialog):
         self.s_fin.setValue(imp.finestra_archivio)
 
     def _salva(self):
-        imp = magico.Impostazioni(
-            pesi={k: s.value() for k, s in self.pesi.items()},
-            finestra_tendenza=self.s_tend.value(), profondita_eco=self.s_eco.value(),
-            personalizzate={k: s.value() for k, s in self.pers.items() if s.value()},
-            nitidezza=self.s_nit.value(), max_comuni=self.s_com.value(),
-            limite_archivio=self._imp_limiti().limite_archivio, soglia_archivio=self.s_soglia.value(),
-            finestra_archivio=self.s_fin.value())
+        imp = carica_impostazioni(self.arch)      # conserva statistiche e filtri appresi
+        imp.pesi = {k: s.value() for k, s in self.pesi.items()}
+        imp.finestra_tendenza, imp.profondita_eco = self.s_tend.value(), self.s_eco.value()
+        imp.personalizzate = {k: s.value() for k, s in self.pers.items() if s.value()}
+        imp.nitidezza, imp.max_comuni = self.s_nit.value(), self.s_com.value()
+        imp.limite_archivio = self._imp_limiti().limite_archivio
+        imp.soglia_archivio, imp.finestra_archivio = self.s_soglia.value(), self.s_fin.value()
         if not any(imp.pesi.values()) and not imp.personalizzate:
             QMessageBox.warning(self, "Impostazioni", "Almeno una voce deve avere peso maggiore di zero.")
             return
@@ -297,3 +297,185 @@ class FinestraStorico(QDialog):
                              "Jolly", "SuperStar", "Estrazione successiva", "Punti 1", "Punti 2", "Punti 3",
                              "Jolly tra i 6", "SuperStar preso"], righe)
         v.addWidget(tab, 1)
+
+
+# ---------------------------------------------------------------- apprendimento
+class Allenatore(QThread):
+    avanzamento = Signal(int, int)
+    finito = Signal(object)
+
+    def __init__(self, storico, imp, concorsi):
+        super().__init__()
+        self.storico, self.imp, self.concorsi = storico, imp, concorsi
+        self._stop = False
+
+    def run(self):
+        from ..core import apprendimento
+        self.finito.emit(apprendimento.allena(self.storico, self.imp, self.concorsi,
+                                              lambda i, n: self.avanzamento.emit(i, n), lambda: self._stop))
+
+
+class FinestraApprendimento(QDialog):
+    """Analisi delle previsioni rispetto alle estrazioni uscite e stato dell'apprendimento."""
+
+    def __init__(self, arch: Archivio, nuove=None, parent=None):
+        super().__init__(parent)
+        from PySide6.QtWidgets import QCheckBox, QSplitter
+        self.arch = arch
+        self.thread = None
+        self.setWindowTitle("Magico Pensiero – analisi delle previsioni e apprendimento")
+        self.resize(1200, 760)
+        v = QVBoxLayout(self)
+        if nuove:
+            l = QLabel(f"<b>Sono uscite {len(nuove)} nuove estrazioni: ecco come le aveva viste Magico Pensiero "
+                       "e cosa è stato corretto.</b>")
+            l.setStyleSheet("background:#e8f5e9; padding:6px;")
+            v.addWidget(l)
+        div = QSplitter()
+        sx = QVBoxLayout()
+        w_sx = QGroupBox("Estrazioni valutate (clic per i dettagli)")
+        w_sx.setLayout(sx)
+        self.tab = QTableWidget()
+        self.tab.verticalHeader().setVisible(False)
+        self.tab.setSelectionBehavior(QTableWidget.SelectRows)
+        self.tab.itemSelectionChanged.connect(self._dettaglio)
+        sx.addWidget(self.tab, 2)
+        self.testo = QPlainTextEdit()
+        self.testo.setReadOnly(True)
+        sx.addWidget(self.testo, 3)
+        div.addWidget(w_sx)
+
+        dx = QVBoxLayout()
+        w_dx = QGroupBox("Stato dell'apprendimento")
+        w_dx.setLayout(dx)
+        self.tab_voci = QTableWidget()
+        self.tab_voci.verticalHeader().setVisible(False)
+        dx.addWidget(QLabel("Come ogni voce ha 'visto' i numeri usciti (50% = come il caso; lo scarto conta "
+                            "solo oltre ±1,5):"))
+        dx.addWidget(self.tab_voci, 2)
+        self.l_filtri = QLabel()
+        self.l_filtri.setWordWrap(True)
+        dx.addWidget(self.l_filtri)
+        f = QFormLayout()
+        imp = carica_impostazioni(arch)
+        self.ck_att = QCheckBox("Apprendimento automatico attivo")
+        self.ck_att.setChecked(imp.apprendimento)
+        self.s_forza = QDoubleSpinBox()
+        self.s_forza.setRange(0, 2)
+        self.s_forza.setSingleStep(0.05)
+        self.s_forza.setValue(imp.forza_apprendimento)
+        self.s_soglia = QDoubleSpinBox()
+        self.s_soglia.setRange(5, 60)
+        self.s_soglia.setSuffix(" %")
+        self.s_soglia.setValue(imp.soglia_filtri * 100)
+        f.addRow(self.ck_att)
+        f.addRow("Forza della correzione dei pesi", self.s_forza)
+        f.addRow("Allenta un filtro se scarta più vincenti di", self.s_soglia)
+        dx.addLayout(f)
+        b_salva = QPushButton("💾 Salva queste impostazioni")
+        b_salva.clicked.connect(self._salva)
+        dx.addWidget(b_salva)
+        h = QHBoxLayout()
+        h.addWidget(QLabel("Allena sul passato, ultimi"))
+        self.s_n = QSpinBox()
+        self.s_n.setRange(50, 5000)
+        self.s_n.setValue(1000)
+        h.addWidget(self.s_n)
+        h.addWidget(QLabel("concorsi"))
+        self.b_allena = QPushButton("▶ Allena")
+        self.b_allena.clicked.connect(self._allena)
+        h.addWidget(self.b_allena)
+        dx.addLayout(h)
+        self.barra = QProgressBar()
+        dx.addWidget(self.barra)
+        b_azz = QPushButton("Azzera l'apprendimento (torna ai pesi e filtri di base)")
+        b_azz.clicked.connect(self._azzera)
+        dx.addWidget(b_azz)
+        div.addWidget(w_dx)
+        div.setSizes([700, 500])
+        v.addWidget(div, 1)
+        self._ricarica()
+
+    def _ricarica(self):
+        from ..core import apprendimento
+        self.registro = list(reversed(apprendimento.leggi_registro(self.arch)))
+        righe = []
+        for r in self.registro:
+            alg = [max(p["punti"]) for p in r.get("previsioni", []) if p["origine"] == "Algoritmo"]
+            cla = [max(p["punti"]) for p in r.get("previsioni", []) if p["origine"].startswith("Claude")]
+            righe.append([date.fromisoformat(r["data_estrazione"]).strftime("%d/%m/%Y"),
+                          " ".join(map(str, r["estratti"])), alg[0] if alg else "-", cla[0] if cla else "-",
+                          len(r.get("positivi", [])), len(r.get("mancanze", []))])
+        riempi_tabella(self.tab, ["Estrazione", "Numeri usciti", "Punti algoritmo", "Punti Claude", "Positivi",
+                                  "Mancanze"], righe)
+        if self.registro:
+            self.tab.selectRow(0)
+        else:
+            self.testo.setPlainText("Nessuna estrazione valutata finora.\n\nDa oggi in poi, ogni volta che una "
+                                    "nuova estrazione entra in archivio, il programma la confronta con le sestine "
+                                    "generate e corregge l'algoritmo. Puoi anche allenarlo subito sul passato con il "
+                                    "pulsante «Allena».")
+        imp = carica_impostazioni(self.arch)
+        riempi_tabella(self.tab_voci, ["Voce", "Valutazioni", "Posizione media %", "Scarto dal caso",
+                                       "Peso di base", "Peso effettivo"], apprendimento.stato_voci(imp))
+        descr = magico.descrivi_filtri(imp, self.arch.sestine())
+        self.l_filtri.setText("<b>Filtri di forma attuali:</b> " + "; ".join(descr.values()))
+
+    def _dettaglio(self):
+        from ..core.apprendimento import Valutazione
+        righe = {i.row() for i in self.tab.selectedItems()}
+        if not righe:
+            return
+        r = self.registro[next(iter(righe))]
+        val = Valutazione(**{k: r[k] for k in Valutazione.__dataclass_fields__ if k in r})
+        self.testo.setPlainText(val.testo())
+
+    def _salva(self):
+        imp = carica_impostazioni(self.arch)
+        imp.apprendimento = self.ck_att.isChecked()
+        imp.forza_apprendimento = self.s_forza.value()
+        imp.soglia_filtri = self.s_soglia.value() / 100
+        self.arch.scrivi_impostazione(magico.CHIAVE_IMP, imp.a_json())
+        self._ricarica()
+
+    def _allena(self):
+        storico = self.arch.sestine()
+        if len(storico) < 150:
+            QMessageBox.warning(self, "Allena", "Servono almeno 150 estrazioni in archivio.")
+            return
+        self._salva()
+        self.b_allena.setEnabled(False)
+        self.thread = Allenatore(storico, carica_impostazioni(self.arch), self.s_n.value())
+        self.thread.avanzamento.connect(lambda i, n: (self.barra.setMaximum(n), self.barra.setValue(i)))
+        self.thread.finito.connect(self._allenato)
+        self.thread.start()
+
+    def _allenato(self, esito):
+        imp, correzioni, fatti = esito
+        self.arch.scrivi_impostazione(magico.CHIAVE_IMP, imp.a_json())
+        self.b_allena.setEnabled(True)
+        self._ricarica()
+        testo = f"Allenamento completato su {fatti} concorsi.\n\n"
+        testo += ("Correzioni ai filtri:\n" + "\n".join(correzioni)) if correzioni else \
+            "Nessun filtro ha avuto bisogno di correzioni."
+        testo += "\n\nI pesi effettivi delle voci sono nella tabella a destra."
+        self.testo.setPlainText(testo)
+
+    def _azzera(self):
+        if QMessageBox.question(self, "Azzera", "Cancellare le statistiche apprese e tornare ai filtri di base? "
+                                                "(I pesi di base restano quelli impostati.)") != QMessageBox.Yes:
+            return
+        imp = carica_impostazioni(self.arch)
+        base = magico.Impostazioni()
+        imp.stat_voci, imp.stat_filtri = {}, {}
+        for campo in ("pari_min", "pari_max", "alti_min", "alti_max", "consecutivi_max", "somma_percentile",
+                      "max_stessa_decina"):
+            setattr(imp, campo, getattr(base, campo))
+        self.arch.scrivi_impostazione(magico.CHIAVE_IMP, imp.a_json())
+        self._ricarica()
+
+    def closeEvent(self, ev):
+        if self.thread and self.thread.isRunning():
+            self.thread._stop = True
+            self.thread.wait(5000)
+        super().closeEvent(ev)

@@ -78,6 +78,8 @@ class FinestraPrincipale(QMainWindow):
         self.aggiorna_stato()
         self._mostra_ultima_previsione()
         if avvio_automatico:
+            QTimer.singleShot(200, self._valuta_nuove)
+        if avvio_automatico:
             QTimer.singleShot(400, self._all_avvio)
 
     # ------------------------------------------------------------------ menu
@@ -131,6 +133,7 @@ class FinestraPrincipale(QMainWindow):
         self._azione(m, "Impostazioni dell'algoritmo...", self.impostazioni_magico)
         self._azione(m, "Verifica storica dell'algoritmo...", self.verifica_magico)
         self._azione(m, "Storico delle previsioni...", self.storico_magico)
+        self._azione(m, "📈 Analisi delle previsioni e apprendimento...", self.apprendimento)
 
         for nome in MENU_VUOTI_DOPO:
             self._menu_vuoto(nome)
@@ -207,6 +210,20 @@ class FinestraPrincipale(QMainWindow):
     def _dopo(self, dlg):
         if getattr(dlg, "modificato", False):
             self.aggiorna_stato()
+            self._valuta_nuove()
+
+    def _valuta_nuove(self):
+        """Dopo ogni aggiornamento dell'archivio: confronta le previsioni con le estrazioni uscite
+        e corregge Magico Pensiero (apprendimento)."""
+        from ..core import apprendimento
+        try:
+            nuove = apprendimento.elabora_nuove(self.arch)
+        except Exception as ex:     # l'apprendimento non deve mai bloccare il programma
+            self.statusBar().showMessage(f"Analisi delle previsioni non riuscita: {ex}", 10000)
+            return
+        if nuove:
+            from .magico import FinestraApprendimento
+            FinestraApprendimento(self.arch, nuove, self).exec()
 
     def apri_archivio(self):
         dlg = FinestraArchivio(self.arch, self)
@@ -355,6 +372,10 @@ class FinestraPrincipale(QMainWindow):
         from .magico import FinestraVerifica
         FinestraVerifica(self.arch, self).exec()
 
+    def apprendimento(self):
+        from .magico import FinestraApprendimento
+        FinestraApprendimento(self.arch, parent=self).exec()
+
     def storico_magico(self):
         from .magico import FinestraStorico
         FinestraStorico(self.arch, self).exec()
@@ -391,6 +412,8 @@ class FinestraPrincipale(QMainWindow):
         esito = self.arch.unisci(estrazioni)
         self.arch.scrivi_impostazione("ultimo_aggiornamento", date.today().isoformat())
         self.aggiorna_stato()
+        if esito.nuove:
+            self._valuta_nuove()
         msg = f"Aggiornamento automatico: {esito.nuove} nuove estrazioni" if esito.nuove else \
             "Archivio già aggiornato"
         if esito.conflitti:

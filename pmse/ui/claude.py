@@ -12,24 +12,26 @@ from .griglia import COLORE_JOLLY, COLORI_SESTINE, Griglia90
 from .magico import carica_impostazioni, punteggi_personalizzati
 
 INFO_CHIAVE = (
-    "Per far intervenire Claude serve una <b>chiave API</b> personale: si crea nella Claude Console "
-    "(<b>platform.claude.com</b> → API keys) dopo aver acquistato del credito. L'uso dell'API è a pagamento "
-    "e separato dall'abbonamento a claude.ai (i piani Max, Ultra e Team includono un credito API mensile). "
-    "Ogni consultazione invia a Claude un riepilogo statistico dell'archivio (qualche migliaio di token). "
-    "La chiave resta salvata solo su questo computer, nell'archivio del programma.")
+    "Per far intervenire Claude serve una <b>chiave API</b> personale (a pagamento, separata dall'abbonamento "
+    "a claude.ai): 1) accedi a <b>platform.claude.com</b> e acquista del credito (Settings → Billing); "
+    "2) apri <b>platform.claude.com/settings/keys</b> → <b>Create key</b>, dai un nome, scegli la scadenza e "
+    "<b>lega la chiave a un workspace</b> (es. Default) così non serve l'ID workspace; 3) copia la chiave "
+    "(inizia con <b>sk-ant-</b>), incollala qui sotto e premi <b>Prova la chiave</b>. "
+    "La chiave resta salvata solo su questo computer.")
 
 
 class Interrogatore(QThread):
     finito = Signal(object)
     errore = Signal(str)
 
-    def __init__(self, chiave, modello, dossier, gia_uscite, m, limiti):
+    def __init__(self, chiave, modello, dossier, gia_uscite, m, limiti, workspace=""):
         super().__init__()
         self.args = (chiave, modello, dossier, gia_uscite, m, limiti)
+        self.workspace = workspace
 
     def run(self):
         try:
-            self.finito.emit(claude_ai.chiedi_a_claude(*self.args))
+            self.finito.emit(claude_ai.chiedi_a_claude(*self.args, workspace=self.workspace))
         except claude_ai.ErroreClaude as ex:
             self.errore.emit(str(ex))
         except Exception as ex:   # qualunque imprevisto di rete o di formato
@@ -61,6 +63,14 @@ class FinestraClaude(QDialog):
         b_salva = QPushButton("Salva chiave")
         b_salva.clicked.connect(self._salva_chiave)
         h.addWidget(b_salva)
+        b_prova = QPushButton("🔌 Prova la chiave")
+        b_prova.clicked.connect(self._prova_chiave)
+        h.addWidget(b_prova)
+        h.addWidget(QLabel("ID workspace (facoltativo):"))
+        self.e_ws = QLineEdit(arch.leggi_impostazione(claude_ai.CHIAVE_WORKSPACE) or "")
+        self.e_ws.setPlaceholderText("wrkspc_... solo se richiesto")
+        self.e_ws.setMaximumWidth(200)
+        h.addWidget(self.e_ws)
         h.addSpacing(20)
         h.addWidget(QLabel("Modello:"))
         self.c_modello = QComboBox()
@@ -116,9 +126,25 @@ class FinestraClaude(QDialog):
         v.addLayout(h3, 1)
 
     # ----------------------------------------------------------------- azioni
-    def _salva_chiave(self):
+    def _salva_chiave(self, avvisa: bool = True):
         self.arch.scrivi_impostazione(claude_ai.CHIAVE_API, self.e_chiave.text().strip())
-        QMessageBox.information(self, "Chiave API", "Chiave salvata su questo computer.")
+        self.arch.scrivi_impostazione(claude_ai.CHIAVE_WORKSPACE, self.e_ws.text().strip())
+        self.arch.scrivi_impostazione(claude_ai.CHIAVE_MODELLO, self.c_modello.currentData())
+        if avvisa:
+            QMessageBox.information(self, "Chiave API", "Chiave salvata su questo computer.")
+
+    def _prova_chiave(self):
+        from PySide6.QtWidgets import QApplication
+        self._salva_chiave(avvisa=False)
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            esito = claude_ai.prova_chiave(self.e_chiave.text().strip(), self.c_modello.currentData(),
+                                           self.e_ws.text().strip())
+            QMessageBox.information(self, "Prova della chiave", "✔ " + esito)
+        except claude_ai.ErroreClaude as ex:
+            QMessageBox.warning(self, "Prova della chiave", f"La chiave non funziona ancora:\n\n{ex}")
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def _prepara(self) -> str | None:
         storico = self.arch.sestine()
@@ -129,8 +155,10 @@ class FinestraClaude(QDialog):
         self.base = magico.genera(storico, imp, punteggi_personalizzati(self.arch, imp, storico))
         self.gia_uscite = {tuple(x[1]) for x in storico}
         self.matrice = magico.matrice(storico)
+        from ..core import apprendimento
         return claude_ai.costruisci_dossier(storico, self.base,
-                                            self.arch.leggi_impostazione(claude_ai.CHIAVE_VERIFICA))
+                                            self.arch.leggi_impostazione(claude_ai.CHIAVE_VERIFICA),
+                                            lezioni=apprendimento.riepilogo_per_claude(self.arch), imp=imp)
 
     def _mostra_dossier(self):
         dossier = self._prepara()
@@ -162,7 +190,7 @@ class FinestraClaude(QDialog):
         self.barra.setVisible(True)
         self.testo.setHtml("<p>Claude sta studiando l'archivio... (di solito meno di un minuto)</p>")
         self.thread = Interrogatore(chiave, self.c_modello.currentData(), dossier, self.gia_uscite,
-                                    self.matrice, self.base.limiti_archivio)
+                                    self.matrice, self.base.limiti_archivio, self.e_ws.text().strip())
         self.thread.finito.connect(self._risposta)
         self.thread.errore.connect(self._errore)
         self.thread.start()

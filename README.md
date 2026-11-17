@@ -9,6 +9,11 @@ Non serve installare niente: basta avviare il file. Al primo avvio Windows potre
 
 L'archivio viene salvato in `%APPDATA%\PensieroMagicoSE\archivio.db`.
 
+## Versione 0.4 – Analisi delle previsioni e apprendimento
+Da quando si installa questa versione, ogni nuova estrazione che entra in archivio viene analizzata automaticamente: il programma rifà il calcolo di Magico Pensiero "com'era prima", guarda in che posizione ogni voce aveva messo i numeri usciti, controlla se i filtri avrebbero scartato la combinazione vincente e confronta le sestine salvate (dell'algoritmo e di Claude) con quella uscita. Il risultato è un elenco di **positivi** e **mancanze** (menu Magico Pensiero → Analisi delle previsioni e apprendimento).
+L'algoritmo si corregge da solo: i pesi effettivi delle voci si spostano verso quelle che, sommando tutte le estrazioni valutate, hanno visto i numeri usciti meglio del caso (conta solo lo scarto oltre ±1,5 deviazioni standard, così le oscillazioni casuali non lo sbilanciano) e i filtri che scartano troppo spesso le vere vincenti vengono allentati. Si può allenare subito sul passato e azzerare. Le lezioni vengono passate anche a Claude.
+Nella finestra di Claude: pulsante **Prova la chiave** e campo facoltativo **ID workspace**.
+
 ## Versione 0.3.1 – Somiglianza con l'archivio
 Nuova analisi *Somiglianza con l'archivio*: per ogni combinazione vincente calcola il massimo di numeri in comune con una qualsiasi estrazione precedente e ricava l'intervallo consigliato (di solito 3-4). Magico Pensiero scarta le sestine fuori da questo intervallo (automatico o fissato a 3/4/5 nelle impostazioni), Claude riceve la regola come obbligatoria e, se non la rispetta, gli viene chiesto di correggere la risposta. Nella ricerca di sestine un pulsante applica i limiti consigliati.
 
