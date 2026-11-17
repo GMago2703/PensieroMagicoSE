@@ -105,11 +105,16 @@ class Archivio:
         ordine = "ASC" if crescente else "DESC"
         return [self._da_riga(r) for r in self.con.execute(f"SELECT * FROM estrazioni ORDER BY data {ordine}")]
 
-    def sestine(self) -> list[tuple[date, list[int], int, int | None]]:
-        """Accesso veloce per le analisi: (data, sestina ordinata, jolly, superstar) in ordine crescente."""
-        return [(date.fromisoformat(r[0]), [r[1], r[2], r[3], r[4], r[5], r[6]], r[7], r[8])
-                for r in self.con.execute(
-                    "SELECT data,n1,n2,n3,n4,n5,n6,jolly,superstar FROM estrazioni ORDER BY data")]
+    def sestine(self) -> list[tuple[date, list[int], int, int | None, list[int]]]:
+        """Accesso veloce per le analisi, in ordine crescente di data:
+        (data, sestina ordinata, jolly, superstar, numeri nell'ordine di estrazione)."""
+        out = []
+        for r in self.con.execute("SELECT data,n1,n2,n3,n4,n5,n6,jolly,superstar,e1,e2,e3,e4,e5,e6 "
+                                  "FROM estrazioni ORDER BY data"):
+            s = [r[1], r[2], r[3], r[4], r[5], r[6]]
+            ordine = [r[9], r[10], r[11], r[12], r[13], r[14]]
+            out.append((date.fromisoformat(r[0]), s, r[7], r[8], ordine if all(ordine) else list(s)))
+        return out
 
     def conta(self) -> int:
         return self.con.execute("SELECT COUNT(*) FROM estrazioni").fetchone()[0]

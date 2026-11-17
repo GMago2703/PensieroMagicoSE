@@ -142,3 +142,64 @@ def test_analisi(arch):
     riga86 = [r for r in fr.righe if r[0] == 86][0]
     assert riga86[1] == 2 and riga86[3] == 0
     assert verifica_integrita(arch)
+
+
+def storico_finto(n=400, seme=7):
+    import random
+    from datetime import timedelta
+    rnd = random.Random(seme)
+    out = []
+    d = date(2010, 1, 2)
+    for i in range(n):
+        s = rnd.sample(range(1, 91), 8)
+        out.append(Estrazione(data=d + timedelta(days=2 * i + (1 if (d + timedelta(days=2 * i)).weekday() in (0, 6) else 0)),
+                              numeri=s[:6], jolly=s[6], superstar=s[7]))
+    return out
+
+
+def test_nuove_analisi_e_personalizzate(arch):
+    from pmse.core import personalizzate as pz
+    arch.unisci(storico_finto())
+    st = arch.sestine()
+    for codice in ("consecutivi", "somme", "sequenze", "pari_dispari", "posizioni"):
+        ris = analisi.REGISTRO[codice].funzione(st)
+        assert ris.righe and len(ris.numeri_riga) == len(ris.righe), codice
+    pos = analisi.posizioni(st, tipo=1)
+    assert sum(r[7] for r in pos.righe) == 6 * len(st)
+    pd = analisi.pari_dispari(st)
+    assert round(sum(r[3] for r in pd.righe)) == 100
+    assert analisi.progressioni([10, 20, 30, 41, 42, 43], 3, 10) == [(10, [10, 20, 30]), (1, [41, 42, 43])]
+    for m in pz.MISURE.values():
+        v = pz.calcola_misura(m.codice, st, m.param_predefinito)
+        assert len(v) == 90
+    r = pz.esempio()
+    r.filtri.parita = 1
+    ris = pz.esegui(r, st)
+    assert all(riga[0] % 2 == 0 for riga in ris.righe)
+    pz.salva_tutte(arch, [r])
+    assert pz.carica(arch)[0].nome == r.nome
+    assert r.codice in pz.tutte_le_analisi(arch)
+
+
+def test_sestine_e_magico(arch):
+    from pmse.core import magico, sestine
+    arch.unisci(storico_finto())
+    st = arch.sestine()
+    idx = sestine.IndiceArchivio(st)
+    c = idx.confronta(st[-1][1])
+    assert c.gia_uscita and c.max_punti == 6
+    crit = sestine.Criteri(max_punti_archivio=3, somma_min=200, somma_max=320, pari_min=3, pari_max=3,
+                           obbligatori=[7], max_comuni_tra_risultati=2)
+    trovate, _ = sestine.cerca(idx, crit, 5, seed=1)
+    assert len(trovate) == 5
+    for s in trovate:
+        assert 7 in s and 200 <= sum(s) <= 320 and sum(1 for n in s if n % 2 == 0) == 3
+    assert idx.punti(trovate).max() <= 3
+    r = magico.genera(st)
+    assert len(r.sestine) == 3 and all(len(set(s.numeri)) == 6 for s in r.sestine)
+    assert r.jolly not in r.sestine[0].numeri
+    assert magico.genera(st).sestine[0].numeri == r.sestine[0].numeri      # riproducibile
+    es = magico.verifica_storica(st, 20)
+    assert es.prove == 20
+    magico.salva_previsione(arch, r)
+    assert magico.leggi_previsioni(arch)[-1]["sestine"][0] == r.sestine[0].numeri

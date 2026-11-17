@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QFileDialog, QFrame, QGridLayout, QHBoxLayout, QL
                                QPlainTextEdit, QPushButton, QDialog, QSizePolicy, QVBoxLayout, QWidget)
 
 from .. import __version__
-from ..core import analisi, internet
+from ..core import internet, magico, personalizzate
 from ..core.db import Archivio, verifica_integrita
 from ..core.importatore import esporta_csv
 from .analisi import FinestraAnalisi
@@ -76,6 +76,7 @@ class FinestraPrincipale(QMainWindow):
         self._menu()
         self._centro()
         self.aggiorna_stato()
+        self._mostra_ultima_previsione()
         if avvio_automatico:
             QTimer.singleShot(400, self._all_avvio)
 
@@ -118,17 +119,17 @@ class FinestraPrincipale(QMainWindow):
         self.a_avvio.setCheckable(True)
         self.a_avvio.setChecked(self.arch.leggi_impostazione("aggiorna_avvio", "1") == "1")
 
-        m = mb.addMenu("A&nalisi")
-        for d in analisi.REGISTRO.values():
-            self._azione(m, d.nome + "...", lambda _=False, c=d.codice: self.apri_analisi(c))
-        m.addSeparator()
-        self._azione(m, "Crea nuova analisi... (prossima fase)", abilitata=False)
+        self.m_analisi = mb.addMenu("A&nalisi")
+        self.m_analisi.aboutToShow.connect(self._menu_analisi)
+        self._menu_analisi()
 
         m = mb.addMenu("&Magico Pensiero")
-        self._azione(m, "Genera le 3 sestine Magico Pensiero", self.genera)
-        self._azione(m, "Impostazioni algoritmo... (prossima fase)", abilitata=False)
-        self._azione(m, "Verifica storica dell'algoritmo... (prossima fase)", abilitata=False)
-        self._azione(m, "Storico delle previsioni... (prossima fase)", abilitata=False)
+        self._azione(m, "✨ Genera le 3 sestine Magico Pensiero", self.genera)
+        self._azione(m, "Come sono nate le sestine (spiegazione)...", self.spiegazione)
+        m.addSeparator()
+        self._azione(m, "Impostazioni dell'algoritmo...", self.impostazioni_magico)
+        self._azione(m, "Verifica storica dell'algoritmo...", self.verifica_magico)
+        self._azione(m, "Storico delle previsioni...", self.storico_magico)
 
         for nome in MENU_VUOTI_DOPO:
             self._menu_vuoto(nome)
@@ -149,6 +150,7 @@ class FinestraPrincipale(QMainWindow):
         self.p_sx = Pannello("SuperEnalotto", "#d81b60", selezionabile=True)
         self.p_sx.pulsante("📚  Archivio", self.apri_archivio)
         self.p_sx.pulsante("🔍  Analisi", lambda: self.apri_analisi(None))
+        self.p_sx.pulsante("📋  Sestine", self.mie_sestine)
         self.p_sx.pulsante("✔  Tutti", self.p_sx.griglia.seleziona_tutti)
         self.p_sx.pulsante("🟥  Azzera", self.p_sx.griglia.azzera)
         self.p_sx.lato.addStretch()
@@ -156,6 +158,7 @@ class FinestraPrincipale(QMainWindow):
 
         self.p_dx = Pannello("Magico Pensiero", "#6a1b9a", selezionabile=False)
         self.p_dx.pulsante("✨  Genera", self.genera)
+        self.p_dx.pulsante("❓  Perché", self.spiegazione)
         legenda = QLabel()
         voci = [(COLORI_SESTINE[i], f"Sestina {i + 1}") for i in range(3)] + \
                [(COLORE_JOLLY, "Jolly"), (COLORE_SUPERSTAR, "SuperStar")]
@@ -164,7 +167,7 @@ class FinestraPrincipale(QMainWindow):
         self.p_dx.lato.addWidget(legenda)
         self.p_dx.lato.addStretch()
         self.l_sestine = QLabel("Le 3 sestine compariranno qui dopo l'elaborazione.")
-        self.l_sestine.setFont(QFont("Consolas", 10))
+        self.l_sestine.setFont(QFont("Consolas", 11))
         self.l_sestine.setWordWrap(True)
         self.p_dx.sotto.setText("")
         self.p_dx.layout().addWidget(self.l_sestine, 3, 0, 1, 3)
@@ -274,11 +277,76 @@ class FinestraPrincipale(QMainWindow):
     def apri_analisi(self, codice):
         FinestraAnalisi(self.arch, codice, self).exec()
 
+    def _menu_analisi(self):
+        m = self.m_analisi
+        m.clear()
+        for d in personalizzate.tutte_le_analisi(self.arch).values():
+            self._azione(m, d.nome + "...", lambda _=False, c=d.codice: self.apri_analisi(c))
+        m.addSeparator()
+        self._azione(m, "🛠 Costruttore di analisi personalizzate...", self.costruttore)
+        self._azione(m, "📋 Le mie sestine: confronto con l'archivio e ricerca...", self.mie_sestine)
+
+    def costruttore(self):
+        from .costruttore import FinestraCostruttore
+        FinestraCostruttore(self.arch, self).exec()
+
+    def mie_sestine(self):
+        from .sestine import FinestraSestine
+        FinestraSestine(self.arch, sorted(self.p_sx.griglia.selezionati), self).exec()
+
     def genera(self):
-        QMessageBox.information(self, "Magico Pensiero", (
-            "L'algoritmo Magico Pensiero è ancora da progettare insieme.\n\n"
-            "Quando sarà pronto, questo comando combinerà i punteggi delle analisi scelte "
-            "e mostrerà qui a destra le 3 sestine, il Jolly e il SuperStar."))
+        from .magico import genera
+        if self.arch.conta() < 30:
+            QMessageBox.information(self, "Magico Pensiero", "Servono almeno 30 estrazioni in archivio.")
+            return
+        try:
+            r = genera(self.arch)
+        except ValueError as ex:
+            QMessageBox.warning(self, "Magico Pensiero", str(ex))
+            return
+        self.ultimo_magico = r
+        magico.salva_previsione(self.arch, r)
+        self.mostra_magico(r)
+
+    def mostra_magico(self, r):
+        self.p_dx.griglia.mostra_sestine([s.numeri for s in r.sestine], r.jolly, r.superstar)
+        righe = [f"<span style='color:{COLORI_SESTINE[i]}'>■</span> Sestina {i + 1}: "
+                 f"<b>{' '.join(f'{n:2d}' for n in s.numeri)}</b>" for i, s in enumerate(r.sestine)]
+        righe.append(f"<span style='color:{COLORE_JOLLY}'>■</span> Jolly <b>{r.jolly}</b>"
+                     f" &nbsp; <span style='color:#b8860b'>■</span> SuperStar <b>{r.superstar or '-'}</b>")
+        self.l_sestine.setText("<br>".join(righe))
+
+    def _mostra_ultima_previsione(self):
+        """All'avvio ripropone le sestine già generate per il prossimo concorso."""
+        from types import SimpleNamespace
+        ultima = self.arch.ultima()
+        prev = magico.leggi_previsioni(self.arch)
+        if ultima and prev and prev[-1].get("dopo") == ultima.data.isoformat():
+            p = prev[-1]
+            self.mostra_magico(SimpleNamespace(sestine=[SimpleNamespace(numeri=s) for s in p["sestine"]],
+                                               jolly=p["jolly"], superstar=p.get("superstar")))
+
+    def spiegazione(self):
+        from .magico import FinestraSpiegazione
+        if not getattr(self, "ultimo_magico", None):
+            self.genera()
+        if getattr(self, "ultimo_magico", None):
+            FinestraSpiegazione(self.ultimo_magico, self).exec()
+
+    def impostazioni_magico(self):
+        from .magico import FinestraImpostazioni
+        if FinestraImpostazioni(self.arch, self).exec():
+            self.ultimo_magico = None
+            if self.arch.conta() >= 30:
+                self.genera()
+
+    def verifica_magico(self):
+        from .magico import FinestraVerifica
+        FinestraVerifica(self.arch, self).exec()
+
+    def storico_magico(self):
+        from .magico import FinestraStorico
+        FinestraStorico(self.arch, self).exec()
 
     def informazioni(self):
         QMessageBox.about(self, "Pensiero Magico SE", (

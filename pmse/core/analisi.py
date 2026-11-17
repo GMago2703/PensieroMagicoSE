@@ -1,9 +1,11 @@
 """Motore delle analisi.
 
-Ogni analisi riceve lo storico (in ordine crescente) e restituisce un
-RisultatoAnalisi: una tabella da mostrare e, soprattutto, un PUNTEGGIO per
-ciascuno dei 90 numeri. Il punteggio è il linguaggio comune che permetterà a
-Magico Pensiero di combinare analisi diverse (anche quelle create dall'utente).
+Ogni analisi riceve lo storico (in ordine crescente di data) e restituisce un
+RisultatoAnalisi con:
+- una tabella (colonne + righe);
+- per ogni riga, i numeri "interessati" da evidenziare sulla griglia;
+- un PUNTEGGIO per ciascuno dei 90 numeri: è il linguaggio comune con cui
+  Magico Pensiero combina analisi diverse (anche quelle create dall'utente).
 
 Per aggiungere un'analisi: scrivere una funzione e decorarla con @registra.
 """
@@ -12,9 +14,12 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date
+from math import comb
 from typing import Callable
 
-Storico = list[tuple[date, list[int], int, int | None]]   # (data, sestina, jolly, superstar)
+# (data, sestina ordinata, jolly, superstar, numeri in ordine di estrazione)
+Riga = tuple[date, list[int], int, int | None, list[int]]
+Storico = list[Riga]
 
 
 @dataclass
@@ -25,6 +30,7 @@ class Parametro:
     minimo: int = 0
     massimo: int = 10000
     aiuto: str = ""
+    scelte: list[str] | None = None      # se presente: menu a tendina (valore = indice)
 
 
 @dataclass
@@ -32,8 +38,9 @@ class RisultatoAnalisi:
     titolo: str
     colonne: list[str]
     righe: list[list]
-    punteggi: dict[int, float] = field(default_factory=dict)   # numero -> punteggio (più alto = più "favorito")
+    punteggi: dict[int, float] = field(default_factory=dict)   # numero -> punteggio (alto = "favorito")
     nota: str = ""
+    numeri_riga: list[list[int]] = field(default_factory=list)  # numeri da evidenziare per ogni riga
 
 
 @dataclass
@@ -46,6 +53,7 @@ class DefinizioneAnalisi:
 
 
 REGISTRO: dict[str, DefinizioneAnalisi] = {}
+P_ULTIME = Parametro("ultime", "Considera le ultime N estrazioni (0 = tutte)", 0)
 
 
 def registra(codice: str, nome: str, descrizione: str, parametri: list[Parametro] | None = None):
@@ -55,7 +63,7 @@ def registra(codice: str, nome: str, descrizione: str, parametri: list[Parametro
     return deco
 
 
-def _finestra(storico: Storico, ultime: int) -> Storico:
+def finestra(storico: Storico, ultime: int) -> Storico:
     return storico[-ultime:] if ultime and ultime < len(storico) else storico
 
 
@@ -69,42 +77,45 @@ def normalizza(punteggi: dict[int, float]) -> dict[int, float]:
     return {n: (v - lo) / (hi - lo) for n, v in punteggi.items()}
 
 
+def ritardi_evento(esiti: list[bool]) -> tuple[int, int, int]:
+    """Per un evento che accade o no in ogni estrazione: (volte, ritardo attuale, ritardo massimo)."""
+    volte, ultimo, rmax = 0, -1, 0
+    for i, s in enumerate(esiti):
+        if s:
+            rmax = max(rmax, i - ultimo - 1)
+            ultimo = i
+            volte += 1
+    attuale = len(esiti) - 1 - ultimo
+    return volte, attuale, max(rmax, attuale)
+
+
+def pct(a: int, b: int) -> float:
+    return round(100 * a / b, 2) if b else 0.0
+
+
 # --------------------------------------------------------------------------
 @registra("frequenze_ritardi", "Frequenze e ritardi",
           "Per ogni numero: quante volte è uscito, da quante estrazioni manca (ritardo attuale), "
-          "il ritardo massimo e quello medio storico.",
-          [Parametro("ultime", "Considera le ultime N estrazioni (0 = tutte)", 0)])
+          "il ritardo massimo e quello medio storico.", [P_ULTIME])
 def frequenze_ritardi(storico: Storico, ultime: int = 0) -> RisultatoAnalisi:
-    dati = _finestra(storico, ultime)
-    freq = Counter()
-    ultima_pos: dict[int, int] = {}
-    rit_max = Counter()
-    for i, (_, sestina, _, _) in enumerate(dati):
-        for n in sestina:
-            prec = ultima_pos.get(n, -1)
-            rit_max[n] = max(rit_max[n], i - prec - 1)
-            ultima_pos[n] = i
-            freq[n] += 1
+    dati = finestra(storico, ultime)
     tot = len(dati)
-    righe = []
-    punteggi = {}
+    righe, punteggi = [], {}
     for n in range(1, 91):
-        rit = tot - 1 - ultima_pos[n] if n in ultima_pos else tot
-        rmax = max(rit_max[n], rit)
-        medio = round((tot - freq[n]) / (freq[n] + 1), 1)
-        righe.append([n, freq[n], round(100 * freq[n] / tot, 2) if tot else 0, rit, rmax, medio])
-        punteggi[n] = freq[n]
+        volte, rit, rmax = ritardi_evento([n in r[1] for r in dati])
+        medio = round((tot - volte) / (volte + 1), 1)
+        righe.append([n, volte, pct(volte, tot), rit, rmax, medio])
+        punteggi[n] = volte
     return RisultatoAnalisi(
         f"Frequenze e ritardi su {tot} estrazioni",
         ["Numero", "Frequenza", "% uscite", "Ritardo attuale", "Ritardo max", "Ritardo medio"],
-        righe, punteggi,
-        "Punteggio = frequenza nel periodo scelto.")
+        righe, punteggi, "Punteggio = frequenza nel periodo scelto. Clic su una riga per evidenziare il numero.",
+        [[r[0]] for r in righe])
 
 
 @registra("ritardatari", "Numeri ritardatari",
           "Classifica dei numeri per ritardo attuale rapportato al loro ritardo medio "
-          "(indice > 1 = più in ritardo del solito).",
-          [Parametro("ultime", "Considera le ultime N estrazioni (0 = tutte)", 0)])
+          "(indice > 1 = più in ritardo del solito).", [P_ULTIME])
 def ritardatari(storico: Storico, ultime: int = 0) -> RisultatoAnalisi:
     base = frequenze_ritardi(storico, ultime)
     righe, punteggi = [], {}
@@ -115,23 +126,26 @@ def ritardatari(storico: Storico, ultime: int = 0) -> RisultatoAnalisi:
     righe.sort(key=lambda r: -r[4])
     return RisultatoAnalisi("Numeri ritardatari", ["Numero", "Ritardo attuale", "Ritardo medio",
                                                    "Ritardo max", "Indice ritardo"], righe, punteggi,
-                            "Punteggio = ritardo attuale / ritardo medio.")
+                            "Punteggio = ritardo attuale / ritardo medio.", [[r[0]] for r in righe])
+
+
+def matrice_transizione(dati: Storico, distanza: int) -> dict[int, Counter]:
+    trans: dict[int, Counter] = {n: Counter() for n in range(1, 91)}
+    for i in range(len(dati) - distanza):
+        for a in dati[i][1]:
+            trans[a].update(dati[i + distanza][1])
+    return trans
 
 
 @registra("successivi", "Numeri successivi (nesso tra estrazioni)",
           "Dati i numeri dell'ultima estrazione, conta quali numeri sono usciti più spesso "
           "nell'estrazione che segue (a distanza N) ogni volta che quei numeri erano usciti.",
-          [Parametro("distanza", "Distanza in estrazioni", 1, 1, 50),
-           Parametro("ultime", "Considera le ultime N estrazioni (0 = tutte)", 0)])
+          [Parametro("distanza", "Distanza in estrazioni", 1, 1, 50), P_ULTIME])
 def successivi(storico: Storico, distanza: int = 1, ultime: int = 0) -> RisultatoAnalisi:
-    dati = _finestra(storico, ultime)
+    dati = finestra(storico, ultime)
     if len(dati) <= distanza:
         return RisultatoAnalisi("Numeri successivi", ["Numero", "Conteggio"], [], {})
-    # matrice di transizione: da numero a -> numero b uscito 'distanza' estrazioni dopo
-    trans: dict[int, Counter] = {n: Counter() for n in range(1, 91)}
-    for i in range(len(dati) - distanza):
-        for a in dati[i][1]:
-            trans[a].update(dati[i + distanza][1])
+    trans = matrice_transizione(dati, distanza)
     ultima = dati[-1][1]
     totale = Counter()
     for a in ultima:
@@ -141,44 +155,210 @@ def successivi(storico: Storico, distanza: int = 1, ultime: int = 0) -> Risultat
     return RisultatoAnalisi(
         f"Numeri seguiti a {distanza} estrazione/i dall'ultima sestina {' '.join(map(str, ultima))}",
         ["Numero", "Volte uscito dopo"], righe, {n: float(totale[n]) for n in range(1, 91)},
-        "Punteggio = quante volte il numero è uscito dopo i numeri dell'ultima estrazione.")
+        "Punteggio = quante volte il numero è uscito dopo i numeri dell'ultima estrazione.",
+        [[r[0]] for r in righe])
 
 
 @registra("ripetuti", "Numeri ripetuti dall'estrazione precedente",
-          "Distribuzione di quanti numeri di ogni estrazione erano già usciti in quella precedente.",
-          [Parametro("ultime", "Considera le ultime N estrazioni (0 = tutte)", 0)])
+          "Distribuzione di quanti numeri di ogni estrazione erano già usciti in quella precedente.", [P_ULTIME])
 def ripetuti(storico: Storico, ultime: int = 0) -> RisultatoAnalisi:
-    dati = _finestra(storico, ultime)
-    distr = Counter()
-    for a, b in zip(dati, dati[1:]):
-        distr[len(set(a[1]) & set(b[1]))] += 1
-    tot = sum(distr.values()) or 1
-    righe = [[k, distr[k], round(100 * distr[k] / tot, 2)] for k in range(0, 7)]
-    return RisultatoAnalisi("Numeri ripetuti dalla precedente", ["Numeri ripetuti", "Volte", "%"], righe, {},
-                            "Analisi descrittiva: non assegna punteggi ai numeri.")
+    dati = finestra(storico, ultime)
+    coppie = list(zip(dati, dati[1:]))
+    righe, numeri = [], []
+    for k in range(0, 7):
+        esiti = [len(set(a[1]) & set(b[1])) == k for a, b in coppie]
+        volte, rit, rmax = ritardi_evento(esiti)
+        righe.append([k, volte, pct(volte, len(coppie)), rit, rmax])
+        ultimo = next((sorted(set(a[1]) & set(b[1])) for a, b in reversed(coppie)
+                       if len(set(a[1]) & set(b[1])) == k), [])
+        numeri.append(ultimo)
+    return RisultatoAnalisi("Numeri ripetuti dalla precedente",
+                            ["Numeri ripetuti", "Volte", "%", "Ritardo attuale", "Ritardo max"], righe, {},
+                            "Clic su una riga: evidenzia i numeri ripetuti l'ultima volta che è successo.", numeri)
+
+
+# ---------------------------------------------------------- nuove analisi
+@registra("consecutivi", "Consecutività numerica",
+          "Coppie di numeri consecutivi (es. 23-24) uscite nella stessa sestina: quante volte, "
+          "da quanto mancano. Nella nota la distribuzione di quante coppie consecutive ha ogni estrazione.",
+          [P_ULTIME])
+def consecutivi(storico: Storico, ultime: int = 0) -> RisultatoAnalisi:
+    dati = finestra(storico, ultime)
+    tot = len(dati)
+    righe, numeri, punteggi = [], [], Counter()
+    for n in range(1, 90):
+        volte, rit, rmax = ritardi_evento([n in r[1] and n + 1 in r[1] for r in dati])
+        righe.append([f"{n}-{n + 1}", volte, pct(volte, tot), rit, rmax])
+        numeri.append([n, n + 1])
+        punteggi[n] += volte
+        punteggi[n + 1] += volte
+    ordine = sorted(range(len(righe)), key=lambda i: -righe[i][1])
+    righe = [righe[i] for i in ordine]
+    numeri = [numeri[i] for i in ordine]
+    distr = Counter(sum(1 for x, y in zip(r[1], r[1][1:]) if y - x == 1) for r in dati)
+    nota = "Coppie consecutive per estrazione: " + ", ".join(
+        f"{k}: {pct(distr[k], tot)}%" for k in range(0, 6) if distr[k])
+    return RisultatoAnalisi("Consecutività numerica",
+                            ["Coppia", "Volte", "% estrazioni", "Ritardo attuale", "Ritardo max"],
+                            righe, {n: float(punteggi[n]) for n in range(1, 91)}, nota, numeri)
+
+
+@registra("somme", "Somme",
+          "Somma dei 6 numeri di ogni estrazione, raggruppata in classi: frequenza, ritardo di ogni classe "
+          "e numeri dell'ultima estrazione caduta nella classe.",
+          [Parametro("ampiezza", "Ampiezza delle classi di somma", 20, 5, 100), P_ULTIME])
+def somme(storico: Storico, ampiezza: int = 20, ultime: int = 0) -> RisultatoAnalisi:
+    dati = finestra(storico, ultime)
+    tot = len(dati)
+    sm = [sum(r[1]) for r in dati]
+    if not sm:
+        return RisultatoAnalisi("Somme", ["Classe"], [], {})
+    righe, numeri = [], []
+    inizio = (min(sm) // ampiezza) * ampiezza
+    for lo in range(inizio, max(sm) + 1, ampiezza):
+        hi = lo + ampiezza - 1
+        esiti = [lo <= s <= hi for s in sm]
+        volte, rit, rmax = ritardi_evento(esiti)
+        if not volte:
+            continue
+        righe.append([f"{lo}-{hi}", volte, pct(volte, tot), rit, rmax])
+        numeri.append(next(r[1] for r, e in zip(reversed(dati), reversed(esiti)) if e))
+    ss = sorted(sm)
+    # punteggio: quanto spesso il numero compare nelle estrazioni con somma "tipica" (50% centrale)
+    q1, q3 = ss[len(ss) // 4], ss[3 * len(ss) // 4]
+    punteggi = Counter()
+    for r, s in zip(dati, sm):
+        if q1 <= s <= q3:
+            punteggi.update(r[1])
+    nota = (f"Ultima somma: {sm[-1]}. Minima {ss[0]}, media {round(sum(ss) / tot, 1)}, massima {ss[-1]}. "
+            f"Il 50% delle estrazioni ha somma tra {q1} e {q3}.")
+    return RisultatoAnalisi("Somme", ["Classe di somma", "Volte", "%", "Ritardo attuale", "Ritardo max"],
+                            righe, {n: float(punteggi[n]) for n in range(1, 91)}, nota, numeri)
+
+
+def progressioni(sestina: list[int], lunghezza_min: int, passo_max: int) -> list[tuple[int, list[int]]]:
+    """Progressioni aritmetiche massimali (passo, numeri) contenute nella sestina."""
+    s = sorted(sestina)
+    insieme = set(s)
+    trovate = []
+    for i, a in enumerate(s):
+        for b in s[i + 1:]:
+            d = b - a
+            if d > passo_max or (a - d) in insieme:     # non massimale: inizia prima
+                continue
+            seq = [a, b]
+            while seq[-1] + d in insieme:
+                seq.append(seq[-1] + d)
+            if len(seq) >= lunghezza_min:
+                trovate.append((d, seq))
+    return trovate
+
+
+@registra("sequenze", "Sequenze",
+          "Sequenze di numeri a passo costante nella stessa sestina (es. 12-13-14 passo 1, "
+          "10-20-30 passo 10): quali sono uscite, quante volte e quando.",
+          [Parametro("lunghezza", "Lunghezza minima della sequenza", 3, 3, 6),
+           Parametro("passo", "Passo massimo", 10, 1, 44), P_ULTIME])
+def sequenze(storico: Storico, lunghezza: int = 3, passo: int = 10, ultime: int = 0) -> RisultatoAnalisi:
+    dati = finestra(storico, ultime)
+    tot = len(dati)
+    conteggio: Counter = Counter()
+    ultima: dict[tuple, int] = {}
+    per_passo: Counter = Counter()
+    con_sequenza = 0
+    for i, r in enumerate(dati):
+        trovate = progressioni(r[1], lunghezza, passo)
+        if trovate:
+            con_sequenza += 1
+        for d, seq in trovate:
+            k = tuple(seq)
+            conteggio[k] += 1
+            ultima[k] = i
+            per_passo[d] += 1
+    righe, numeri, punteggi = [], [], Counter()
+    for k, volte in sorted(conteggio.items(), key=lambda kv: (-kv[1], -ultima[kv[0]])):
+        righe.append([" - ".join(map(str, k)), k[1] - k[0], len(k), volte, tot - 1 - ultima[k],
+                      dati[ultima[k]][0].strftime("%d/%m/%Y")])
+        numeri.append(list(k))
+        punteggi.update(k)
+    nota = (f"Estrazioni con almeno una sequenza: {con_sequenza} su {tot} ({pct(con_sequenza, tot)}%). "
+            "Per passo: " + ", ".join(f"passo {d}: {v}" for d, v in sorted(per_passo.items())))
+    return RisultatoAnalisi("Sequenze", ["Sequenza", "Passo", "Lunghezza", "Volte", "Estrazioni fa", "Ultima"],
+                            righe, {n: float(punteggi[n]) for n in range(1, 91)}, nota, numeri)
+
+
+@registra("pari_dispari", "Pari e dispari",
+          "Quanti numeri pari e dispari contiene ogni estrazione: frequenza reale, frequenza attesa "
+          "dal calcolo delle probabilità e ritardo di ogni combinazione.", [P_ULTIME])
+def pari_dispari(storico: Storico, ultime: int = 0) -> RisultatoAnalisi:
+    dati = finestra(storico, ultime)
+    tot = len(dati)
+    righe, numeri = [], []
+    for k in range(6, -1, -1):
+        esiti = [sum(1 for n in r[1] if n % 2 == 0) == k for r in dati]
+        volte, rit, rmax = ritardi_evento(esiti)
+        atteso = round(100 * comb(45, k) * comb(45, 6 - k) / comb(90, 6), 2)
+        righe.append([f"{k} pari - {6 - k} dispari", volte, pct(volte, tot), atteso, rit, rmax])
+        numeri.append(next((r[1] for r, e in zip(reversed(dati), reversed(esiti)) if e), []))
+    pari_usciti = sum(1 for r in dati for n in r[1] if n % 2 == 0)
+    punteggi = {n: (1.0 if n % 2 == 0 else 0.0) for n in range(1, 91)}
+    # il punteggio favorisce la parità meno uscita nelle ultime estrazioni
+    if pari_usciti > 3 * tot:
+        punteggi = {n: 1 - v for n, v in punteggi.items()}
+    return RisultatoAnalisi("Pari e dispari",
+                            ["Composizione", "Volte", "% reale", "% attesa", "Ritardo attuale", "Ritardo max"],
+                            righe, punteggi,
+                            f"Numeri pari usciti: {pct(pari_usciti, 6 * tot)}% del totale. Clic su una riga: "
+                            "evidenzia l'ultima sestina con quella composizione.", numeri)
+
+
+@registra("posizioni", "Posizioni",
+          "Frequenza di ogni numero in ciascuna delle 6 posizioni: in ordine crescente (1ª = numero più "
+          "piccolo) oppure nell'ordine in cui i numeri sono stati estratti.",
+          [Parametro("tipo", "Posizioni", 0, 0, 1, scelte=["In ordine crescente", "In ordine di estrazione"]),
+           P_ULTIME])
+def posizioni(storico: Storico, tipo: int = 0, ultime: int = 0) -> RisultatoAnalisi:
+    dati = finestra(storico, ultime)
+    tot = len(dati)
+    freq = [Counter() for _ in range(6)]
+    for r in dati:
+        seq = r[4] if tipo == 1 else r[1]
+        for p, n in enumerate(seq):
+            freq[p][n] += 1
+    righe = []
+    for n in range(1, 91):
+        valori = [freq[p][n] for p in range(6)]
+        migliore = max(range(6), key=lambda p: valori[p]) + 1 if any(valori) else "-"
+        righe.append([n, *valori, sum(valori), migliore])
+    nota = []
+    for p in range(6):
+        if freq[p]:
+            usati = sorted(freq[p].elements())
+            top = ", ".join(str(n) for n, _ in freq[p].most_common(3))
+            nota.append(f"{p + 1}ª: min {usati[0]}, media {round(sum(usati) / len(usati), 1)}, "
+                        f"max {usati[-1]}, più frequenti {top}")
+    ultima = dati[-1][4] if (tipo == 1 and dati) else (dati[-1][1] if dati else [])
+    return RisultatoAnalisi(
+        "Posizioni " + ("(ordine di estrazione)" if tipo == 1 else "(ordine crescente)"),
+        ["Numero", "1ª", "2ª", "3ª", "4ª", "5ª", "6ª", "Totale", "Posizione preferita"],
+        righe, {n: float(sum(freq[p][n] for p in range(6))) for n in range(1, 91)},
+        " | ".join(nota) + (f"  — Ultima estrazione: {' '.join(map(str, ultima))}" if ultima else ""),
+        [[r[0]] for r in righe])
 
 
 @registra("struttura", "Struttura delle sestine",
-          "Somma, pari/dispari, alti (46-90)/bassi, decine e consecutivi delle estrazioni.",
-          [Parametro("ultime", "Considera le ultime N estrazioni (0 = tutte)", 0)])
+          "Riepilogo: pari/dispari, alti (46-90)/bassi, coppie consecutive.", [P_ULTIME])
 def struttura(storico: Storico, ultime: int = 0) -> RisultatoAnalisi:
-    dati = _finestra(storico, ultime)
-    pari, alti, cons, somme = Counter(), Counter(), Counter(), []
-    for _, s, _, _ in dati:
+    dati = finestra(storico, ultime)
+    pari, alti, cons = Counter(), Counter(), Counter()
+    for r in dati:
+        s = r[1]
         pari[sum(1 for n in s if n % 2 == 0)] += 1
         alti[sum(1 for n in s if n > 45)] += 1
         cons[sum(1 for x, y in zip(s, s[1:]) if y - x == 1)] += 1
-        somme.append(sum(s))
     tot = len(dati) or 1
-    righe = []
-    for k in range(7):
-        righe.append([k, pari[k], round(100 * pari[k] / tot, 1), alti[k], round(100 * alti[k] / tot, 1),
-                      cons[k], round(100 * cons[k] / tot, 1)])
-    nota = ""
-    if somme:
-        ss = sorted(somme)
-        nota = (f"Somma dei 6 numeri: minima {ss[0]}, media {round(sum(ss) / len(ss), 1)}, "
-                f"massima {ss[-1]}; il 50% centrale è tra {ss[len(ss) // 4]} e {ss[3 * len(ss) // 4]}.")
+    righe = [[k, pari[k], pct(pari[k], tot), alti[k], pct(alti[k], tot), cons[k], pct(cons[k], tot)]
+             for k in range(7)]
     return RisultatoAnalisi("Struttura delle sestine",
                             ["Quantità", "Pari", "% pari", "Alti", "% alti", "Coppie consecutive", "%"],
-                            righe, {}, nota)
+                            righe, {}, "")

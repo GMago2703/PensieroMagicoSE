@@ -83,3 +83,85 @@ def test_finestre(app, arch):
     FinestraInternet(arch, parent=w).close()
     w.aggiorna_stato()
     w.close()
+
+
+def test_nuove_finestre(app, arch):
+    from test_nucleo import storico_finto
+
+    from pmse.core import personalizzate as pz
+    from pmse.ui.costruttore import FinestraCostruttore
+    from pmse.ui.finestra import FinestraPrincipale
+    from pmse.ui.magico import FinestraImpostazioni, FinestraSpiegazione, FinestraStorico, FinestraVerifica
+    from pmse.ui.sestine import FinestraSestine
+    from pmse.ui.analisi import FinestraAnalisi
+
+    arch.unisci(storico_finto(600))
+    pz.salva_tutte(arch, [pz.esempio()])
+    w = FinestraPrincipale(arch, avvio_automatico=False)
+    w.show()
+    w.p_sx.griglia.selezionati = {3, 8, 15, 22, 41, 67, 70, 88}
+    w.p_sx.griglia._ridisegna_selezione()
+    w.genera()
+    app.processEvents()
+    foto("home_magico", w)
+    w._menu_analisi()
+
+    for codice in ("consecutivi", "somme", "sequenze", "pari_dispari", "posizioni", pz.esempio().codice):
+        f = FinestraAnalisi(arch, codice, w)
+        f.show()
+        f.tab.selectRow(0)
+        app.processEvents()
+        foto("analisi_" + codice.replace(":", "_").replace(" ", "_"), f)
+        f.close()
+
+    c = FinestraCostruttore(arch, w)
+    c.show()
+    c.nuova()
+    c._aggiungi_ing(pz.Ingrediente("successivi", 2, 1.5))
+    c.ck_decine[2].setChecked(True)
+    c.prova()
+    app.processEvents()
+    foto("costruttore", c)
+    c.close()
+
+    s = FinestraSestine(arch, sorted(w.p_sx.griglia.selezionati)[:6], w)
+    s.show()
+    s.e_nuova.setText("1 2 3 4 5 6")
+    s._aggiungi_testo()
+    s.aggiungi([[5, 18, 27, 44, 63, 81]])
+    s.tab_c.selectRow(0)
+    app.processEvents()
+    foto("mie_sestine", s)
+    s.schede.setCurrentIndex(1)
+    s.s_maxp.setValue(3)
+    s.c_pesi.setCurrentIndex(1)
+    s.cerca()
+    assert s.tab_r.rowCount() == 10
+    s.tab_r.selectRow(0)
+    app.processEvents()
+    foto("cerca_sestine", s)
+    s.close()
+
+    imp = FinestraImpostazioni(arch, w)
+    imp.show()
+    app.processEvents()
+    foto("magico_impostazioni", imp)
+    imp.close()
+    sp = FinestraSpiegazione(w.ultimo_magico, w)
+    sp.show()
+    app.processEvents()
+    foto("magico_spiegazione", sp)
+    sp.close()
+    v = FinestraVerifica(arch, w)
+    v.s_n.setValue(30)
+    v.show()
+    v.avvia()
+    v.thread.wait(60000)
+    app.processEvents()
+    foto("magico_verifica", v)
+    v.close()
+    st = FinestraStorico(arch, w)
+    st.show()
+    app.processEvents()
+    st.close()
+    w.close()

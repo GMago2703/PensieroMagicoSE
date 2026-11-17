@@ -9,7 +9,13 @@ Non serve installare niente: basta avviare il file. Al primo avvio Windows potre
 
 L'archivio viene salvato in `%APPDATA%\PensieroMagicoSE\archivio.db`.
 
-## Fase 1 (questa versione)
+## Fase 2 (versione 0.2)
+- **Nuove analisi**: Consecutività numerica, Somme, Sequenze, Pari e dispari, Posizioni. In ogni tabella un clic su una riga evidenzia sulla griglia i numeri interessati.
+- **Costruttore di analisi personalizzate** (Analisi → Costruttore): ricette fatte di misure pesate (frequenza, ritardo, tendenza, numeri successivi, posizione, numeri amici, giorno della settimana, Jolly, SuperStar…) e filtri (parità, intervallo, decine, finali, numeri usciti di recente). Le ricette salvate compaiono nel menu Analisi e si possono usare in Magico Pensiero.
+- **Le mie sestine** (Analisi → Le mie sestine): confronto di sestine dell'utente con tutto l'archivio (punti massimi, quante volte avrebbero fatto 2-3-4-5, ultima volta con almeno 3 numeri, caratteristiche) e ricerca di sestine con caratteristiche date (mai uscite, al massimo N numeri in comune con qualsiasi estrazione, somma, pari, alti, consecutivi, decine, numeri obbligatori/esclusi, probabilità pesata con un'analisi).
+- **Magico Pensiero 0.1** (bozza): punteggio dei numeri da cinque voci (eco delle estrazioni precedenti, affinità con l'ultima estrazione, tendenza, maturità del ritardo, frequenza storica) più le analisi personalizzate; generazione delle 3 sestine con controllo della forma; Jolly e SuperStar; spiegazione, impostazioni, verifica storica contro sestine casuali, storico delle previsioni.
+
+## Fase 1
 - **Home**: a sinistra la tabella dei 90 numeri selezionabili, a destra la tabella "Magico Pensiero".
 - **Archivio**
   - consultazione con ordine crescente/decrescente, filtro per anno, ricerca di un numero;
