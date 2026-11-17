@@ -17,7 +17,9 @@ questa memoria in quattro modi e ne fa una sintesi.
 2. COSTRUZIONE DELLE SESTINE: si generano migliaia di sestine estraendo i numeri
    con probabilità proporzionale al punteggio; si scartano quelle con una
    "forma" rara nello storico (somma, pari/dispari, alti/bassi, consecutivi,
-   decine) e quelle già uscite.
+   decine), quelle già uscite e quelle che hanno troppi (o troppo pochi) numeri
+   in comune con le estrazioni passate rispetto a quanto accade alle vere
+   combinazioni vincenti (analisi "Somiglianza con l'archivio", di solito 3-4).
 
 3. VALUTAZIONE: ogni sestina riceve un voto = punteggio medio dei numeri
    + legame tra i suoi numeri (coppie che storicamente escono insieme più del
