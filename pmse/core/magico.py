@@ -40,7 +40,7 @@ from datetime import date
 
 import numpy as np
 
-from .analisi import Storico
+from .analisi import Storico, limiti_consigliati, massimi_in_comune
 
 VOCI = {
     "eco": "Eco (numeri successivi)",
@@ -61,6 +61,11 @@ class Impostazioni:
     nitidezza: float = 3.0              # più alta = sestine più concentrate sui numeri migliori
     candidate: int = 6000
     max_comuni: int = 2                 # numeri in comune ammessi tra le 3 sestine
+    # somiglianza con l'archivio: quanti numeri al massimo una sestina può avere in comune con
+    # una qualsiasi estrazione passata. 0 = automatico (dall'analisi "Somiglianza con l'archivio")
+    limite_archivio: int = 0
+    soglia_archivio: float = 90.0       # copertura usata per il limite automatico (%)
+    finestra_archivio: int = 500        # ultime estrazioni studiate per il limite automatico
 
     def a_json(self) -> str:
         return json.dumps(asdict(self))
@@ -99,6 +104,8 @@ class RisultatoMagico:
     basata_su: date | None
     estrazioni_usate: int
     migliori: list[tuple[list[int], float]] = field(default_factory=list)   # le candidate con voto più alto
+    limiti_archivio: tuple[int, int] = (0, 6)    # numeri in comune con l'archivio ammessi (min, max)
+    in_comune_migliori: list[int] = field(default_factory=list)
 
 
 # ------------------------------------------------------------------ utilità
@@ -262,6 +269,17 @@ def genera(storico: Storico, imp: Impostazioni | None = None,
     if not len(cand):
         raise ValueError("Nessuna sestina candidata: prova a ridurre la nitidezza.")
 
+    # somiglianza con l'archivio: massimo di numeri in comune con una qualsiasi estrazione passata
+    lo, hi = limiti_archivio(storico, imp)
+    vett = np.zeros((len(cand), 91), dtype=np.float32)
+    np.put_along_axis(vett, cand.astype(np.int64), 1, axis=1)
+    in_comune = (vett @ m.T).max(axis=1).astype(int)
+    for allarga in range(0, 4):           # se i limiti lasciano troppe poche candidate, si allargano
+        ok = (in_comune >= lo - allarga) & (in_comune <= hi + allarga)
+        if ok.sum() >= 3:
+            break
+    cand, in_comune = cand[ok], in_comune[ok]
+
     # 3. voto
     media = punteggi[cand].mean(axis=1)
     i_a, i_b = np.triu_indices(6, 1)
@@ -282,6 +300,7 @@ def genera(storico: Storico, imp: Impostazioni | None = None,
         s = [int(x) for x in cand[i]]
         if all(len(set(s) & set(x.numeri)) <= imp.max_comuni for x in scelte):
             scelte.append(SestinaMagica(s, round(float(voto[i]), 4), {
+                "max numeri in comune con l'archivio": int(in_comune[i]),
                 "punteggio medio numeri": round(float(media[i]), 3),
                 "legame tra i numeri": round(float(coppie_n[i]), 3),
                 "tipicità della forma": round(float(tipicita[i]), 3)}))
@@ -289,11 +308,21 @@ def genera(storico: Storico, imp: Impostazioni | None = None,
             break
     fuori = [k for k in np.argsort(-punteggi) if k > 0 and k not in scelte[0].numeri]
     jolly = int(fuori[0])
-    migliori = [([int(x) for x in cand[i]], round(float(voto[i]), 4)) for i in np.argsort(-voto)[:40]]
+    ordine = np.argsort(-voto)[:40]
+    migliori = [([int(x) for x in cand[i]], round(float(voto[i]), 4)) for i in ordine]
     return RisultatoMagico(scelte, jolly, _superstar(storico, imp),
                            {k: round(float(punteggi[k]), 4) for k in range(1, 91)},
                            {k: {n: round(float(v[n]), 4) for n in range(1, 91)} for k, v in voci.items()},
-                           storico[-1][0], len(storico), migliori)
+                           storico[-1][0], len(storico), migliori, (lo, hi), [int(in_comune[i]) for i in ordine])
+
+
+def limiti_archivio(storico: Storico, imp: Impostazioni) -> tuple[int, int]:
+    """Numeri in comune con l'archivio ammessi per una sestina: automatici (dall'analisi della
+    somiglianza delle combinazioni vincenti con le precedenti) oppure fissati dall'utente."""
+    if imp.limite_archivio:
+        auto_lo, _ = limiti_consigliati(massimi_in_comune(storico, imp.finestra_archivio), imp.soglia_archivio)
+        return min(auto_lo, imp.limite_archivio), imp.limite_archivio
+    return limiti_consigliati(massimi_in_comune(storico, imp.finestra_archivio), imp.soglia_archivio)
 
 
 # ---------------------------------------------------------- verifica storica

@@ -56,6 +56,12 @@ candidate dell'algoritmo, modificarle o comporne di nuove.
 Regole obbligatorie: ogni sestina ha 6 numeri DIVERSI tra 1 e 90, in ordine crescente; le 3 sestine hanno al \
 massimo 2 numeri in comune tra loro a due a due; nessuna sestina è identica a una già uscita; il Jolly è tra 1 e \
 90 e NON appartiene alla 1ª sestina; il SuperStar è tra 1 e 90.
+Regola di SOMIGLIANZA CON L'ARCHIVIO (fondamentale): l'analisi delle combinazioni vincenti rispetto a tutte le \
+precedenti mostra quanti numeri, al massimo, una nuova combinazione vincente ha di solito in comune con una \
+qualsiasi estrazione passata. Ogni tua sestina deve rispettare il limite indicato nel dossier alla sezione \
+"Somiglianza con l'archivio": confrontata con OGNI estrazione dell'archivio deve avere al massimo il numero di \
+numeri in comune indicato, e il suo massimo deve cadere nell'intervallo consigliato. Le candidate dell'algoritmo \
+riportano già questo valore; se componi sestine nuove tienine conto (il programma lo verifica).
 
 Rispondi in italiano e SOLO con un oggetto JSON valido, senza testo prima o dopo, con questa struttura:
 {"sestine": [[n,n,n,n,n,n],[n,n,n,n,n,n],[n,n,n,n,n,n]],
@@ -85,6 +91,8 @@ class RispostaClaude:
     token_ingresso: int = 0
     token_uscita: int = 0
     avvisi: list[str] = field(default_factory=list)
+    in_comune_archivio: list[int] = field(default_factory=list)
+    corretta: bool = False          # True se Claude ha dovuto correggere una prima risposta
 
 
 # ------------------------------------------------------------------ dossier
@@ -144,12 +152,26 @@ def costruisci_dossier(storico: Storico, r: magico.RisultatoMagico, verifica: st
     out.extend(_riga(f"{a}-{b}", c, round(float(l), 2)) for l, c, a, b in coppie[:30])
     out.append("")
 
+    from .analisi import massimi_in_comune
+    lo, hi = r.limiti_archivio
+    massimi = massimi_in_comune(storico, 500)
+    cm = Counter(massimi)
+    out.append("## Somiglianza con l'archivio")
+    out.append("Per ognuna delle ultime 500 estrazioni: massimo di numeri in comune con una qualsiasi estrazione "
+               "precedente → " + ", ".join(f"{k} numeri: {round(100 * cm[k] / len(massimi), 1)}%" for k in sorted(cm)))
+    out.append(f"INTERVALLO CONSIGLIATO E OBBLIGATORIO per le tue sestine: massimo in comune con l'archivio "
+               f"da {lo} a {hi} (cioè nessuna estrazione passata deve avere più di {hi} numeri in comune con "
+               f"la sestina, e almeno una deve averne {lo} o più).")
+    out.append("")
+
     out.append("## Proposta dell'algoritmo Magico Pensiero 0.1")
     for i, s in enumerate(r.sestine, 1):
-        out.append(f"sestina {i}: {' '.join(map(str, s.numeri))} (voto {s.voto})")
+        out.append(f"sestina {i}: {' '.join(map(str, s.numeri))} (voto {s.voto}; max in comune con l'archivio "
+                   f"{s.dettaglio.get("max numeri in comune con l'archivio", '?')})")
     out.append(f"jolly {r.jolly}; superstar {r.superstar}")
-    out.append("Migliori candidate (sestina;voto):")
-    out.extend(_riga(" ".join(map(str, c)), v) for c, v in r.migliori[:30])
+    out.append("Migliori candidate (sestina;voto;max numeri in comune con l'archivio):")
+    comuni = r.in_comune_migliori or [""] * len(r.migliori)
+    out.extend(_riga(" ".join(map(str, c)), v, k) for (c, v), k in zip(r.migliori[:30], comuni))
     out.append("")
 
     serie_ss = [x[3] for x in storico if x[3]]
@@ -187,7 +209,15 @@ def _estrai_json(testo: str) -> dict:
         raise ErroreClaude(f"La risposta di Claude non è un JSON valido: {ex}")
 
 
-def valida_risposta(d: dict, gia_uscite: set[tuple]) -> RispostaClaude:
+def in_comune_archivio(sestine: list[list[int]], m: np.ndarray) -> list[int]:
+    v = np.zeros((len(sestine), 91), dtype=np.float32)
+    for i, s in enumerate(sestine):
+        v[i, s] = 1
+    return [int(x) for x in (v @ m.T).max(axis=1)] if len(m) else [0] * len(sestine)
+
+
+def valida_risposta(d: dict, gia_uscite: set[tuple], m: np.ndarray | None = None,
+                    limiti: tuple[int, int] | None = None) -> RispostaClaude:
     try:
         sestine = [sorted(int(x) for x in s) for s in d["sestine"]][:3]
         jolly = int(d["jolly"])
@@ -212,23 +242,21 @@ def valida_risposta(d: dict, gia_uscite: set[tuple]) -> RispostaClaude:
     for i, s in enumerate(sestine, 1):
         if tuple(s) in gia_uscite:
             avvisi.append(f"La sestina {i} è già uscita in passato.")
+    comuni_arch = in_comune_archivio(sestine, m) if m is not None else []
+    if limiti and comuni_arch:
+        lo, hi = limiti
+        for i, k in enumerate(comuni_arch, 1):
+            if not lo <= k <= hi:
+                avvisi.append(f"La sestina {i} ha al massimo {k} numeri in comune con l'archivio "
+                              f"(limite consigliato da {lo} a {hi}).")
     mot = d.get("motivazioni") or []
     return RispostaClaude(sestine, jolly, superstar, [str(x) for x in mot][:3],
                           str(d.get("jolly_superstar", "")), str(d.get("analisi", "")),
-                          str(d.get("scartati", "")), str(d.get("affidabilita", "")), avvisi=avvisi)
+                          str(d.get("scartati", "")), str(d.get("affidabilita", "")), avvisi=avvisi,
+                          in_comune_archivio=comuni_arch)
 
 
-def chiedi_a_claude(chiave: str, modello: str, dossier: str, gia_uscite: set[tuple],
-                    timeout: int = 300) -> RispostaClaude:
-    if not chiave:
-        raise ErroreClaude("Manca la chiave API di Claude.")
-    corpo = {
-        "model": modello,
-        "max_tokens": 6000,
-        "system": SISTEMA,
-        "messages": [{"role": "user", "content": dossier + "\n\nOra scegli le 3 sestine, il Jolly e il "
-                                                            "SuperStar e rispondi solo con il JSON richiesto."}],
-    }
+def _invia(chiave: str, corpo: dict, timeout: int) -> dict:
     req = urllib.request.Request(URL_API, data=json.dumps(corpo).encode("utf-8"), method="POST", headers={
         "x-api-key": chiave,
         "anthropic-version": VERSIONE_API,
@@ -236,7 +264,7 @@ def chiedi_a_claude(chiave: str, modello: str, dossier: str, gia_uscite: set[tup
     })
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            dati = json.loads(resp.read().decode("utf-8"))
+            return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as ex:
         dettaglio = ex.read().decode("utf-8", errors="replace")
         try:
@@ -249,14 +277,46 @@ def chiedi_a_claude(chiave: str, modello: str, dossier: str, gia_uscite: set[tup
         raise ErroreClaude(f"Errore {ex.code} ({spiegazioni.get(ex.code, 'errore del servizio')}): {dettaglio}")
     except (urllib.error.URLError, TimeoutError) as ex:
         raise ErroreClaude(f"Impossibile contattare Claude: {ex}")
+
+
+def _testo(dati: dict) -> str:
     testo = "".join(b.get("text", "") for b in dati.get("content", []) if b.get("type") == "text")
     if dati.get("stop_reason") == "max_tokens" and "}" not in testo:
         raise ErroreClaude("La risposta di Claude è stata troncata: riprova.")
-    r = valida_risposta(_estrai_json(testo), gia_uscite)
+    return testo
+
+
+def chiedi_a_claude(chiave: str, modello: str, dossier: str, gia_uscite: set[tuple],
+                    m: np.ndarray | None = None, limiti: tuple[int, int] | None = None,
+                    timeout: int = 300) -> RispostaClaude:
+    """Chiede a Claude la scelta. Se la risposta viola le regole, gli chiede UNA volta di correggerla."""
+    if not chiave:
+        raise ErroreClaude("Manca la chiave API di Claude.")
+    messaggi = [{"role": "user", "content": dossier + "\n\nOra scegli le 3 sestine, il Jolly e il SuperStar "
+                                                       "e rispondi solo con il JSON richiesto."}]
+    corpo = {"model": modello, "max_tokens": 6000, "system": SISTEMA, "messages": messaggi}
+    dati = _invia(chiave, corpo, timeout)
+    testo = _testo(dati)
+    r = valida_risposta(_estrai_json(testo), gia_uscite, m, limiti)
+    ing, usc = int(dati.get("usage", {}).get("input_tokens", 0)), int(dati.get("usage", {}).get("output_tokens", 0))
+    if r.avvisi:
+        messaggi += [{"role": "assistant", "content": testo},
+                     {"role": "user", "content": "Il programma ha verificato la tua risposta e non rispetta queste "
+                                                 "regole obbligatorie:\n- " + "\n- ".join(r.avvisi) +
+                                                 "\nCorreggi le sestine (o Jolly/SuperStar) interessate e rispondi "
+                                                 "di nuovo solo con il JSON completo."}]
+        dati2 = _invia(chiave, corpo, timeout)
+        try:
+            r2 = valida_risposta(_estrai_json(_testo(dati2)), gia_uscite, m, limiti)
+            r2.corretta = True
+            if len(r2.avvisi) <= len(r.avvisi):
+                r = r2
+        except ErroreClaude:
+            pass
+        ing += int(dati2.get("usage", {}).get("input_tokens", 0))
+        usc += int(dati2.get("usage", {}).get("output_tokens", 0))
     r.modello = dati.get("model", modello)
-    uso = dati.get("usage", {})
-    r.token_ingresso = int(uso.get("input_tokens", 0))
-    r.token_uscita = int(uso.get("output_tokens", 0))
+    r.token_ingresso, r.token_uscita = ing, usc
     return r
 
 
@@ -264,4 +324,4 @@ def come_risultato(rc: RispostaClaude, base: magico.RisultatoMagico) -> magico.R
     """Trasforma la risposta di Claude in un risultato mostrabile in home e salvabile nello storico."""
     return magico.RisultatoMagico(
         [magico.SestinaMagica(s, 0.0, {"motivazione": 0.0}) for s in rc.sestine], rc.jolly, rc.superstar,
-        base.punteggi, base.voci, base.basata_su, base.estrazioni_usate, [])
+        base.punteggi, base.voci, base.basata_su, base.estrazioni_usate, [], base.limiti_archivio)

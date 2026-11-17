@@ -106,7 +106,8 @@ def test_nuove_finestre(app, arch):
     foto("home_magico", w)
     w._menu_analisi()
 
-    for codice in ("consecutivi", "somme", "sequenze", "pari_dispari", "posizioni", pz.esempio().codice):
+    for codice in ("consecutivi", "somme", "sequenze", "pari_dispari", "posizioni", "somiglianza",
+                   pz.esempio().codice):
         f = FinestraAnalisi(arch, codice, w)
         f.show()
         f.tab.selectRow(0)

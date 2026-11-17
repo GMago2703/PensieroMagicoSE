@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date
 
 from PySide6.QtCore import QThread, Signal
-from PySide6.QtWidgets import (QDialog, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMessageBox,
+from PySide6.QtWidgets import (QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMessageBox,
                                QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QTableWidget, QVBoxLayout)
 
 from ..core import magico, personalizzate
@@ -80,6 +80,31 @@ class FinestraImpostazioni(QDialog):
         f2.addRow("Nitidezza (più alta = sestine più concentrate sui numeri migliori)", self.s_nit)
         f2.addRow("Numeri in comune ammessi tra le 3 sestine", self.s_com)
         v.addWidget(g2)
+
+        g3 = QGroupBox("Somiglianza con l'archivio (numeri in comune con le estrazioni passate)")
+        f3 = QFormLayout(g3)
+        self.c_lim = QComboBox()
+        self.c_lim.addItems(["Automatico, secondo l'analisi delle combinazioni vincenti", "Al massimo 3",
+                             "Al massimo 4", "Al massimo 5"])
+        self.c_lim.setCurrentIndex(0 if not imp.limite_archivio else imp.limite_archivio - 2)
+        self.s_soglia = QDoubleSpinBox()
+        self.s_soglia.setRange(50, 100)
+        self.s_soglia.setValue(imp.soglia_archivio)
+        self.s_soglia.setSuffix(" %")
+        self.s_fin = QSpinBox()
+        self.s_fin.setRange(50, 10000)
+        self.s_fin.setValue(imp.finestra_archivio)
+        self.l_lim = QLabel()
+        self.l_lim.setWordWrap(True)
+        f3.addRow("Limite", self.c_lim)
+        f3.addRow("Copertura richiesta (automatico)", self.s_soglia)
+        f3.addRow("Estrazioni studiate (automatico)", self.s_fin)
+        f3.addRow(self.l_lim)
+        for w in (self.c_lim, self.s_soglia, self.s_fin):
+            (w.currentIndexChanged if isinstance(w, QComboBox) else w.valueChanged).connect(self._anteprima_limiti)
+        v.addWidget(g3)
+        self._anteprima_limiti()
+
         h = QHBoxLayout()
         b_def = QPushButton("Ripristina predefiniti")
         b_def.clicked.connect(self._predefiniti)
@@ -93,6 +118,21 @@ class FinestraImpostazioni(QDialog):
         h.addWidget(b_ann)
         v.addLayout(h)
 
+    def _imp_limiti(self) -> magico.Impostazioni:
+        i = self.c_lim.currentIndex()
+        return magico.Impostazioni(limite_archivio=0 if i == 0 else i + 2, soglia_archivio=self.s_soglia.value(),
+                                   finestra_archivio=self.s_fin.value())
+
+    def _anteprima_limiti(self, *_):
+        storico = self.arch.sestine()
+        if len(storico) < 30:
+            self.l_lim.setText("Archivio troppo piccolo per calcolare i limiti.")
+            return
+        lo, hi = magico.limiti_archivio(storico, self._imp_limiti())
+        self.l_lim.setText(f"Con queste impostazioni ogni sestina dovrà avere, con QUALSIASI estrazione passata, "
+                           f"al massimo <b>{hi}</b> numeri in comune, e con almeno una estrazione <b>{lo}</b> o più. "
+                           "(Dettagli: menu Analisi → Somiglianza con l'archivio)")
+
     def _predefiniti(self):
         imp = magico.Impostazioni()
         for k, s in self.pesi.items():
@@ -103,13 +143,18 @@ class FinestraImpostazioni(QDialog):
         self.s_eco.setValue(imp.profondita_eco)
         self.s_nit.setValue(imp.nitidezza)
         self.s_com.setValue(imp.max_comuni)
+        self.c_lim.setCurrentIndex(0)
+        self.s_soglia.setValue(imp.soglia_archivio)
+        self.s_fin.setValue(imp.finestra_archivio)
 
     def _salva(self):
         imp = magico.Impostazioni(
             pesi={k: s.value() for k, s in self.pesi.items()},
             finestra_tendenza=self.s_tend.value(), profondita_eco=self.s_eco.value(),
             personalizzate={k: s.value() for k, s in self.pers.items() if s.value()},
-            nitidezza=self.s_nit.value(), max_comuni=self.s_com.value())
+            nitidezza=self.s_nit.value(), max_comuni=self.s_com.value(),
+            limite_archivio=self._imp_limiti().limite_archivio, soglia_archivio=self.s_soglia.value(),
+            finestra_archivio=self.s_fin.value())
         if not any(imp.pesi.values()) and not imp.personalizzate:
             QMessageBox.warning(self, "Impostazioni", "Almeno una voce deve avere peso maggiore di zero.")
             return
@@ -129,6 +174,9 @@ class FinestraSpiegazione(QDialog):
             det = ", ".join(f"{k} {v:.2f}" for k, v in s.dettaglio.items())
             testo.append(f"Sestina {i}: {' '.join(map(str, s.numeri))}  — voto {s.voto:.3f} ({det})")
         testo.append(f"Jolly: {r.jolly} (miglior numero fuori dalla 1ª sestina)    SuperStar: {r.superstar or '-'}")
+        lo, hi = r.limiti_archivio
+        testo.append(f"Somiglianza con l'archivio: ogni sestina ha al massimo {hi} numeri in comune con qualsiasi "
+                     f"estrazione passata (e almeno {lo} con una di esse), come le combinazioni vincenti reali.")
         l = QLabel("\n".join(testo))
         l.setWordWrap(True)
         v.addWidget(l)

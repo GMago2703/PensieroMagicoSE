@@ -247,6 +247,9 @@ class FinestraSestine(QDialog):
             gl.addWidget(wdg, r, 1, 1, 3)
             r += 1
         gl.addWidget(self.ck_mai, r, 0, 1, 2)
+        b_lim = QPushButton("Usa i limiti di somiglianza consigliati dall'analisi")
+        b_lim.clicked.connect(self._limiti_consigliati)
+        gl.addWidget(b_lim, r, 2, 1, 2)
         r += 1
         coppie = [("Al massimo questi numeri in comune con QUALSIASI estrazione passata", self.s_maxp, None),
                   ("Almeno questi numeri in comune con ALMENO UNA estrazione passata", self.s_minp, None),
@@ -282,6 +285,15 @@ class FinestraSestine(QDialog):
         self.tab_r.itemSelectionChanged.connect(lambda: self._dettaglio(self.tab_r))
         v.addWidget(self.tab_r, 1)
         return w
+
+    def _limiti_consigliati(self):
+        from ..core.analisi import limiti_consigliati, massimi_in_comune
+        if len(self.indice.storico) < 30:
+            return
+        lo, hi = limiti_consigliati(massimi_in_comune(self.indice.storico, 500), 90)
+        self.s_minp.setValue(lo)
+        self.s_maxp.setValue(hi)
+        self.l_esito.setText(f"Limiti consigliati: da {lo} a {hi} numeri in comune con l'archivio.")
 
     def cerca(self):
         nums = lambda t: [int(x) for x in re.findall(r"\d+", t) if 1 <= int(x) <= 90]   # noqa: E731

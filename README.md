@@ -9,6 +9,9 @@ Non serve installare niente: basta avviare il file. Al primo avvio Windows potre
 
 L'archivio viene salvato in `%APPDATA%\PensieroMagicoSE\archivio.db`.
 
+## Versione 0.3.1 – Somiglianza con l'archivio
+Nuova analisi *Somiglianza con l'archivio*: per ogni combinazione vincente calcola il massimo di numeri in comune con una qualsiasi estrazione precedente e ricava l'intervallo consigliato (di solito 3-4). Magico Pensiero scarta le sestine fuori da questo intervallo (automatico o fissato a 3/4/5 nelle impostazioni), Claude riceve la regola come obbligatoria e, se non la rispetta, gli viene chiesto di correggere la risposta. Nella ricerca di sestine un pulsante applica i limiti consigliati.
+
 ## Versione 0.3 – Magico Pensiero + Claude
 Menu Magico Pensiero → *Magico Pensiero + Claude* (o pulsante 🤖 Claude in home). Il programma calcola la proposta dell'algoritmo, prepara un dossier statistico dell'archivio (ultime estrazioni, statistiche per numero, forma delle sestine, coppie forti, candidate dell'algoritmo, SuperStar, esito della verifica storica) e lo invia a Claude tramite la Claude API. Claude valuta, scarta ciò che ritiene meno plausibile e sceglie le 3 sestine, il Jolly e il SuperStar con le motivazioni. La scelta si può mostrare in home e viene salvata nello storico delle previsioni accanto a quella dell'algoritmo, così nel tempo si confrontano i risultati reali.
 

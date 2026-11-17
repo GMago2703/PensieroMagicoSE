@@ -17,6 +17,8 @@ from datetime import date
 from math import comb
 from typing import Callable
 
+import numpy as np
+
 # (data, sestina ordinata, jolly, superstar, numeri in ordine di estrazione)
 Riga = tuple[date, list[int], int, int | None, list[int]]
 Storico = list[Riga]
@@ -362,3 +364,80 @@ def struttura(storico: Storico, ultime: int = 0) -> RisultatoAnalisi:
     return RisultatoAnalisi("Struttura delle sestine",
                             ["Quantità", "Pari", "% pari", "Alti", "% alti", "Coppie consecutive", "%"],
                             righe, {}, "")
+
+
+# ------------------------------------------------- somiglianza con l'archivio
+def massimi_in_comune(storico: Storico, ultime: int = 0) -> list[int]:
+    """Per ogni estrazione (delle ultime N): il massimo di numeri in comune con UNA QUALSIASI
+    delle estrazioni precedenti. Indica quanto una sestina vincente "somiglia" all'archivio."""
+    n = len(storico)
+    m = np.zeros((n, 91), dtype=np.float32)
+    for i, r in enumerate(storico):
+        m[i, r[1]] = 1
+    inizio = max(1, n - ultime) if ultime else 1
+    risultati = []
+    for a in range(inizio, n, 400):                      # a blocchi per non usare troppa memoria
+        b = min(a + 400, n)
+        comuni = m[a:b] @ m[:b].T                        # blocco x tutte le precedenti
+        for k in range(b - a):
+            i = a + k
+            risultati.append(int(comuni[k, :i].max()))
+    return risultati
+
+
+def limiti_consigliati(massimi: list[int], soglia: float = 90.0) -> tuple[int, int]:
+    """Intervallo [minimo, massimo] di "numeri in comune con l'archivio" che copre almeno
+    la soglia % delle estrazioni, togliendo i valori rari alle due estremità."""
+    if not massimi:
+        return 0, 6
+    c = Counter(massimi)
+    tot = len(massimi)
+    lo, hi = min(c), max(c)
+    coperti = tot
+    while lo < hi:
+        togli_lo, togli_hi = c[lo], c[hi]
+        if togli_lo <= togli_hi and 100 * (coperti - togli_lo) / tot >= soglia:
+            coperti -= togli_lo
+            lo += 1
+        elif 100 * (coperti - togli_hi) / tot >= soglia:
+            coperti -= togli_hi
+            hi -= 1
+        elif 100 * (coperti - togli_lo) / tot >= soglia:
+            coperti -= togli_lo
+            lo += 1
+        else:
+            break
+    return lo, hi
+
+
+@registra("somiglianza", "Somiglianza con l'archivio",
+          "Per ogni estrazione: il massimo di numeri in comune con una qualsiasi estrazione precedente. "
+          "Mostra quanto le combinazioni vincenti 'assomigliano' a quelle già uscite e da qui ricava "
+          "il limite consigliato per le sestine di Magico Pensiero.",
+          [Parametro("ultime", "Considera le ultime N estrazioni (0 = tutte)", 500),
+           Parametro("soglia", "Copertura richiesta per il limite consigliato (%)", 90, 50, 100)])
+def somiglianza(storico: Storico, ultime: int = 500, soglia: int = 90) -> RisultatoAnalisi:
+    if len(storico) < 2:
+        return RisultatoAnalisi("Somiglianza con l'archivio", ["Massimo in comune"], [], {})
+    massimi = massimi_in_comune(storico, ultime)
+    dati = storico[-len(massimi):]
+    tot = len(massimi)
+    lo, hi = limiti_consigliati(massimi, soglia)
+    righe, numeri = [], []
+    cumulata = 0
+    for k in range(0, 7):
+        esiti = [x == k for x in massimi]
+        volte, rit, rmax = ritardi_evento(esiti)
+        if not volte and not (lo <= k <= hi):
+            continue
+        cumulata += volte
+        righe.append([k, volte, pct(volte, tot), pct(cumulata, tot), rit, rmax,
+                      "✔ consigliato" if lo <= k <= hi else ""])
+        numeri.append(next((r[1] for r, e in zip(reversed(dati), reversed(esiti)) if e), []))
+    nota = (f"Su {tot} estrazioni, ogni nuova combinazione vincente aveva al massimo da {min(massimi)} a "
+            f"{max(massimi)} numeri in comune con le precedenti. Limite consigliato (copre almeno il {soglia}%): "
+            f"da {lo} a {hi} numeri in comune. Ultima estrazione: {massimi[-1]}. "
+            "Nota: più l'archivio cresce, più è facile trovare un'estrazione passata con 3 o 4 numeri uguali.")
+    return RisultatoAnalisi("Somiglianza con l'archivio",
+                            ["Max numeri in comune", "Volte", "%", "% cumulata", "Ritardo attuale", "Ritardo max",
+                             "Limite"], righe, {}, nota, numeri)

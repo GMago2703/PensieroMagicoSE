@@ -228,16 +228,43 @@ def test_claude_ai(arch):
         def __exit__(self, *a):
             pass
 
-    with mock.patch("urllib.request.urlopen", return_value=R(json.dumps(risposta).encode())) as u:
+    corretta = dict(scelta, jolly=77)
+    risposta2 = dict(risposta, content=[{"type": "text", "text": json.dumps(corretta)}])
+    with mock.patch("urllib.request.urlopen", side_effect=[R(json.dumps(risposta).encode()),
+                                                           R(json.dumps(risposta2).encode())]) as u:
         rc = claude_ai.chiedi_a_claude("chiave", "claude-opus-5-5", dossier, set())
         req = u.call_args[0][0]
         assert req.get_header("Anthropic-version") == claude_ai.VERSIONE_API
-        assert "temperature" not in json.loads(req.data)
-    assert rc.sestine[1] == [10, 20, 30, 40, 50, 60] and rc.superstar == 33 and rc.token_uscita == 6
-    assert any("Jolly" in a for a in rc.avvisi)        # jolly nella prima sestina segnalato
+        corpo = json.loads(req.data)
+        assert "temperature" not in corpo and len(corpo["messages"]) == 3     # richiesta di correzione
+    assert rc.sestine[1] == [10, 20, 30, 40, 50, 60] and rc.superstar == 33 and rc.token_uscita == 12
+    assert rc.corretta and rc.jolly == 77 and not rc.avvisi
+    m = magico.matrice(st)
+    v = claude_ai.valida_risposta(scelta, set(), m, (5, 5))
+    assert any("in comune con l'archivio" in a for a in v.avvisi)
     with pytest.raises(claude_ai.ErroreClaude):
         claude_ai.valida_risposta({"sestine": [[1, 1, 2, 3, 4, 5]] * 3, "jolly": 9, "superstar": 2}, set())
     ris = claude_ai.come_risultato(rc, r)
     magico.salva_previsione(arch, r)
     magico.salva_previsione(arch, ris, origine="Claude (prova)")
     assert [p["origine"] for p in magico.leggi_previsioni(arch)] == ["Algoritmo", "Claude (prova)"]
+
+
+def test_somiglianza(arch):
+    from pmse.core import magico
+    arch.unisci(storico_finto(600))
+    st = arch.sestine()
+    massimi = analisi.massimi_in_comune(st, 200)
+    assert len(massimi) == 200
+    # controllo con il calcolo "a mano"
+    i = len(st) - 1
+    assert massimi[-1] == max(len(set(st[i][1]) & set(st[j][1])) for j in range(i))
+    lo, hi = analisi.limiti_consigliati([3] * 60 + [4] * 35 + [5] * 3 + [2] * 2, 90)
+    assert (lo, hi) == (3, 4)
+    ris = analisi.somiglianza(st, 200)
+    assert any(r[6] for r in ris.righe)
+    r = magico.genera(st, magico.Impostazioni(limite_archivio=3))
+    m = magico.matrice(st)
+    from pmse.core.claude_ai import in_comune_archivio
+    assert all(k <= 3 for k in in_comune_archivio([s.numeri for s in r.sestine], m))
+    assert r.limiti_archivio[1] == 3

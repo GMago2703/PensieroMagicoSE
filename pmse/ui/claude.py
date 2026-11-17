@@ -23,9 +23,9 @@ class Interrogatore(QThread):
     finito = Signal(object)
     errore = Signal(str)
 
-    def __init__(self, chiave, modello, dossier, gia_uscite):
+    def __init__(self, chiave, modello, dossier, gia_uscite, m, limiti):
         super().__init__()
-        self.args = (chiave, modello, dossier, gia_uscite)
+        self.args = (chiave, modello, dossier, gia_uscite, m, limiti)
 
     def run(self):
         try:
@@ -128,6 +128,7 @@ class FinestraClaude(QDialog):
         imp = carica_impostazioni(self.arch)
         self.base = magico.genera(storico, imp, punteggi_personalizzati(self.arch, imp, storico))
         self.gia_uscite = {tuple(x[1]) for x in storico}
+        self.matrice = magico.matrice(storico)
         return claude_ai.costruisci_dossier(storico, self.base,
                                             self.arch.leggi_impostazione(claude_ai.CHIAVE_VERIFICA))
 
@@ -160,7 +161,8 @@ class FinestraClaude(QDialog):
         self.b_applica.setEnabled(False)
         self.barra.setVisible(True)
         self.testo.setHtml("<p>Claude sta studiando l'archivio... (di solito meno di un minuto)</p>")
-        self.thread = Interrogatore(chiave, self.c_modello.currentData(), dossier, self.gia_uscite)
+        self.thread = Interrogatore(chiave, self.c_modello.currentData(), dossier, self.gia_uscite,
+                                    self.matrice, self.base.limiti_archivio)
         self.thread.finito.connect(self._risposta)
         self.thread.errore.connect(self._errore)
         self.thread.start()
@@ -185,15 +187,24 @@ class FinestraClaude(QDialog):
         self.l_sestine.setText("<br>".join(righe))
         esc = lambda t: t.replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br>")   # noqa: E731
         html = [f"<h3>La scelta di Claude</h3>"]
-        for i, (s, m) in enumerate(zip(rc.sestine, rc.motivazioni + [""] * 3), 1):
-            html.append(f"<p><b>Sestina {i}: {' '.join(map(str, s))}</b><br>{esc(m)}</p>")
+        comuni = rc.in_comune_archivio or [None] * 3
+        for i, (s, m, k) in enumerate(zip(rc.sestine, rc.motivazioni + [""] * 3, comuni), 1):
+            extra = f" <span style='color:#555'>(max {k} numeri in comune con l'archivio)</span>" if k is not None \
+                else ""
+            html.append(f"<p><b>Sestina {i}: {' '.join(map(str, s))}</b>{extra}<br>{esc(m)}</p>")
         html.append(f"<p><b>Jolly {rc.jolly} e SuperStar {rc.superstar}</b><br>{esc(rc.jolly_superstar)}</p>")
         html.append(f"<h4>Analisi</h4><p>{esc(rc.analisi)}</p>")
         html.append(f"<h4>Scartati</h4><p>{esc(rc.scartati)}</p>")
         html.append(f"<h4>Affidabilità</h4><p>{esc(rc.affidabilita)}</p>")
         if rc.avvisi:
             html.append("<p style='color:#b71c1c'><b>Attenzione:</b> " + " ".join(map(esc, rc.avvisi)) + "</p>")
+        if rc.corretta:
+            html.append("<p style='color:#555'>La prima risposta di Claude non rispettava tutte le regole: "
+                        "il programma gli ha chiesto di correggerla.</p>")
         if self.base:
+            lo, hi = self.base.limiti_archivio
+            html.append(f"<p style='color:#555'>Limite di somiglianza con l'archivio applicato: da {lo} a {hi} "
+                        "numeri in comune.</p>")
             prop = " | ".join(" ".join(map(str, s.numeri)) for s in self.base.sestine)
             html.append(f"<p style='color:#555'>Proposta di partenza dell'algoritmo: {prop}</p>")
         html.append(f"<p style='color:#777; font-size:10px'>Modello {rc.modello} — token inviati "
