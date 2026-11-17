@@ -16,19 +16,12 @@ jobs:
           mkdir -p es
           i=0
           for u in \
-            https://www.superenalotto.com/archivio/estrazioni-2025 \
-            https://www.superenalotto.com/archivio/estrazioni-2010 \
-            https://www.superenalotto.com/ \
-            https://www.superenalotto.com/jackpot \
-            https://www.superenalotto.com/vincite \
-            https://www.superenalotto.com/statistiche \
-            https://www.superenalotto.com/jackpot-vinti \
-            https://www.superenalotto.com/vincite-superenalotto \
-            https://www.superenalotto.com/risultati \
-            https://www.superenalotto.com/estrazione \
-            https://www.sisal.it/superenalotto/archivio-estrazioni \
-            https://www.sisal.it/superenalotto/jackpot \
-            https://it.wikipedia.org/wiki/SuperEnalotto ; do
+            https://www.superenalotto.com/risultati-estrazione/17-11-2026 \
+            https://www.superenalotto.com/risultati-estrazione/11-09-2026 \
+            https://www.superenalotto.com/risultati-estrazione/16-02-2023 \
+            https://www.superenalotto.com/risultati-estrazione/03-01-1998 \
+            https://www.superenalotto.com/risultati-estrazione/22-05-2025 \
+            https://www.superenalotto.com/vincite/quote-vincitori ; do
             i=$((i+1)); f=es/p$(printf %02d $i).html
             code=$(curl -sS -L -m 40 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -o $f -w "%{http_code}" "$u" || echo ERR)
             echo "$f $code $(wc -c < $f 2>/dev/null) $u" | tee -a es/indice.txt
