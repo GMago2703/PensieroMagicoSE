@@ -63,3 +63,14 @@ Le righe di intestazione e quelle non riconosciute vengono ignorate e mostrate n
 - `tests` – test automatici, eseguiti a ogni build
 
 Gioca responsabilmente: le estrazioni sono casuali e nessun programma può garantire vincite.
+
+## App Android (versione ridotta)
+
+Cartella `mobile/`: interfaccia per il tocco (Kivy) che riusa senza modifiche il nucleo `pmse/core`.
+Funzioni: archivio con aggiornamento da Internet, Magico Pensiero, verifica storica (con
+apprendimento), intelligenza artificiale (Gemini o Claude). SuperEnalotto ed Eurojackpot restano
+separati (cartella, archivio, previsioni, apprendimento e chiavi distinti).
+
+L'APK viene creato da GitHub Actions (`.github/workflows/android.yml`): test della logica, prova
+grafica su schermo virtuale, compilazione con buildozer, prova sull'emulatore Android con
+download reale degli archivi, poi pubblicazione nelle Releases con tag `apk-N`.
