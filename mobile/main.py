@@ -15,7 +15,7 @@ from kivy.app import App
 from kivy.clock import Clock, mainthread
 from kivy.core.window import Window
 from kivy.graphics import Color, Ellipse, Rectangle, RoundedRectangle
-from kivy.metrics import dp, sp
+from kivy.metrics import Metrics, dp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.checkbox import CheckBox
@@ -42,6 +42,34 @@ COLORE_JOLLY, COLORE_SUPERSTAR, COLORE_EURO = "#fb8c00", "#d4a017", "#1565c0"
 EVIDENZIA = "c62828"
 
 
+def sp(v: float) -> float:
+    """Dimensione dei caratteri: segue l'ingrandimento scelto nelle impostazioni di Android, ma al
+    massimo del 15%, così le scritte restano dentro pulsanti e riquadri."""
+    try:
+        scala = min(max(float(Metrics.fontscale), 0.85), 1.15)
+    except Exception:
+        scala = 1.0
+    return dp(v) * scala
+
+
+def adatta_testo(w, minimo: float = 9):
+    """Riduce il carattere finché la scritta (su una riga) non entra nella larghezza del widget."""
+    w._fs_base = w.font_size
+
+    def adatta(*_):
+        if w.width <= 1 or not w.text:
+            return
+        limite = w.width - dp(12)
+        w.font_size = w._fs_base
+        w.texture_update()
+        while w.texture_size[0] > limite and w.font_size > dp(minimo):
+            w.font_size *= 0.92
+            w.texture_update()
+    w.bind(width=adatta, text=adatta)
+    Clock.schedule_once(adatta, 0)
+    return w
+
+
 def colore_gioco(g) -> str:
     return ARDESIA if g.is_ej else VERDE_SCURO
 
@@ -63,7 +91,7 @@ def bottone(testo, azione=None, colore=ARANCIO, alto=dp(54), **kw) -> Button:
                background_normal="", background_down="", background_color=hexc(colore), **kw)
     if azione:
         b.bind(on_release=lambda *_: azione())
-    return b
+    return adatta_testo(b)
 
 
 class Testo(Label):
@@ -75,6 +103,21 @@ class Testo(Label):
                          valign="top", **kw)
         self.bind(width=lambda *_: setattr(self, "text_size", (self.width, None)),
                   texture_size=lambda *_: setattr(self, "height", self.texture_size[1]))
+
+
+def paragrafi(contenitore, testo: str, colore=(0.12, 0.12, 0.12, 1), **kw) -> None:
+    """Aggiunge un testo lungo come più paragrafi: sui telefoni un'unica scritta enorme diventa nera."""
+    pezzi, attuale = [], []
+    for riga in testo.split("\n"):
+        attuale.append(riga)
+        if len(attuale) >= 20 or (not riga.strip() and len(attuale) > 1):
+            pezzi.append("\n".join(attuale).strip("\n"))
+            attuale = []
+    if attuale:
+        pezzi.append("\n".join(attuale).strip("\n"))
+    for p in pezzi:
+        if p.strip():
+            contenitore.add_widget(Testo(p, colore, **kw))
 
 
 class Scheda(BoxLayout):
@@ -129,8 +172,8 @@ def riga_palle(titolo, numeri, colore, testo_scuro=False) -> BoxLayout:
 
 def riga_jolly_superstar(jolly, superstar) -> BoxLayout:
     r = riga_palle("Jolly", [jolly], COLORE_JOLLY)
-    r.add_widget(Label(text="SuperStar", color=(0.15, 0.15, 0.15, 1), bold=True, font_size=sp(13),
-                       size_hint_x=None, width=dp(76)), index=1)
+    r.add_widget(adatta_testo(Label(text="SuperStar", color=(0.15, 0.15, 0.15, 1), bold=True, font_size=sp(13),
+                                    size_hint_x=None, width=dp(80)), 7), index=1)
     p = Palla(superstar, COLORE_SUPERSTAR, True)
     r.add_widget(p, index=1)
     r.palle.append(p)
@@ -163,8 +206,10 @@ def evidenzia(numeri, presi) -> str:
 def avviso(titolo, testo):
     corpo = BoxLayout(orientation="vertical", padding=dp(10), spacing=dp(10))
     sv = ScrollView()
-    t = Testo(pulisci(str(testo)), colore=(1, 1, 1, 1))
-    sv.add_widget(t)
+    dentro = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6))
+    dentro.bind(minimum_height=dentro.setter("height"))
+    paragrafi(dentro, pulisci(str(testo)), (1, 1, 1, 1))
+    sv.add_widget(dentro)
     corpo.add_widget(sv)
     p = Popup(title=titolo, content=corpo, size_hint=(0.92, 0.75))
     corpo.add_widget(bottone("OK", p.dismiss, VERDE))
@@ -186,9 +231,8 @@ class Pagina(Screen):
             sfondo(testa, "#00000040")
             testa.add_widget(bottone("<", lambda: app.vai("home"), ARANCIO, alto=dp(48),
                                      size_hint_x=None, width=dp(56)))
-            self.l_titolo = Label(text=self.titolo, bold=True, italic=True, font_size=sp(21),
-                                  color=hexc(LIME), halign="left", valign="middle")
-            self.l_titolo.bind(size=lambda w, s: setattr(w, "text_size", s))
+            self.l_titolo = adatta_testo(Label(text=self.titolo, bold=True, italic=True, font_size=sp(21),
+                                               color=hexc(LIME)))
             testa.add_widget(self.l_titolo)
             box.add_widget(testa)
         self.sv = ScrollView(do_scroll_x=False)
@@ -230,12 +274,12 @@ class Home(Pagina):
                              background_color=hexc(LIME if g is self.g else "#ffffff30"),
                              color=(0, 0, 0, 1) if g is self.g else (1, 1, 1, 1), allow_no_selection=False)
             b.bind(on_release=lambda _b, gg=g: self.app.cambia_gioco(gg))
-            scelta.add_widget(b)
+            scelta.add_widget(adatta_testo(b))
         c.add_widget(scelta)
-        c.add_widget(Label(text=self.g.nome, bold=True, italic=True, font_size=sp(44),
-                           color=hexc(LIME), size_hint_y=None, height=dp(70)))
-        c.add_widget(Label(text=f"Pensiero Magico {self.g.codice}", italic=True, font_size=sp(18),
-                           color=hexc(ARANCIO), bold=True, size_hint_y=None, height=dp(24)))
+        c.add_widget(adatta_testo(Label(text=self.g.nome, bold=True, italic=True, font_size=sp(44),
+                                        color=hexc(LIME), size_hint_y=None, height=dp(70))))
+        c.add_widget(adatta_testo(Label(text=f"Pensiero Magico {self.g.codice}", italic=True, font_size=sp(18),
+                                        color=hexc(ARANCIO), bold=True, size_hint_y=None, height=dp(26))))
 
         sch = Scheda()
         n, ultima = self.s.conta(), self.s.ultima()
@@ -277,8 +321,8 @@ class PaginaArchivio(Pagina):
     def mostra(self):
         c = self.corpo
         c.clear_widgets()
-        c.add_widget(bottone(("Ordine: dalla più vecchia" if self.crescente else "Ordine: dalla più recente") +
-                             "  (tocca per invertire)", self._inverti, VERDE, alto=dp(46)))
+        c.add_widget(bottone(("Dalla più vecchia" if self.crescente else "Dalla più recente") +
+                             " (tocca per invertire)", self._inverti, VERDE, alto=dp(46)))
         self.tutte = self.s.elenco(self.crescente)
         self.mostrate = 0
         if not self.tutte:
@@ -299,11 +343,12 @@ class PaginaArchivio(Pagina):
                     f"[color=ffb74d]J{e.jolly:2d}[/color] [color=fff176]S{e.superstar or 0:2d}[/color]")
             righe.append(f"{e.data:%d/%m/%y} [b]{' '.join(f'{n:2d}' for n in e.numeri)}[/b] {spec}")
         self.mostrate += len(righe)
-        c.add_widget(Testo("\n".join(righe), (1, 1, 1, 1), font_size=sp(14), font_name="RobotoMono-Regular",
-                           line_height=1.25))
+        for i in range(0, len(righe), 25):      # pezzi piccoli: un testo enorme non si può disegnare
+            c.add_widget(Testo("\n".join(righe[i:i + 25]), (1, 1, 1, 1), font_size=sp(14),
+                               font_name="RobotoMono-Regular", line_height=1.25))
         resto = len(self.tutte) - self.mostrate
         if resto > 0:
-            self.b_altre.text = f"Mostra altre {min(resto, self.BLOCCO)} (ne restano {resto})"
+            self.b_altre.text = f"Mostra altre {min(resto, self.BLOCCO)} (restano {resto})"
             c.add_widget(self.b_altre)
 
 
@@ -422,8 +467,8 @@ class PaginaVerifica(Pagina):
     def _mostra_esito(self, es, nota):
         self.esito.clear_widgets()
         sch = Scheda()
-        sch.add_widget(Testo(pulisci(es.testo()).replace("[", "(").replace("]", ")"), font_size=sp(13),
-                             font_name="RobotoMono-Regular"))
+        paragrafi(sch, pulisci(es.testo()).replace("[", "(").replace("]", ")"), font_size=sp(13),
+                  font_name="RobotoMono-Regular")
         if nota:
             sch.add_widget(Testo(f"[b]{pulisci(nota)}[/b]", font_size=sp(13)))
         self.esito.add_widget(sch)
@@ -462,6 +507,7 @@ class PaginaAI(Pagina):
         sch.add_widget(Testo("[b]Servizio[/b]"))
         self.sp_forn = Spinner(text=servizi.FORNITORI[self.fornitore], values=list(servizi.FORNITORI.values()),
                                size_hint_y=None, height=dp(46), font_size=sp(16))
+        adatta_testo(self.sp_forn)
         self.sp_forn.bind(text=lambda *_: self._cambia_fornitore())
         sch.add_widget(self.sp_forn)
         sch.add_widget(Testo("[b]Chiave API[/b] (resta solo su questo telefono)"))
@@ -469,7 +515,7 @@ class PaginaAI(Pagina):
                                   font_size=sp(15), write_tab=False)
         sch.add_widget(self.e_chiave)
         sch.add_widget(Testo("[b]Modello[/b]"))
-        self.sp_mod = Spinner(size_hint_y=None, height=dp(46), font_size=sp(13))
+        self.sp_mod = adatta_testo(Spinner(size_hint_y=None, height=dp(46), font_size=sp(15)))
         sch.add_widget(self.sp_mod)
         self._carica_fornitore()
         r = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(8))
@@ -550,8 +596,8 @@ class PaginaAI(Pagina):
             self.esito.add_widget(bottone("Usa questa scelta (salva tra le previsioni)",
                                           lambda: self._applica(rc, base, f), VERDE))
         sch2 = Scheda()
-        sch2.add_widget(Testo(pulisci(servizi.descrivi_risposta(rc, base, self.g)).replace("[", "(").replace("]", ")"),
-                              font_size=sp(13)))
+        paragrafi(sch2, pulisci(servizi.descrivi_risposta(rc, base, self.g)).replace("[", "(").replace("]", ")"),
+                  font_size=sp(13))
         self.esito.add_widget(sch2)
 
     def _applica(self, rc, base, f):

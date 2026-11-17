@@ -31,7 +31,9 @@ jobs:
       - name: Prova grafica (app vera su schermo virtuale)
         env:
           FOTO_DIR: foto_android
-        run: xvfb-run -a -s "-screen 0 1280x1024x24" python mobile/prova_grafica.py
+        run: |
+          xvfb-run -a -s "-screen 0 1280x1024x24" python mobile/prova_grafica.py
+          PMSE_TELEFONO=1 FOTO_DIR=foto_android/telefono xvfb-run -a -s "-screen 0 1400x2400x24" python mobile/prova_grafica.py
       - name: Pubblica le schermate sul ramo "foto-android"
         if: always()
         run: |
@@ -40,7 +42,7 @@ jobs:
           git config user.email "actions@github.com"
           git checkout --orphan foto-tmp
           git rm -rf --cached . -q
-          git add -f foto_android/*.png
+          git add -f foto_android
           git commit -q -m "Schermate app Android ${{ github.run_number }}"
           git push -f -q origin foto-tmp:foto-android
 

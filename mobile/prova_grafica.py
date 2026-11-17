@@ -17,10 +17,16 @@ os.environ["PMSE_DATI"] = tempfile.mkdtemp()
 FOTO = Path(os.environ.get("FOTO_DIR", "foto_android"))
 FOTO.mkdir(parents=True, exist_ok=True)
 
+TELEFONO = bool(os.environ.get("PMSE_TELEFONO"))
+DENSITA = 2.625 if TELEFONO else 1.0
+if TELEFONO:          # come un telefono vero: alta densità e caratteri di sistema ingranditi
+    os.environ["KIVY_METRICS_DENSITY"] = str(DENSITA)
+    os.environ["KIVY_METRICS_FONTSCALE"] = "1.3"
+
 from kivy.config import Config  # noqa: E402
 
-Config.set("graphics", "width", "400")
-Config.set("graphics", "height", "820")
+Config.set("graphics", "width", str(int(400 * DENSITA)))
+Config.set("graphics", "height", str(int(820 * DENSITA)))
 Config.set("kivy", "exit_on_escape", "0")
 
 from kivy.clock import Clock  # noqa: E402
@@ -97,6 +103,21 @@ class Prova(main.PensieroMagicoApp):
 
     def foto(self, nome):
         Window.screenshot(name=str(FOTO / f"{nome}.png"))
+        self.controlla(nome)
+
+    def controlla(self, nome):
+        """Nessuna scritta deve uscire dal suo spazio; nessun testo può essere troppo alto da disegnare
+        (oltre circa 4000 pixel il telefono lo mostra nero)."""
+        from kivy.uix.label import Label
+        for radice in list(Window.children):
+            for w in radice.walk(restrict=True):
+                if not isinstance(w, Label) or not w.text or w.width <= 1:
+                    continue
+                if w.texture_size[1] > 4000:
+                    ERRORI.append(f"{nome}: testo troppo alto ({w.texture_size[1]} px): {w.text[:40]!r}")
+                if w.text_size[0] is None and w.texture_size[0] > w.width + 2:
+                    ERRORI.append(f"{nome}: scritta fuori dallo spazio ({w.texture_size[0]:.0f} > "
+                                  f"{w.width:.0f}): {w.text[:40]!r}")
 
     def copione(self):
         yield
@@ -202,7 +223,7 @@ class Prova(main.PensieroMagicoApp):
         assert self.serv.conta() == 400
         self.foto("b06_ritorno_se")
         # telefono stretto (320 dp): le palline devono restare dentro i riquadri
-        Window.size = (320, 640)
+        Window.size = (int(320 * DENSITA), int(640 * DENSITA))
         yield
         self.vai("magico")
         yield
