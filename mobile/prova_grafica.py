@@ -25,8 +25,8 @@ if TELEFONO:          # come un telefono vero: alta densità e caratteri di sist
 
 from kivy.config import Config  # noqa: E402
 
-Config.set("graphics", "width", str(int(400 * DENSITA)))
-Config.set("graphics", "height", str(int(820 * DENSITA)))
+Config.set("graphics", "width", str(int(400 * DENSITA) // 8 * 8))      # multiplo di 8: catture diritte
+Config.set("graphics", "height", str(int(820 * DENSITA) // 8 * 8))
 Config.set("kivy", "exit_on_escape", "0")
 
 from kivy.clock import Clock  # noqa: E402
