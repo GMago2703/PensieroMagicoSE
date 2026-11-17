@@ -25,7 +25,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q xvfb libgl1-mesa-dri libgl1 libmtdev1 libegl1
-          pip install "kivy[base]==2.3.1" numpy certifi pytest
+          pip install "kivy[base]==2.3.1" numpy certifi pytest openpyxl
       - name: Test della logica dell'app
         run: python -m pytest -q tests/test_mobile.py tests/test_nucleo.py tests/test_ej.py
       - name: Prova grafica (app vera su schermo virtuale)
