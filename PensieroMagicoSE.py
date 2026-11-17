@@ -1,0 +1,31 @@
+"""Avvio di Pensiero Magico SE."""
+import sys
+import traceback
+
+
+def main():
+    from PySide6.QtWidgets import QApplication, QMessageBox
+
+    from pmse.ui.finestra import FinestraPrincipale
+
+    app = QApplication(sys.argv)
+    app.setApplicationName("Pensiero Magico SE")
+    app.setStyle("Fusion")
+    from pathlib import Path
+
+    from PySide6.QtGui import QIcon
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
+    app.setWindowIcon(QIcon(str(base / "pmse" / "icona.png")))
+
+    def errore_non_gestito(tipo, valore, tb):
+        testo = "".join(traceback.format_exception(tipo, valore, tb))
+        QMessageBox.critical(None, "Errore imprevisto", testo[-3000:])
+
+    sys.excepthook = errore_non_gestito
+    w = FinestraPrincipale()
+    w.show()
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()
