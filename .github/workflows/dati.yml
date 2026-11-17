@@ -1,0 +1,27 @@
+name: Dati vincite SuperEnalotto
+on:
+  push:
+    branches: [ main ]
+    paths: [ ".github/workflows/dati.yml" ]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  vincite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy
+      - name: Scarica i vincitori di tutti i concorsi
+        run: python strumenti/scarica_vincite.py
+      - name: Pubblica sul ramo "dati-vincite"
+        run: |
+          git config user.name "github-actions"; git config user.email "actions@github.com"
+          cp pmse/dati/vincite_se.json /tmp/v.json
+          git checkout --orphan dv-tmp; git rm -rf --cached . -q
+          mkdir -p dv && cp /tmp/v.json dv/vincite_se.json
+          git add -f dv; git commit -q -m "vincite"; git push -f -q origin dv-tmp:dati-vincite
