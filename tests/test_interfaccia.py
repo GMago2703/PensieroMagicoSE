@@ -178,6 +178,19 @@ def test_nuove_finestre(app, arch):
     v.c_filtro.setCurrentIndex(1)
     app.processEvents()
     v.close()
+    from pmse.core import laboratorio
+    from pmse.ui.laboratorio import FinestraLaboratorio
+    lab = FinestraLaboratorio(arch, w)
+    lab.s_sim.setValue(50)
+    lab.show()
+    lab.avvia()
+    lab.thread.wait(300000)
+    app.processEvents()
+    assert lab.risultato.prove and "VERDETTO" in arch.leggi_impostazione(laboratorio.CHIAVE_LAB + "_testo")
+    assert arch.leggi_impostazione(laboratorio.CHIAVE_LAB)
+    foto("laboratorio", lab)
+    entra_nello_schermo(lab, app)
+    lab.close()
     from pmse.core import claude_ai
     from pmse.ui.claude import FinestraClaude
     cl = FinestraClaude(arch, w)

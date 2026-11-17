@@ -126,7 +126,8 @@ def _riga(*v) -> str:
 
 
 def costruisci_dossier(storico: Storico, r: magico.RisultatoMagico, verifica: str | None = None,
-                       ultime: int = 40, lezioni: str | None = None, imp: magico.Impostazioni | None = None) -> str:
+                       ultime: int = 40, lezioni: str | None = None, imp: magico.Impostazioni | None = None,
+                       laboratorio: str | None = None) -> str:
     g = gioco_di(storico)
     N, K, comb = g.n, g.k, g.nome_comb
     n = len(storico)
@@ -247,6 +248,12 @@ def costruisci_dossier(storico: Storico, r: magico.RisultatoMagico, verifica: st
                    ", ".join(f"{magico.VOCI[k]} {v}" for k, v in eff.items()))
         out.append("Filtri di forma attuali: " + "; ".join(magico.descrivi_filtri(imp, storico).values()))
     out.append(lezioni.strip() if lezioni else "Nessuna valutazione ancora disponibile.")
+    if laboratorio:
+        out.append("")
+        out.append("## Laboratorio sulla casualità (test statistici sull'intero archivio)")
+        out.append(laboratorio.strip())
+        out.append("Se il laboratorio non trova anomalie, le estrazioni sono compatibili con il caso: dichiaralo "
+                   "nell'affidabilità e non presentare la scelta come una previsione sicura.")
     return "\n".join(out)
 
 

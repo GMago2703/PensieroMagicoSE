@@ -131,3 +131,22 @@ def test_contesto_ssl():
         assert c.cert_store_stats()["x509_ca"] > 50                       # certificati caricati
     except ImportError:
         pass
+
+
+def test_laboratorio_servizio(tmp_path, finto_internet, monkeypatch):
+    from pmse.core import laboratorio
+    s = servizi.Servizio(tmp_path, SE)
+    s.aggiorna()
+    r = s.laboratorio(simulazioni=20)
+    assert r.prove and "VERDETTO" in s.ultimo_laboratorio()
+    visti = {}
+
+    def finta(chiave, modello, dossier, *a, **k):
+        visti["dossier"] = dossier
+        return claude_ai.RispostaClaude([[1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12], [13, 14, 15, 16, 17, 18]],
+                                        19, 20, [], "", "", "", "", modello)
+    monkeypatch.setattr(claude_ai, "chiedi_a_gemini", finta)
+    s.chiedi_ai("gemini", "k", "gemini-3.8-flash")
+    assert "Laboratorio sulla casualità" in visti["dossier"]
+    assert s.arch.leggi_impostazione(laboratorio.CHIAVE_LAB) in visti["dossier"]
+    s.chiudi()

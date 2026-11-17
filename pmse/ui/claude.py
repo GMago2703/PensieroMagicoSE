@@ -7,7 +7,7 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit,
                                QProgressBar, QPushButton, QTextBrowser, QVBoxLayout)
 
-from ..core import claude_ai, magico
+from ..core import claude_ai, laboratorio, magico
 from ..core.db import Archivio
 from .griglia import COLORE_JOLLY, COLORI_SESTINE, Griglia90
 from .magico import carica_impostazioni, punteggi_personalizzati
@@ -216,7 +216,8 @@ class FinestraClaude(QDialog):
         from ..core import apprendimento
         return claude_ai.costruisci_dossier(storico, self.base,
                                             self.arch.leggi_impostazione(claude_ai.CHIAVE_VERIFICA),
-                                            lezioni=apprendimento.riepilogo_per_claude(self.arch), imp=imp)
+                                            lezioni=apprendimento.riepilogo_per_claude(self.arch), imp=imp,
+                                            laboratorio=self.arch.leggi_impostazione(laboratorio.CHIAVE_LAB))
 
     def _mostra_dossier(self):
         dossier = self._prepara()

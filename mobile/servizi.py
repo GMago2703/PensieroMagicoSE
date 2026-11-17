@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
-from pmse.core import apprendimento, claude_ai, internet, magico, personalizzate
+from pmse.core import apprendimento, claude_ai, internet, laboratorio, magico, personalizzate
 from pmse.core.db import Archivio, EsitoUnione
 from pmse.core.gioco import EJ, GIOCHI, SE, Gioco
 
@@ -148,6 +148,16 @@ class Servizio:
                 nota = "Apprendimento: questi concorsi erano già stati studiati, nulla da aggiungere."
         return es, nota
 
+    # ---------------------------------------------------------- laboratorio
+    def laboratorio(self, simulazioni: int = 100, avanzamento=None, interrompi=None) -> "laboratorio.Rapporto":
+        r = laboratorio.esegui(self.arch.tutte(True), self.g, simulazioni, avanzamento, interrompi)
+        self.arch.scrivi_impostazione(laboratorio.CHIAVE_LAB, laboratorio.riassunto_per_ai(r))
+        self.arch.scrivi_impostazione(laboratorio.CHIAVE_LAB + "_testo", r.testo())
+        return r
+
+    def ultimo_laboratorio(self) -> str:
+        return self.arch.leggi_impostazione(laboratorio.CHIAVE_LAB + "_testo", "") or ""
+
     # ---------------------------------------------------- intelligenza artificiale
     def fornitore(self) -> str:
         return self.arch.leggi_impostazione(claude_ai.CHIAVE_FORNITORE, "gemini") or "gemini"
@@ -191,7 +201,8 @@ class Servizio:
         m = magico.matrice(storico)
         dossier = claude_ai.costruisci_dossier(storico, base,
                                                self.arch.leggi_impostazione(claude_ai.CHIAVE_VERIFICA),
-                                               lezioni=apprendimento.riepilogo_per_claude(self.arch), imp=imp)
+                                               lezioni=apprendimento.riepilogo_per_claude(self.arch), imp=imp,
+                                               laboratorio=self.arch.leggi_impostazione(laboratorio.CHIAVE_LAB))
         if fornitore == "gemini":
             rc = claude_ai.chiedi_a_gemini(chiave.strip(), modello, dossier, gia_uscite, m,
                                            base.limiti_archivio, g=self.g)

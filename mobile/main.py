@@ -300,6 +300,7 @@ class Home(Pagina):
         c.add_widget(bottone("Magico Pensiero", lambda: self.app.vai("magico"), ARANCIO))
         c.add_widget(bottone("Verifica storica", lambda: self.app.vai("verifica"), ARANCIO))
         c.add_widget(bottone("Intelligenza artificiale", lambda: self.app.vai("ai"), ARANCIO))
+        c.add_widget(bottone("Laboratorio: è davvero casuale?", lambda: self.app.vai("laboratorio"), ARANCIO))
         c.add_widget(bottone("Archivio estrazioni", lambda: self.app.vai("archivio"), VERDE))
         piede = Testo(f"versione {__version__} – i numeri del lotto sono casuali: gioca con moderazione",
                       (1, 1, 1, 0.7), font_size=sp(11))
@@ -608,6 +609,78 @@ class PaginaAI(Pagina):
                                      "con l'estrazione quando aggiornerai l'archivio.")
 
 
+class PaginaLaboratorio(Pagina):
+    titolo = "Laboratorio"
+
+    def __init__(self, app, **kw):
+        super().__init__(app, name="laboratorio", **kw)
+        self.stop = False
+
+    def mostra(self):
+        c = self.corpo
+        c.clear_widgets()
+        sch = Scheda()
+        paragrafi(sch, "Il laboratorio interroga l'archivio con il metodo scientifico. La macchina estrattrice è "
+                       "deterministica ma caotica: differenze minime crescono a ogni urto e rendono impossibile "
+                       "calcolare le traiettorie. Un difetto sistematico però lascia un'impronta nei numeri.\n\n"
+                       "1. La macchina: palline più frequenti, posizione di uscita (per il SuperEnalotto fino al 2009 "
+                       "le ruote del Lotto), coppie, vicini, decine, cambiamenti nel tempo, giorno della settimana.\n"
+                       "2. La memoria: ripetizioni, vicini, ritardi.\n"
+                       "3. La previsione: una gara tra regole, compreso un modello di apprendimento automatico, "
+                       "giudicate solo sui concorsi che non hanno mai visto.\n\n"
+                       "Si parla di ANOMALIA solo se il risultato resta improbabile anche dopo la correzione per le "
+                       "molte prove. L'esito viene passato anche all'intelligenza artificiale.", font_size=sp(14))
+        c.add_widget(sch)
+        self.b_avvia = bottone("Avvia il laboratorio", self._avvia, ARANCIO)
+        c.add_widget(self.b_avvia)
+        self.barra = ProgressBar(max=1, value=0, size_hint_y=None, height=dp(18), opacity=0)
+        c.add_widget(self.barra)
+        self.l_stato = Testo("", (1, 1, 1, 1))
+        c.add_widget(self.l_stato)
+        self.esito = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8))
+        self.esito.bind(minimum_height=self.esito.setter("height"))
+        c.add_widget(self.esito)
+        self._mostra_rapporto(self.s.ultimo_laboratorio())
+
+    def _mostra_rapporto(self, testo):
+        self.esito.clear_widgets()
+        if not testo:
+            return
+        sch = Scheda()
+        paragrafi(sch, pulisci(testo).replace("[", "(").replace("]", ")"), font_size=sp(13))
+        self.esito.add_widget(sch)
+
+    def _avvia(self):
+        if self.app.occupato:
+            self.stop = True
+            self.b_avvia.text = "Interruzione..."
+            return
+        if self.s.conta() < 200:
+            avviso("Laboratorio", "Servono almeno 200 estrazioni: aggiorna prima l'archivio da Internet.")
+            return
+        self.stop = False
+        self.b_avvia.text = "Ferma"
+        self.barra.opacity, self.barra.value = 1, 0
+        self.l_stato.text = "Laboratorio in corso... (sul telefono può richiedere qualche minuto)"
+
+        @mainthread
+        def avanza(testo, i, n):
+            self.barra.max, self.barra.value = max(n, 1), i
+            self.l_stato.text = testo
+
+        def fatto(r):
+            self.b_avvia.text = "Avvia il laboratorio"
+            self.barra.opacity = 0
+            self.l_stato.text = "Interrotto: risultato parziale." if self.stop else "Laboratorio completato."
+            self._mostra_rapporto(r.testo())
+            self.sv.scroll_y = 0.7
+
+        def errore(_m):
+            self.b_avvia.text = "Avvia il laboratorio"
+            self.barra.opacity = 0
+        self.app.in_background(None, lambda: self.s.laboratorio(100, avanza, lambda: self.stop), fatto, errore)
+
+
 # ------------------------------------------------------------------ applicazione
 def autotest_richiesto() -> bool:
     """Vero solo se l'app è stata avviata dalla build con: am start ... --es autotest 1"""
@@ -633,7 +706,7 @@ class PensieroMagicoApp(App):
         self.serv = servizi.Servizio(self.cartella, servizi.ultimo_gioco(self.cartella))
         self.sm = ScreenManager(transition=SlideTransition(duration=0.18))
         self.pagine = {}
-        for cls in (Home, PaginaArchivio, PaginaMagico, PaginaVerifica, PaginaAI):
+        for cls in (Home, PaginaArchivio, PaginaMagico, PaginaVerifica, PaginaAI, PaginaLaboratorio):
             p = cls(self)
             self.pagine[p.name] = p
             self.sm.add_widget(p)
@@ -677,6 +750,10 @@ class PensieroMagicoApp(App):
                 print(f"AUTOTEST {g.codice} Magico Pensiero: {[x.numeri for x in r.sestine]} {r.jolly} {r.superstar}")
                 es, _ = s.verifica(10)
                 print(f"AUTOTEST {g.codice} verifica: {es.prove} concorsi, {es.numeri_mp} numeri indovinati")
+                t1 = time.time()
+                lab = s.laboratorio(30)
+                print(f"AUTOTEST {g.codice} laboratorio: {len(lab.prove)} prove, {len(lab.anomalie)} anomalie, "
+                      f"{time.time() - t1:.0f}s")
                 s.chiudi()
             if "SE" in senza_rete and "EJ" in senza_rete:
                 raise RuntimeError("nessun sito raggiungibile")

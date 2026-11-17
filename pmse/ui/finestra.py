@@ -285,6 +285,8 @@ class FinestraPrincipale(QMainWindow):
         self._azione(m, "Verifica storica (previsioni su quanto già avvenuto)...", self.verifica_magico)
         self._azione(m, "Storico delle previsioni...", self.storico_magico)
         self._azione(m, "📈 Analisi delle previsioni e apprendimento...", self.apprendimento)
+        m.addSeparator()
+        self._azione(m, "🧪 Laboratorio: la casualità è davvero casuale?...", self.laboratorio)
 
         for nome in MENU_VUOTI_DOPO:
             self._menu_vuoto(nome)
@@ -544,6 +546,10 @@ class FinestraPrincipale(QMainWindow):
             self.ultimo_magico = None
             if self.arch.conta() >= 30:
                 self.genera()
+
+    def laboratorio(self):
+        from .laboratorio import FinestraLaboratorio
+        FinestraLaboratorio(self.arch, self).exec()
 
     def verifica_magico(self):
         from .magico import FinestraVerifica

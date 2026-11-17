@@ -160,6 +160,17 @@ class Prova(main.PensieroMagicoApp):
         v.sv.scroll_y = 0.45
         yield
         self.foto("a07_verifica_dettaglio_se")
+        self.vai("laboratorio")
+        yield
+        yield
+        lab = self.pagine["laboratorio"]
+        lab._avvia()
+        yield
+        yield
+        assert "VERDETTO" in self.serv.ultimo_laboratorio()
+        lab.sv.scroll_y = 0.5
+        yield
+        self.foto("a075_laboratorio_se")
         self.vai("ai")
         yield
         yield
