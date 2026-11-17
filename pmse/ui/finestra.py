@@ -23,22 +23,71 @@ from .griglia import COLORE_JOLLY, COLORE_SUPERSTAR, COLORI_SESTINE, Griglia90
 from .importa import FinestraImporta
 from .internet import FinestraInternet, Scaricatore
 
+# Colori ispirati alla palette del sito sisal.it (verdi, verde lime, arancio, grigio ardesia)
+VERDE_SCURO, VERDE, LIME, ARANCIO, ARDESIA = "#00653B", "#0B7D3E", "#BED62F", "#FF8E0D", "#2F3C43"
+
 SFONDO = """
-QMainWindow { background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-              stop:0 #b8860b, stop:0.35 #f4d35e, stop:0.6 #d4a017, stop:1 #8b6508); }
-QMainWindow[gioco="EJ"] { background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-              stop:0 #0d2a6b, stop:0.4 #1f4fb0, stop:0.7 #2c6ad1, stop:1 #0a1f52); }
 QToolButton#selettore { font-weight: bold; padding: 2px 8px; }
-QFrame#pannello { background: white; border: 2px solid #555; }
-QLabel#titolo { font-family: 'Segoe UI'; font-size: 24px; font-weight: bold; }
+QFrame#pannello { background: white; border: 2px solid #2F3C43; border-radius: 6px; }
+QLabel#titolo { font-family: 'Segoe UI Black', 'Segoe UI'; font-size: 26px; font-weight: 900;
+                font-style: italic; }
 QPushButton[class="lato"] { text-align: left; padding: 6px 10px; font-size: 12px; min-width: 100px; }
 """
 
-MENU_VUOTI = ["Sistemi", "Condizioni", "Elaborazione", "Combinazioni", "Statistiche", "Metodi"]
+MENU_VUOTI = ["Sistemi", "Condizioni", "Sviluppo", "Combinazioni", "Statistiche", "Metodi"]
 MENU_VUOTI_DOPO = ["Stampe", "Ricevitoria", "Impostazioni"]
 
 
 FINESTRE: list = []        # riferimenti alle finestre aperte (evita che vengano distrutte)
+
+
+class SfondoHome(QWidget):
+    """Sfondo della home: colori in stile sisal.it e il nome del gioco scritto in grande, in parte
+    nascosto dalle tabelle che gli stanno davanti."""
+
+    def __init__(self, gioco: Gioco):
+        super().__init__()
+        self.g = gioco
+
+    def paintEvent(self, ev):
+        from PySide6.QtGui import QBrush, QColor, QLinearGradient, QPainter, QPainterPath, QPen
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        r = self.rect()
+        grad = QLinearGradient(0, 0, r.width(), r.height())
+        if self.g.is_ej:
+            grad.setColorAt(0, QColor(ARDESIA))
+            grad.setColorAt(0.55, QColor("#24323A"))
+            grad.setColorAt(1, QColor(VERDE_SCURO))
+        else:
+            grad.setColorAt(0, QColor(VERDE_SCURO))
+            grad.setColorAt(0.55, QColor(VERDE))
+            grad.setColorAt(1, QColor("#0E9A4C"))
+        p.fillRect(r, QBrush(grad))
+        # striscia lime in basso, come le barre del sito
+        p.fillRect(0, r.height() - 10, r.width(), 10, QColor(LIME))
+        # nome del gioco a caratteri giganti
+        testo = self.g.nome
+        f = QFont("Segoe UI Black")
+        f.setBold(True)
+        f.setItalic(True)
+        f.setPixelSize(max(60, int(r.width() / (len(testo) * 0.62))))
+        p.setFont(f)
+        metrica = p.fontMetrics()
+        larghezza = metrica.horizontalAdvance(testo)
+        x = (r.width() - larghezza) / 2
+        for y, colore in ((r.height() * 0.30, LIME if not self.g.is_ej else ARANCIO),
+                          (r.height() * 0.92, "#FFFFFF")):
+            percorso = QPainterPath()
+            percorso.addText(x, y, f, testo)
+            p.setPen(QPen(QColor(0, 0, 0, 70), 10))
+            p.drawPath(percorso.translated(6, 6))          # ombra
+            p.setPen(QPen(QColor(ARANCIO if colore != ARANCIO else LIME), 4))
+            c = QColor(colore)
+            c.setAlpha(235)
+            p.setBrush(c)
+            p.drawPath(percorso)
+        p.end()
 
 
 def apri_programma(codice: str, avvio_automatico: bool = True) -> "FinestraPrincipale":
@@ -198,7 +247,7 @@ class FinestraPrincipale(QMainWindow):
 
     # -------------------------------------------------------------- centro
     def _centro(self):
-        w = QWidget()
+        w = SfondoHome(self.g)
         esterno = QVBoxLayout(w)
         esterno.addStretch()
         h = QHBoxLayout()
@@ -208,7 +257,7 @@ class FinestraPrincipale(QMainWindow):
         h.addStretch()
 
         g = self.g
-        self.p_sx = Pannello(g.nome, "#1565c0" if g.is_ej else "#d81b60", selezionabile=True, gioco=g)
+        self.p_sx = Pannello(g.nome, ARANCIO if g.is_ej else VERDE, selezionabile=True, gioco=g)
         self.p_sx.pulsante("📚  Archivio", self.apri_archivio)
         self.p_sx.pulsante("🔍  Analisi", lambda: self.apri_analisi(None))
         self.p_sx.pulsante(f"📋  {g.C(plurale=True)}", self.mie_sestine)
@@ -217,7 +266,7 @@ class FinestraPrincipale(QMainWindow):
         self.p_sx.lato.addStretch()
         self.p_sx.griglia.selezione_cambiata.connect(lambda s: self.l_sel.setText(f"Numeri selezionati: {len(s)}"))
 
-        self.p_dx = Pannello("Magico Pensiero", "#6a1b9a", selezionabile=False, gioco=g)
+        self.p_dx = Pannello("Magico Pensiero", ARDESIA, selezionabile=False, gioco=g)
         self.p_dx.pulsante("✨  Genera", self.genera)
         self.p_dx.pulsante("❓  Perché", self.spiegazione)
         self.p_dx.pulsante("🤖  AI", self.claude)
