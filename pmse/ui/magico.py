@@ -203,6 +203,8 @@ class FinestraVerifica(QDialog):
     def _finito(self, es: magico.EsitoVerifica):
         self.b_via.setEnabled(True)
         self.testo.setPlainText(es.testo())
+        if es.prove:      # l'esito viene passato a Claude come informazione
+            self.arch.scrivi_impostazione("magico_ultima_verifica", es.testo())
         righe = [[d.strftime("%d/%m/%Y"), " ".join(map(str, estr)),
                   *[" ".join(map(str, s)) for s in sest], *punti, max(punti)]
                  for d, sest, estr, punti in reversed(es.dettagli)]
@@ -240,9 +242,10 @@ class FinestraStorico(QDialog):
                          "sì" if p.get("superstar") and p["superstar"] == e.superstar else "no"]
             else:
                 esito = ["in attesa dell'estrazione", "", "", "", "", ""]
-            righe.append([p.get("generata", ""), dopo.strftime("%d/%m/%Y") if dopo else "",
+            righe.append([p.get("origine", "Algoritmo"), p.get("generata", ""),
+                          dopo.strftime("%d/%m/%Y") if dopo else "",
                           *[" ".join(map(str, s)) for s in sest], p["jolly"], p.get("superstar") or "-", *esito])
-        riempi_tabella(tab, ["Generata il", "Dopo il concorso del", "Sestina 1", "Sestina 2", "Sestina 3",
+        riempi_tabella(tab, ["Origine", "Generata il", "Dopo il concorso del", "Sestina 1", "Sestina 2", "Sestina 3",
                              "Jolly", "SuperStar", "Estrazione successiva", "Punti 1", "Punti 2", "Punti 3",
                              "Jolly tra i 6", "SuperStar preso"], righe)
         v.addWidget(tab, 1)

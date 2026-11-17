@@ -203,3 +203,41 @@ def test_sestine_e_magico(arch):
     assert es.prove == 20
     magico.salva_previsione(arch, r)
     assert magico.leggi_previsioni(arch)[-1]["sestine"][0] == r.sestine[0].numeri
+
+
+def test_claude_ai(arch):
+    import io
+    import json
+    from unittest import mock
+
+    from pmse.core import claude_ai, magico
+    arch.unisci(storico_finto(300))
+    st = arch.sestine()
+    r = magico.genera(st)
+    dossier = claude_ai.costruisci_dossier(st, r, "verifica di prova")
+    assert "Statistiche per numero" in dossier and "verifica di prova" in dossier
+    scelta = {"sestine": [[1, 2, 3, 4, 5, 7], [10, 20, 30, 40, 50, 60], [11, 21, 31, 41, 51, 61]],
+              "jolly": 1, "superstar": 33, "motivazioni": ["a", "b", "c"], "analisi": "x"}
+    risposta = {"model": "claude-opus-5-5", "stop_reason": "end_turn", "usage": {"input_tokens": 5, "output_tokens": 6},
+                "content": [{"type": "text", "text": "```json\n" + json.dumps(scelta) + "\n```"}]}
+
+    class R(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    with mock.patch("urllib.request.urlopen", return_value=R(json.dumps(risposta).encode())) as u:
+        rc = claude_ai.chiedi_a_claude("chiave", "claude-opus-5-5", dossier, set())
+        req = u.call_args[0][0]
+        assert req.get_header("Anthropic-version") == claude_ai.VERSIONE_API
+        assert "temperature" not in json.loads(req.data)
+    assert rc.sestine[1] == [10, 20, 30, 40, 50, 60] and rc.superstar == 33 and rc.token_uscita == 6
+    assert any("Jolly" in a for a in rc.avvisi)        # jolly nella prima sestina segnalato
+    with pytest.raises(claude_ai.ErroreClaude):
+        claude_ai.valida_risposta({"sestine": [[1, 1, 2, 3, 4, 5]] * 3, "jolly": 9, "superstar": 2}, set())
+    ris = claude_ai.come_risultato(rc, r)
+    magico.salva_previsione(arch, r)
+    magico.salva_previsione(arch, ris, origine="Claude (prova)")
+    assert [p["origine"] for p in magico.leggi_previsioni(arch)] == ["Algoritmo", "Claude (prova)"]

@@ -9,6 +9,11 @@ Non serve installare niente: basta avviare il file. Al primo avvio Windows potre
 
 L'archivio viene salvato in `%APPDATA%\PensieroMagicoSE\archivio.db`.
 
+## Versione 0.3 – Magico Pensiero + Claude
+Menu Magico Pensiero → *Magico Pensiero + Claude* (o pulsante 🤖 Claude in home). Il programma calcola la proposta dell'algoritmo, prepara un dossier statistico dell'archivio (ultime estrazioni, statistiche per numero, forma delle sestine, coppie forti, candidate dell'algoritmo, SuperStar, esito della verifica storica) e lo invia a Claude tramite la Claude API. Claude valuta, scarta ciò che ritiene meno plausibile e sceglie le 3 sestine, il Jolly e il SuperStar con le motivazioni. La scelta si può mostrare in home e viene salvata nello storico delle previsioni accanto a quella dell'algoritmo, così nel tempo si confrontano i risultati reali.
+
+Serve una chiave API personale della Claude Console (platform.claude.com): l'uso dell'API è a pagamento e separato dall'abbonamento a claude.ai. La chiave resta salvata solo sul computer dell'utente. Con "Mostra i dati che verranno inviati" si vede esattamente cosa riceve Claude.
+
 ## Fase 2 (versione 0.2)
 - **Nuove analisi**: Consecutività numerica, Somme, Sequenze, Pari e dispari, Posizioni. In ogni tabella un clic su una riga evidenzia sulla griglia i numeri interessati.
 - **Costruttore di analisi personalizzate** (Analisi → Costruttore): ricette fatte di misure pesate (frequenza, ritardo, tendenza, numeri successivi, posizione, numeri amici, giorno della settimana, Jolly, SuperStar…) e filtri (parità, intervallo, decine, finali, numeri usciti di recente). Le ricette salvate compaiono nel menu Analisi e si possono usare in Magico Pensiero.

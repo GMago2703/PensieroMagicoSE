@@ -126,6 +126,7 @@ class FinestraPrincipale(QMainWindow):
         m = mb.addMenu("&Magico Pensiero")
         self._azione(m, "✨ Genera le 3 sestine Magico Pensiero", self.genera)
         self._azione(m, "Come sono nate le sestine (spiegazione)...", self.spiegazione)
+        self._azione(m, "🤖 Magico Pensiero + Claude (intelligenza artificiale)...", self.claude)
         m.addSeparator()
         self._azione(m, "Impostazioni dell'algoritmo...", self.impostazioni_magico)
         self._azione(m, "Verifica storica dell'algoritmo...", self.verifica_magico)
@@ -159,6 +160,7 @@ class FinestraPrincipale(QMainWindow):
         self.p_dx = Pannello("Magico Pensiero", "#6a1b9a", selezionabile=False)
         self.p_dx.pulsante("✨  Genera", self.genera)
         self.p_dx.pulsante("❓  Perché", self.spiegazione)
+        self.p_dx.pulsante("🤖  Claude", self.claude)
         legenda = QLabel()
         voci = [(COLORI_SESTINE[i], f"Sestina {i + 1}") for i in range(3)] + \
                [(COLORE_JOLLY, "Jolly"), (COLORE_SUPERSTAR, "SuperStar")]
@@ -308,9 +310,9 @@ class FinestraPrincipale(QMainWindow):
         magico.salva_previsione(self.arch, r)
         self.mostra_magico(r)
 
-    def mostra_magico(self, r):
+    def mostra_magico(self, r, origine: str = "Proposta dell'algoritmo"):
         self.p_dx.griglia.mostra_sestine([s.numeri for s in r.sestine], r.jolly, r.superstar)
-        righe = [f"<span style='color:{COLORI_SESTINE[i]}'>■</span> Sestina {i + 1}: "
+        righe = [f"<i>{origine}</i>"] + [f"<span style='color:{COLORI_SESTINE[i]}'>■</span> Sestina {i + 1}: "
                  f"<b>{' '.join(f'{n:2d}' for n in s.numeri)}</b>" for i, s in enumerate(r.sestine)]
         righe.append(f"<span style='color:{COLORE_JOLLY}'>■</span> Jolly <b>{r.jolly}</b>"
                      f" &nbsp; <span style='color:#b8860b'>■</span> SuperStar <b>{r.superstar or '-'}</b>")
@@ -323,8 +325,17 @@ class FinestraPrincipale(QMainWindow):
         prev = magico.leggi_previsioni(self.arch)
         if ultima and prev and prev[-1].get("dopo") == ultima.data.isoformat():
             p = prev[-1]
+            o = p.get("origine", "Algoritmo")
             self.mostra_magico(SimpleNamespace(sestine=[SimpleNamespace(numeri=s) for s in p["sestine"]],
-                                               jolly=p["jolly"], superstar=p.get("superstar")))
+                                               jolly=p["jolly"], superstar=p.get("superstar")),
+                               "Scelta di Claude" if o.startswith("Claude") else "Proposta dell'algoritmo")
+
+    def claude(self):
+        from .claude import FinestraClaude
+        dlg = FinestraClaude(self.arch, self)
+        dlg.exec()
+        if dlg.applicato:
+            self.mostra_magico(dlg.applicato, "Scelta di Claude")
 
     def spiegazione(self):
         from .magico import FinestraSpiegazione

@@ -160,6 +160,24 @@ def test_nuove_finestre(app, arch):
     app.processEvents()
     foto("magico_verifica", v)
     v.close()
+    from pmse.core import claude_ai
+    from pmse.ui.claude import FinestraClaude
+    cl = FinestraClaude(arch, w)
+    cl.show()
+    assert cl._prepara()
+    rc = claude_ai.RispostaClaude(
+        [[4, 18, 33, 47, 62, 85], [9, 21, 38, 50, 66, 77], [2, 15, 29, 44, 71, 88]], 56, 12,
+        ["Motivazione di prova 1", "Motivazione di prova 2", "Motivazione di prova 3"],
+        "Prova Jolly/SuperStar", "Analisi di prova.", "Scartati di prova.", "Affidabilità di prova.",
+        "claude-opus-5-5", 4100, 900)
+    cl._risposta(rc)
+    app.processEvents()
+    foto("claude", cl)
+    from unittest import mock
+    with mock.patch("pmse.ui.claude.QMessageBox.information"):
+        cl._applica()
+    cl.close()
+    w.mostra_magico(cl.applicato, "Scelta di Claude")
     st = FinestraStorico(arch, w)
     st.show()
     app.processEvents()

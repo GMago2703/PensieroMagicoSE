@@ -98,6 +98,7 @@ class RisultatoMagico:
     voci: dict[str, dict[int, float]]
     basata_su: date | None
     estrazioni_usate: int
+    migliori: list[tuple[list[int], float]] = field(default_factory=list)   # le candidate con voto più alto
 
 
 # ------------------------------------------------------------------ utilità
@@ -288,10 +289,11 @@ def genera(storico: Storico, imp: Impostazioni | None = None,
             break
     fuori = [k for k in np.argsort(-punteggi) if k > 0 and k not in scelte[0].numeri]
     jolly = int(fuori[0])
+    migliori = [([int(x) for x in cand[i]], round(float(voto[i]), 4)) for i in np.argsort(-voto)[:40]]
     return RisultatoMagico(scelte, jolly, _superstar(storico, imp),
                            {k: round(float(punteggi[k]), 4) for k in range(1, 91)},
                            {k: {n: round(float(v[n]), 4) for n in range(1, 91)} for k, v in voci.items()},
-                           storico[-1][0], len(storico))
+                           storico[-1][0], len(storico), migliori)
 
 
 # ---------------------------------------------------------- verifica storica
@@ -372,11 +374,14 @@ CHIAVE_IMP = "magico_impostazioni"
 CHIAVE_PREV = "magico_previsioni"
 
 
-def salva_previsione(archivio, r: RisultatoMagico) -> None:
+def salva_previsione(archivio, r: RisultatoMagico, origine: str = "Algoritmo") -> None:
     elenco = json.loads(archivio.leggi_impostazione(CHIAVE_PREV, "[]") or "[]")
     voce = {"generata": date.today().isoformat(), "dopo": r.basata_su.isoformat() if r.basata_su else None,
-            "sestine": [s.numeri for s in r.sestine], "jolly": r.jolly, "superstar": r.superstar}
-    elenco = [e for e in elenco if e.get("dopo") != voce["dopo"]] + [voce]   # una per concorso
+            "sestine": [s.numeri for s in r.sestine], "jolly": r.jolly, "superstar": r.superstar,
+            "origine": origine}
+    # una previsione per concorso e per origine (algoritmo / Claude)
+    elenco = [e for e in elenco
+              if not (e.get("dopo") == voce["dopo"] and e.get("origine", "Algoritmo") == origine)] + [voce]
     archivio.scrivi_impostazione(CHIAVE_PREV, json.dumps(elenco[-500:]))
 
 
