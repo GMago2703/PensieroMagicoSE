@@ -181,8 +181,10 @@ def test_nuove_finestre(app, arch):
     w.mostra_magico(cl.applicato, "Scelta di Claude")
     from pmse.core import apprendimento as ap
     from pmse.ui.magico import FinestraApprendimento
-    ap.elabora_nuove(arch)                       # avvia il conteggio "da oggi"
-    arch.unisci(storico_finto(620)[600:])        # 20 nuove estrazioni
+    ulteriori = storico_finto(620)
+    # (l'archivio di prova contiene anche un'estrazione del 2026: si fissa il punto di partenza a mano)
+    arch.scrivi_impostazione(ap.CHIAVE_APPRESO, ulteriori[599].data.isoformat())
+    arch.unisci(ulteriori[600:])                 # 20 nuove estrazioni
     nuove = ap.elabora_nuove(arch)
     assert nuove
     fa = FinestraApprendimento(arch, nuove, w)
