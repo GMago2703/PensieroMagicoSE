@@ -184,7 +184,7 @@ class FinestraPrincipale(QMainWindow):
         cosa = "la cinquina e gli Euronumeri" if self.g.is_ej else "le 3 sestine"
         self._azione(m, f"✨ Genera {cosa} Magico Pensiero", self.genera)
         self._azione(m, f"Come sono nate le {self.g.nome_comb_pl} (spiegazione)...", self.spiegazione)
-        self._azione(m, "🤖 Magico Pensiero + Claude (intelligenza artificiale)...", self.claude)
+        self._azione(m, "🤖 Magico Pensiero + intelligenza artificiale (Gemini o Claude)...", self.claude)
         m.addSeparator()
         self._azione(m, "Impostazioni dell'algoritmo...", self.impostazioni_magico)
         self._azione(m, "Verifica storica dell'algoritmo...", self.verifica_magico)
@@ -220,7 +220,7 @@ class FinestraPrincipale(QMainWindow):
         self.p_dx = Pannello("Magico Pensiero", "#6a1b9a", selezionabile=False, gioco=g)
         self.p_dx.pulsante("✨  Genera", self.genera)
         self.p_dx.pulsante("❓  Perché", self.spiegazione)
-        self.p_dx.pulsante("🤖  Claude", self.claude)
+        self.p_dx.pulsante("🤖  AI", self.claude)
         legenda = QLabel()
         if g.is_ej:
             voci = [(COLORI_SESTINE[0], "Cinquina"), ("#1565c0", "Euronumeri")]
@@ -427,14 +427,14 @@ class FinestraPrincipale(QMainWindow):
             o = p.get("origine", "Algoritmo")
             self.mostra_magico(SimpleNamespace(sestine=[SimpleNamespace(numeri=s) for s in p["sestine"]],
                                                jolly=p["jolly"], superstar=p.get("superstar")),
-                               "Scelta di Claude" if o.startswith("Claude") else "Proposta dell'algoritmo")
+                               "Proposta dell'algoritmo" if o == "Algoritmo" else f"Scelta di {o.split(' ')[0]}")
 
     def claude(self):
         from .claude import FinestraClaude
         dlg = FinestraClaude(self.arch, self)
         dlg.exec()
         if dlg.applicato:
-            self.mostra_magico(dlg.applicato, "Scelta di Claude")
+            self.mostra_magico(dlg.applicato, f"Scelta di {getattr(dlg, 'origine_applicata', 'AI')}")
 
     def spiegazione(self):
         from .magico import FinestraSpiegazione

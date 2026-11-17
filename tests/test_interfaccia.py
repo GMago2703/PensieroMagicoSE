@@ -165,7 +165,13 @@ def test_nuove_finestre(app, arch):
     from pmse.ui.claude import FinestraClaude
     cl = FinestraClaude(arch, w)
     cl.show()
+    assert cl.fornitore == "gemini" and not cl.e_ws.isVisible()
+    cl.c_fornitore.setCurrentIndex(1)
+    assert cl.fornitore == "claude" and cl.c_modello.currentData().startswith("claude")
+    cl.c_fornitore.setCurrentIndex(0)
+    assert cl.c_modello.currentData().startswith("gemini")
     assert cl._prepara()
+    cl.nome_usato = "Gemini"
     rc = claude_ai.RispostaClaude(
         [[4, 18, 33, 47, 62, 85], [9, 21, 38, 50, 66, 77], [2, 15, 29, 44, 71, 88]], 56, 12,
         ["Motivazione di prova 1", "Motivazione di prova 2", "Motivazione di prova 3"],

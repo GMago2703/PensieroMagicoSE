@@ -327,3 +327,45 @@ def test_prova_chiave():
         esito = claude_ai.prova_chiave("sk-ant-prova", "claude-opus-5-5", "wrkspc_1")
         assert u.call_args[0][0].get_header("Anthropic-workspace-id") == "wrkspc_1"
     assert "OK" in esito
+
+
+def test_gemini(arch):
+    import io
+    import json
+    from unittest import mock
+
+    from pmse.core import claude_ai, magico
+    arch.unisci(storico_finto(300))
+    st = arch.sestine()
+    r = magico.genera(st)
+    dossier = claude_ai.costruisci_dossier(st, r)
+    sbagliata = {"sestine": [[1, 2, 3, 4, 5, 7], [10, 20, 30, 40, 50, 60], [11, 21, 31, 41, 51, 61]],
+                 "jolly": 1, "superstar": 33, "motivazioni": ["a", "b", "c"]}
+    giusta = dict(sbagliata, jolly=77)
+
+    def risposta(d):
+        return {"modelVersion": "gemini-3.8-flash",
+                "candidates": [{"finishReason": "STOP", "content": {"role": "model", "parts": [
+                    {"text": "ragionamento", "thought": True}, {"text": json.dumps(d)}]}}],
+                "usageMetadata": {"promptTokenCount": 100, "candidatesTokenCount": 20, "thoughtsTokenCount": 5}}
+
+    class R(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    with mock.patch("urllib.request.urlopen", side_effect=[R(json.dumps(risposta(sbagliata)).encode()),
+                                                           R(json.dumps(risposta(giusta)).encode())]) as u:
+        rc = claude_ai.chiedi_a_gemini("AIza-prova", "gemini-3.8-flash", dossier, set())
+        req = u.call_args[0][0]
+        assert req.full_url.endswith("/models/gemini-3.8-flash:generateContent")
+        assert req.get_header("X-goog-api-key") == "AIza-prova"
+        corpo = json.loads(req.data)
+        assert corpo["contents"][1]["role"] == "model" and "systemInstruction" in corpo
+        assert corpo["generationConfig"]["responseMimeType"] == "application/json"
+    assert rc.corretta and rc.jolly == 77 and rc.modello == "gemini-3.8-flash"
+    assert rc.token_ingresso == 200 and rc.token_uscita == 50
+    with mock.patch("urllib.request.urlopen", return_value=R(json.dumps(risposta({"x": 1})).encode())):
+        assert "Collegamento riuscito" in claude_ai.prova_chiave_gemini("AIza", "gemini-3.8-flash")

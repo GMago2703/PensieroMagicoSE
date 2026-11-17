@@ -448,11 +448,11 @@ class FinestraApprendimento(QDialog):
         righe = []
         for r in self.registro:
             alg = [max(p["punti"]) for p in r.get("previsioni", []) if p["origine"] == "Algoritmo"]
-            cla = [max(p["punti"]) for p in r.get("previsioni", []) if p["origine"].startswith("Claude")]
+            cla = [max(p["punti"]) for p in r.get("previsioni", []) if p["origine"] != "Algoritmo"]
             righe.append([date.fromisoformat(r["data_estrazione"]).strftime("%d/%m/%Y"),
                           " ".join(map(str, r["estratti"])), alg[0] if alg else "-", cla[0] if cla else "-",
                           len(r.get("positivi", [])), len(r.get("mancanze", []))])
-        riempi_tabella(self.tab, ["Estrazione", "Numeri usciti", "Punti algoritmo", "Punti Claude", "Positivi",
+        riempi_tabella(self.tab, ["Estrazione", "Numeri usciti", "Punti algoritmo", "Punti AI", "Positivi",
                                   "Mancanze"], righe)
         if self.registro:
             self.tab.selectRow(0)

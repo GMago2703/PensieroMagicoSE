@@ -253,16 +253,16 @@ def chiave_api(archivio) -> str:
     return (archivio.leggi_impostazione(CHIAVE_API) or os.environ.get("ANTHROPIC_API_KEY") or "").strip()
 
 
-def _estrai_json(testo: str) -> dict:
+def _estrai_json(testo: str, nome: str = "Claude") -> dict:
     testo = testo.strip()
     testo = re.sub(r"^```(?:json)?\s*|\s*```$", "", testo)
     inizio, fine = testo.find("{"), testo.rfind("}")
     if inizio < 0 or fine < inizio:
-        raise ErroreClaude("La risposta di Claude non contiene dati leggibili.")
+        raise ErroreClaude(f"La risposta di {nome} non contiene dati leggibili.")
     try:
         return json.loads(testo[inizio:fine + 1])
     except ValueError as ex:
-        raise ErroreClaude(f"La risposta di Claude non è un JSON valido: {ex}")
+        raise ErroreClaude(f"La risposta di {nome} non è un JSON valido: {ex}")
 
 
 def in_comune_archivio(sestine: list[list[int]], m: np.ndarray) -> list[int]:
@@ -284,7 +284,7 @@ def valida_risposta(d: dict, gia_uscite: set[tuple], m: np.ndarray | None = None
             jolly = int(d["jolly"])
             superstar = int(d["superstar"])
     except (KeyError, TypeError, ValueError):
-        raise ErroreClaude("Nella risposta di Claude mancano numeri o numeri speciali.")
+        raise ErroreClaude("Nella risposta dell'intelligenza artificiale mancano numeri o numeri speciali.")
     if len(sestine) != C:
         raise ErroreClaude(f"Claude non ha indicato {C} {g.nome_comb_pl}.")
     for s in sestine:
@@ -368,39 +368,132 @@ def prova_chiave(chiave: str, modello: str, workspace: str = "") -> str:
     return f"Collegamento riuscito con {dati.get('model', modello)}. Risposta di prova: «{testo[:40]}»."
 
 
-def chiedi_a_claude(chiave: str, modello: str, dossier: str, gia_uscite: set[tuple],
-                    m: np.ndarray | None = None, limiti: tuple[int, int] | None = None,
-                    timeout: int = 300, workspace: str = "", g: Gioco = SE) -> RispostaClaude:
-    """Chiede a Claude la scelta. Se la risposta viola le regole, gli chiede UNA volta di correggerla."""
-    if not chiave:
-        raise ErroreClaude("Manca la chiave API di Claude.")
+def _chiedi(conversa, dossier: str, gia_uscite: set[tuple], m, limiti, g: Gioco, modello: str,
+            nome: str) -> RispostaClaude:
+    """Logica comune a tutti gli assistenti: domanda, verifica delle regole e UNA eventuale correzione.
+    conversa(messaggi) -> (testo, modello_usato, token_ingresso, token_uscita)."""
     cosa = "la cinquina e i 2 Euronumeri" if g.is_ej else "le 3 sestine, il Jolly e il SuperStar"
     messaggi = [{"role": "user", "content": dossier + f"\n\nOra scegli {cosa} e rispondi solo con il JSON "
                                                        "richiesto."}]
-    corpo = {"model": modello, "max_tokens": 6000, "system": istruzioni(g), "messages": messaggi}
-    dati = _invia(chiave, corpo, timeout, workspace)
-    testo = _testo(dati)
-    r = valida_risposta(_estrai_json(testo), gia_uscite, m, limiti, g)
-    ing, usc = int(dati.get("usage", {}).get("input_tokens", 0)), int(dati.get("usage", {}).get("output_tokens", 0))
+    testo, usato, ing, usc = conversa(messaggi)
+    r = valida_risposta(_estrai_json(testo, nome), gia_uscite, m, limiti, g)
     if r.avvisi:
         messaggi += [{"role": "assistant", "content": testo},
                      {"role": "user", "content": "Il programma ha verificato la tua risposta e non rispetta queste "
                                                  "regole obbligatorie:\n- " + "\n- ".join(r.avvisi) +
                                                  "\nCorreggi ciò che non va e rispondi di nuovo solo con il "
                                                  "JSON completo."}]
-        dati2 = _invia(chiave, corpo, timeout, workspace)
+        testo2, _, i2, u2 = conversa(messaggi)
         try:
-            r2 = valida_risposta(_estrai_json(_testo(dati2)), gia_uscite, m, limiti, g)
+            r2 = valida_risposta(_estrai_json(testo2, nome), gia_uscite, m, limiti, g)
             r2.corretta = True
             if len(r2.avvisi) <= len(r.avvisi):
                 r = r2
         except ErroreClaude:
             pass
-        ing += int(dati2.get("usage", {}).get("input_tokens", 0))
-        usc += int(dati2.get("usage", {}).get("output_tokens", 0))
-    r.modello = dati.get("model", modello)
+        ing, usc = ing + i2, usc + u2
+    r.modello = usato or modello
     r.token_ingresso, r.token_uscita = ing, usc
     return r
+
+
+def chiedi_a_claude(chiave: str, modello: str, dossier: str, gia_uscite: set[tuple],
+                    m: np.ndarray | None = None, limiti: tuple[int, int] | None = None,
+                    timeout: int = 300, workspace: str = "", g: Gioco = SE) -> RispostaClaude:
+    """Chiede a Claude la scelta. Se la risposta viola le regole, gli chiede UNA volta di correggerla."""
+    if not chiave:
+        raise ErroreClaude("Manca la chiave API di Claude.")
+    sistema = istruzioni(g)
+
+    def conversa(messaggi):
+        dati = _invia(chiave, {"model": modello, "max_tokens": 6000, "system": sistema, "messages": messaggi},
+                      timeout, workspace)
+        uso = dati.get("usage", {})
+        return (_testo(dati), dati.get("model", modello), int(uso.get("input_tokens", 0)),
+                int(uso.get("output_tokens", 0)))
+
+    return _chiedi(conversa, dossier, gia_uscite, m, limiti, g, modello, "Claude")
+
+
+# ------------------------------------------------------------------ Gemini
+URL_GEMINI = "https://generativelanguage.googleapis.com/v1beta/models/{modello}:generateContent"
+MODELLI_GEMINI = [
+    ("gemini-3.8-flash", "Gemini 3.8 Flash – consigliato (funziona anche con la chiave gratuita)"),
+    ("gemini-4-argon", "Gemini 4 Argon – il più potente (richiede il piano a pagamento)"),
+    ("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite – il più veloce ed economico"),
+]
+CHIAVE_GEMINI = "gemini_api_key"
+CHIAVE_MODELLO_GEMINI = "gemini_modello"
+CHIAVE_FORNITORE = "ai_fornitore"          # "claude" oppure "gemini"
+
+
+def chiave_gemini(archivio) -> str:
+    return (archivio.leggi_impostazione(CHIAVE_GEMINI) or os.environ.get("GEMINI_API_KEY") or "").strip()
+
+
+def _invia_gemini(chiave: str, modello: str, corpo: dict, timeout: int) -> dict:
+    req = urllib.request.Request(URL_GEMINI.format(modello=modello), data=json.dumps(corpo).encode("utf-8"),
+                                 method="POST", headers={"x-goog-api-key": chiave,
+                                                         "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as ex:
+        dettaglio = ex.read().decode("utf-8", errors="replace")
+        try:
+            dettaglio = json.loads(dettaglio)["error"]["message"]
+        except (ValueError, KeyError, TypeError):
+            pass
+        spiegazioni = {400: "richiesta o chiave non valida", 401: "chiave API non valida",
+                       403: "chiave senza permessi o non abilitata alla Gemini API",
+                       404: "modello non disponibile per questa chiave",
+                       429: "limite di richieste raggiunto (quota gratuita esaurita: riprova più tardi)",
+                       500: "errore interno di Google", 503: "servizio momentaneamente sovraccarico"}
+        raise ErroreClaude(f"Errore {ex.code} ({spiegazioni.get(ex.code, 'errore del servizio')}): {dettaglio}")
+    except (urllib.error.URLError, TimeoutError) as ex:
+        raise ErroreClaude(f"Impossibile contattare Gemini: {ex}")
+
+
+def _testo_gemini(dati: dict) -> str:
+    candidati = dati.get("candidates") or []
+    if not candidati:
+        motivo = (dati.get("promptFeedback") or {}).get("blockReason", "nessuna risposta")
+        raise ErroreClaude(f"Gemini non ha risposto ({motivo}).")
+    c = candidati[0]
+    testo = "".join(p.get("text", "") for p in (c.get("content") or {}).get("parts", []) if not p.get("thought"))
+    if c.get("finishReason") == "MAX_TOKENS" and "}" not in testo:
+        raise ErroreClaude("La risposta di Gemini è stata troncata: riprova.")
+    return testo
+
+
+def prova_chiave_gemini(chiave: str, modello: str) -> str:
+    if not chiave:
+        raise ErroreClaude("Manca la chiave API di Gemini.")
+    corpo = {"contents": [{"role": "user", "parts": [{"text": "Rispondi soltanto: OK"}]}]}
+    dati = _invia_gemini(chiave, modello, corpo, 60)
+    return f"Collegamento riuscito con {dati.get('modelVersion', modello)}. " \
+           f"Risposta di prova: «{_testo_gemini(dati).strip()[:40]}»."
+
+
+def chiedi_a_gemini(chiave: str, modello: str, dossier: str, gia_uscite: set[tuple],
+                    m: np.ndarray | None = None, limiti: tuple[int, int] | None = None,
+                    timeout: int = 300, g: Gioco = SE) -> RispostaClaude:
+    """Come chiedi_a_claude, ma con la Gemini API di Google."""
+    if not chiave:
+        raise ErroreClaude("Manca la chiave API di Gemini.")
+    sistema = istruzioni(g)
+
+    def conversa(messaggi):
+        contenuti = [{"role": "model" if x["role"] == "assistant" else "user", "parts": [{"text": x["content"]}]}
+                     for x in messaggi]
+        corpo = {"systemInstruction": {"parts": [{"text": sistema}]}, "contents": contenuti,
+                 "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": 16000}}
+        dati = _invia_gemini(chiave, modello, corpo, timeout)
+        uso = dati.get("usageMetadata", {})
+        return (_testo_gemini(dati), dati.get("modelVersion", modello), int(uso.get("promptTokenCount", 0)),
+                int(uso.get("candidatesTokenCount", 0)) + int(uso.get("thoughtsTokenCount", 0)))
+
+    return _chiedi(conversa, dossier, gia_uscite, m, limiti, g, modello, "Gemini")
 
 
 def come_risultato(rc: RispostaClaude, base: magico.RisultatoMagico) -> magico.RisultatoMagico:
