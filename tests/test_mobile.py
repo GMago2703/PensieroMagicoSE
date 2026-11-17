@@ -42,6 +42,8 @@ def finto_internet(monkeypatch):
             avanzamento("prova", 1, 1)
         return estrazioni(gioco, stato["n"][gioco.codice])
     monkeypatch.setattr(internet, "scarica_anni", scarica)
+    from pmse.core import vincite
+    monkeypatch.setattr(vincite, "scarica", lambda date_c, *a, **k: {})      # niente rete nei test
     return stato
 
 

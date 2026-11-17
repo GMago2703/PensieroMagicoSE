@@ -6,15 +6,20 @@ from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QPushButton, QSpinBox,
                                QTableView, QVBoxLayout)
 
+from ..core import vincite
 from ..core.db import Archivio
 from ..core.modello import GIORNI_BREVI
 from .editor import EditorEstrazione
 from .schermo import adatta_schermo
 
+ORO = "#ffd54f"
+
+
 def colonne(g) -> list[str]:
     speciali = ["Euro 1", "Euro 2"] if g.is_ej else ["Jolly", "SuperStar"]
-    return ["Pos.", "Conc.", "Data", "Giorno", *[f"N{i}" for i in range(1, g.k + 1)], *speciali,
+    base = ["Pos.", "Conc.", "Data", "Giorno", *[f"N{i}" for i in range(1, g.k + 1)], *speciali,
             "Ordine di estrazione", "Fonte"]
+    return base if g.is_ej else base + ["★ 6 vinto"]
 
 
 class ModelloArchivio(QAbstractTableModel):
@@ -25,6 +30,7 @@ class ModelloArchivio(QAbstractTableModel):
         self.colonne = colonne(self.g)
         self.righe = []          # (pos, estrazione)
         self.evidenziato = 0
+        self.vincite = {}        # data ISO -> Vincite (solo SuperEnalotto)
 
     def carica(self, righe, evidenziato: int = 0):
         self.beginResetModel()
@@ -59,7 +65,15 @@ class ModelloArchivio(QAbstractTableModel):
             valori = [pos, e.concorso, e.data.strftime("%d/%m/%Y"), GIORNI_BREVI[e.data.weekday()],
                       *s, e.jolly, e.superstar or "",
                       " ".join(map(str, e.numeri)) if e.numeri != s else "", e.fonte]
+            if not self.g.is_ej:
+                v = self.vincite.get(e.data.isoformat())
+                valori.append(f"★ {v.p6} – {v.premio6}" if v and v.p6 else "")
             return valori[c]
+        if ruolo == Qt.ToolTipRole and not self.g.is_ej:
+            v = self.vincite.get(e.data.isoformat())
+            if v:
+                return (f"Vincitori: 6 punti {v.p6}, 5+1 {v.p51}, 5 punti {v.p5}, 4 punti {v.p4}, "
+                        f"3 punti {v.p3}" + (f"\nPremio del 6: {v.premio6}" if v.p6 else ""))
         if ruolo == Qt.TextAlignmentRole:
             return Qt.AlignCenter
         n = self.evidenziato
@@ -68,6 +82,10 @@ class ModelloArchivio(QAbstractTableModel):
             limite = 4 + k if self.g.is_ej else 6 + k
             if n and 4 <= c < limite and self._valori_numeri(e).get(c) == n:
                 return QBrush(QColor("#1e90ff"))
+            if not self.g.is_ej:
+                v = self.vincite.get(e.data.isoformat())
+                if v and v.p6:
+                    return QBrush(QColor(ORO))           # concorso in cui è stato vinto il 6
             if c == 4 + k:
                 return QBrush(QColor("#bbdefb" if self.g.is_ej else "#ffe0b2"))
             if c == 5 + k:
@@ -109,12 +127,20 @@ class FinestraArchivio(QDialog):
         self.c_dove.addItems(["solo estrazioni che lo contengono", "evidenzia soltanto"])
         self.c_dove.currentIndexChanged.connect(self.aggiorna)
         filtri.addWidget(self.c_dove)
+        self.c_sei = QComboBox()
+        self.c_sei.addItems(["tutti i concorsi", "★ solo quelli con il 6", "tutti tranne quelli con il 6"])
+        self.c_sei.setToolTip("I concorsi in cui è stato vinto il 6 sono evidenziati in oro")
+        self.c_sei.currentIndexChanged.connect(self.aggiorna)
+        if not archivio.gioco.is_ej:
+            filtri.addSpacing(16)
+            filtri.addWidget(self.c_sei)
         filtri.addStretch()
         self.l_info = QLabel()
         filtri.addWidget(self.l_info)
         v.addLayout(filtri)
 
         self.modello = ModelloArchivio(archivio.gioco)
+        self.modello.vincite = vincite.carica(archivio) if not archivio.gioco.is_ej else {}
         self.tabella = QTableView()
         self.tabella.setModel(self.modello)
         self.tabella.setAlternatingRowColors(True)
@@ -169,6 +195,10 @@ class FinestraArchivio(QDialog):
                 righe = [r for r in righe if n in r[1].numeri]
             else:
                 righe = [r for r in righe if n in r[1].numeri or r[1].jolly == n or r[1].superstar == n]
+        if not self.arch.gioco.is_ej and self.c_sei.currentIndex():
+            con6 = {k for k, v in self.modello.vincite.items() if v.p6}
+            voglio = self.c_sei.currentIndex() == 1
+            righe = [r for r in righe if (r[1].data.isoformat() in con6) == voglio]
         if not self.crescente:
             righe.reverse()
         self.modello.carica(righe, n)

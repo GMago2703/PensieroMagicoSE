@@ -41,6 +41,7 @@ jobs:
           --name PensieroMagicoSE
           --icon pmse/icona.ico
           --add-data "pmse/icona.png;pmse"
+          --add-data "pmse/dati;pmse/dati"
           PensieroMagicoSE.py
 
       - name: Carica l'eseguibile tra gli artifact

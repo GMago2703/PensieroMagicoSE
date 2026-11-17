@@ -266,6 +266,8 @@ class FinestraPrincipale(QMainWindow):
         self._azione(m, "Aggiorna ora (estrazioni mancanti)", lambda: self.apri_internet(False))
         self._azione(m, f"Scarica archivio completo dal {self.g.prima_estrazione.year}",
                      lambda: self.apri_internet(True))
+        if not self.g.is_ej:
+            self._azione(m, "★ Aggiorna i vincitori del 6 (per i concorsi che mancano)", self.vincitori_sei)
         m.addSeparator()
         self.a_avvio = self._azione(m, "Aggiorna automaticamente all'avvio", self._cambia_avvio)
         self.a_avvio.setCheckable(True)
@@ -474,6 +476,17 @@ class FinestraPrincipale(QMainWindow):
         self._azione(m, "🛠 Costruttore di analisi personalizzate...", self.costruttore)
         self._azione(m, f"📋 Le mie {self.g.nome_comb_pl}: confronto con l'archivio e ricerca...",
                      self.mie_sestine)
+        if not self.g.is_ej:
+            m.addSeparator()
+            self._azione(m, "★ I concorsi con il 6: confronto con l'archivio...", self.analisi_sei)
+
+    def analisi_sei(self):
+        from .sei import FinestraSei
+        FinestraSei(self.arch, self).exec()
+
+    def vincitori_sei(self):
+        from .sei import FinestraVincitori
+        FinestraVincitori(self.arch, self).exec()
 
     def costruttore(self):
         from .costruttore import FinestraCostruttore

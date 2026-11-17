@@ -191,6 +191,34 @@ def test_nuove_finestre(app, arch):
     foto("laboratorio", lab)
     entra_nello_schermo(lab, app)
     lab.close()
+    # concorsi con il 6: evidenziati in archivio, filtro, confronto
+    import random as _r
+    from pmse.core import vincite
+    from pmse.ui.archivio import FinestraArchivio
+    from pmse.ui.sei import FinestraSei
+    rnd = _r.Random(1)
+    dati = {e.data.isoformat(): vincite.Vincite(e.data.isoformat(), p6=int(rnd.random() < 0.05),
+                                                p3=rnd.randint(15000, 25000), premio6="1.000.000,00 €")
+            for e in arch.tutte(True)}
+    vincite.salva(arch, dati)
+    con6 = sum(1 for v in dati.values() if v.p6)
+    fa = FinestraArchivio(arch, w)
+    fa.c_sei.setCurrentIndex(1)
+    assert fa.modello.rowCount() == con6 > 0
+    assert "★" in fa.modello.data(fa.modello.index(0, len(fa.modello.colonne) - 1))
+    foto("archivio_solo_6", fa)
+    fa.close()
+    fs = FinestraSei(arch, w)
+    fs.show()
+    app.processEvents()
+    assert fs.risultato and len(fs.risultato.sei) == con6
+    foto("concorsi_con_il_6", fs)
+    entra_nello_schermo(fs, app)
+    fs.close()
+    fan = FinestraAnalisi(arch, None, w)
+    fan.c_gruppo.setCurrentIndex(1)
+    assert "solo i concorsi con il 6" in fan.l_nota.text()
+    fan.close()
     from pmse.core import claude_ai
     from pmse.ui.claude import FinestraClaude
     cl = FinestraClaude(arch, w)

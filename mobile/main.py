@@ -315,9 +315,14 @@ class PaginaArchivio(Pagina):
     def __init__(self, app, **kw):
         super().__init__(app, name="archivio", **kw)
         self.crescente = False
+        self.solo6 = False
 
     def _inverti(self):
         self.crescente = not self.crescente
+        self.mostra()
+
+    def _solo6(self):
+        self.solo6 = not self.solo6
         self.mostra()
 
     def mostra(self):
@@ -325,12 +330,20 @@ class PaginaArchivio(Pagina):
         c.clear_widgets()
         c.add_widget(bottone(("Dalla più vecchia" if self.crescente else "Dalla più recente") +
                              " (tocca per invertire)", self._inverti, VERDE, alto=dp(46)))
+        if not self.g.is_ej:
+            c.add_widget(bottone("Mostra tutti i concorsi" if self.solo6 else "Mostra solo i concorsi con il 6",
+                                 self._solo6, "#b8860b", alto=dp(46)))
         self.tutte = self.s.elenco(self.crescente)
+        self.con6 = self.s.date_con_6()
+        if self.solo6:
+            self.tutte = [e for e in self.tutte if e.data in self.con6]
         self.mostrate = 0
         if not self.tutte:
             c.add_widget(Testo("Archivio vuoto: aggiorna da Internet dalla home.", (1, 1, 1, 1)))
             return
-        c.add_widget(Testo(f"{len(self.tutte)} estrazioni", (1, 1, 1, 0.8), font_size=sp(13)))
+        c.add_widget(Testo(f"{len(self.tutte)} estrazioni" +
+                           (f" – [color=ffd54f]* = 6 vinto[/color] ({len(self.con6)} concorsi)" if self.con6 else ""),
+                           (1, 1, 1, 0.8), font_size=sp(13)))
         self.b_altre = bottone("", self._altre, ARANCIO, alto=dp(46))
         self._altre()
         self.sv.scroll_y = 1
@@ -343,7 +356,8 @@ class PaginaArchivio(Pagina):
         for e in self.tutte[self.mostrate:self.mostrate + self.BLOCCO]:
             spec = (f"[color=90caf9]{e.jolly:2d} {e.superstar:2d}[/color]" if g.is_ej else
                     f"[color=ffb74d]J{e.jolly:2d}[/color] [color=fff176]S{e.superstar or 0:2d}[/color]")
-            righe.append(f"{e.data:%d/%m/%y} [b]{' '.join(f'{n:2d}' for n in e.numeri)}[/b] {spec}")
+            riga = f"{e.data:%d/%m/%y} [b]{' '.join(f'{n:2d}' for n in e.numeri)}[/b] {spec}"
+            righe.append(f"[color=ffd54f]{riga} *[/color]" if e.data in self.con6 else riga)
         self.mostrate += len(righe)
         for i in range(0, len(righe), 25):      # pezzi piccoli: un testo enorme non si può disegnare
             c.add_widget(Testo("\n".join(righe[i:i + 25]), (1, 1, 1, 1), font_size=sp(14),

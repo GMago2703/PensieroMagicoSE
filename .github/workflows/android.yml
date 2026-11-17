@@ -75,6 +75,7 @@ jobs:
           mkdir -p mobile/pmse
           cp pmse/__init__.py pmse/icona.png mobile/pmse/
           cp -r pmse/core mobile/pmse/core
+          cp -r pmse/dati mobile/pmse/dati
           find mobile -name __pycache__ -prune -exec rm -rf {} +
       - name: Recupera la cache di buildozer
         id: cache

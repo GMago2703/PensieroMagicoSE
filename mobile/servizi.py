@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
-from pmse.core import apprendimento, claude_ai, internet, laboratorio, magico, personalizzate
+from pmse.core import apprendimento, claude_ai, internet, laboratorio, magico, personalizzate, vincite
 from pmse.core.db import Archivio, EsitoUnione
 from pmse.core.gioco import EJ, GIOCHI, SE, Gioco
 
@@ -83,6 +83,9 @@ class Servizio:
     def elenco(self, crescente: bool = False):
         return self.arch.tutte(crescente)
 
+    def date_con_6(self) -> set:
+        return vincite.date_con_6(self.arch) if self.g.codice == "SE" else set()
+
     def aggiorna(self, avanzamento=None, interrompi=None) -> EsitoAggiornamento:
         """Scarica da Internet gli anni mancanti, unisce senza doppioni e fa imparare Magico Pensiero."""
         ultima = self.arch.ultima()
@@ -90,6 +93,13 @@ class Servizio:
         estrazioni = internet.scarica_anni(anni, avanzamento, interrompi, gioco=self.g)
         esito = EsitoAggiornamento(self.arch.unisci(estrazioni))
         self.arch.scrivi_impostazione("ultimo_aggiornamento", date.today().isoformat())
+        if self.g.codice == "SE":                      # vincitori dei concorsi nuovi (per evidenziare i 6)
+            try:
+                da_fare = vincite.mancanti(self.arch)
+                if len(da_fare) <= 300:
+                    vincite.salva(self.arch, vincite.scarica(da_fare, interrompi=interrompi))
+            except Exception:
+                pass
         if esito.unione.nuove:
             try:
                 esito.valutazioni = apprendimento.elabora_nuove(self.arch)

@@ -3,7 +3,7 @@ title = Pensiero Magico
 package.name = pensieromagico
 package.domain = it.gmago2703
 source.dir = .
-source.include_exts = py,png
+source.include_exts = py,png,json
 source.exclude_patterns = prova_grafica.py
 source.exclude_dirs = bin, .buildozer, foto_android, __pycache__
 version.regex = __version__ = "(.*)"

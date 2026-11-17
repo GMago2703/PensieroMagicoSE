@@ -7,9 +7,32 @@ from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (QCheckBox, QDialog, QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit,
                                QProgressBar, QPushButton, QVBoxLayout)
 
-from ..core import internet
+from ..core import internet, vincite
 from ..core.db import Archivio
 from .schermo import adatta_schermo
+
+
+class ScaricaVincitori(QThread):
+    """Scarica i vincitori (6, 5+1, 5, 4, 3 punti) dei concorsi indicati; il salvataggio avviene dopo,
+    nella finestra, così l'archivio è usato da un solo thread."""
+    avanzamento = Signal(str, int, int)
+    finito = Signal(dict)
+
+    def __init__(self, date_concorsi):
+        super().__init__()
+        self.date_concorsi = date_concorsi
+        self._stop = False
+
+    def ferma(self):
+        self._stop = True
+
+    def run(self):
+        try:
+            dati = vincite.scarica(self.date_concorsi, lambda m, i, n: self.avanzamento.emit(m, i, n),
+                                   lambda: self._stop)
+        except Exception:
+            dati = {}
+        self.finito.emit(dati)
 
 
 class Scaricatore(QThread):
@@ -113,7 +136,34 @@ class FinestraInternet(QDialog):
         for vecchia, nuova in esito.conflitti[:20]:
             self._scrivi(f"  conflitto {vecchia.data:%d/%m/%Y}: archivio {vecchia.sestina} / web {nuova.sestina}")
         self.barra.setValue(self.barra.maximum())
-        if self.automatico and not esito.conflitti:
+        self._conflitti = bool(esito.conflitti)
+        da_fare = vincite.mancanti(self.arch)
+        if da_fare and len(da_fare) <= 300:
+            self._scrivi(f"Scarico i vincitori di {len(da_fare)} concorsi (per evidenziare i 6)...")
+            self.thread_v = ScaricaVincitori(da_fare)
+            self.thread_v.avanzamento.connect(self._avanza)
+            self.thread_v.finito.connect(self._vincitori_finiti)
+            for b in (self.b_agg, self.b_tutto, self.b_chiudi):
+                b.setEnabled(False)
+            self.thread_v.start()
+            return
+        if da_fare:
+            self._scrivi(f"Vincitori di {len(da_fare)} concorsi ancora da scaricare: usa Internet → "
+                         "Aggiorna i vincitori del 6.")
+        self._chiudi_se_automatico()
+
+    def _vincitori_finiti(self, dati):
+        vincite.salva(self.arch, dati)
+        sei = [k for k, v in dati.items() if v.vinto_6]
+        self._scrivi(f"Vincitori letti per {len(dati)} concorsi" +
+                     (f"; 6 vinti il {', '.join(sei)}." if sei else "; nessun 6 tra questi."))
+        if dati:
+            self.modificato = True
+        self._fine_lavoro()
+        self._chiudi_se_automatico()
+
+    def _chiudi_se_automatico(self):
+        if self.automatico and not getattr(self, "_conflitti", False):
             self.accept()
 
     def _errore(self, msg):

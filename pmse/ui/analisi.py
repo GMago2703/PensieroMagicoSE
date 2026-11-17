@@ -6,7 +6,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QComboBox, QDialog, QFormLayout, QHBoxLayout, QLabel, QPushButton, QSpinBox,
                                QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
-from ..core import personalizzate
+from ..core import personalizzate, vincite
+from ..core.gioco import Storico
 from ..core.db import Archivio
 from .griglia import Griglia90
 from .schermo import adatta_schermo
@@ -71,6 +72,17 @@ class FinestraAnalisi(QDialog):
         self.l_desc.setWordWrap(True)
         self.l_desc.setStyleSheet("color:#333; font-style:italic;")
         v.addWidget(self.l_desc)
+        self.c_gruppo = QComboBox()
+        self.c_gruppo.addItems(["tutti i concorsi", "★ solo i concorsi con il 6", "tutti tranne quelli con il 6"])
+        self.c_gruppo.setToolTip("Esegue l'analisi solo sul gruppo dei concorsi in cui è stato vinto il 6 "
+                                 "(o su tutti gli altri)")
+        self.c_gruppo.currentIndexChanged.connect(lambda _: self.esegui())
+        if not archivio.gioco.is_ej:
+            hg = QHBoxLayout()
+            hg.addWidget(QLabel("Concorsi da analizzare:"))
+            hg.addWidget(self.c_gruppo)
+            hg.addStretch()
+            v.addLayout(hg)
         self.box_param = QWidget()
         self.form = QFormLayout(self.box_param)
         v.addWidget(self.box_param)
@@ -148,11 +160,19 @@ class FinestraAnalisi(QDialog):
         if not storico:
             self.l_nota.setText("L'archivio è vuoto: carica prima le estrazioni (menu Internet o Archivio).")
             return
+        if not self.arch.gioco.is_ej and self.c_gruppo.currentIndex():
+            con6 = {x for x in vincite.date_con_6(self.arch)}
+            voglio = self.c_gruppo.currentIndex() == 1
+            storico = Storico([r for r in storico if (r[0] in con6) == voglio], storico.gioco)
+            if len(storico) < 2:
+                self.l_nota.setText("Nessun concorso con il 6 noto: aggiorna i vincitori (menu Internet).")
+                return
         ris = d.funzione(storico, **self._valori())
         self.risultato = ris
         riempi_tabella(self.tab, ris.colonne, ris.righe, ris.numeri_riga)
         self.setWindowTitle(f"Analisi {self.arch.gioco.nome} – {ris.titolo}")
-        self.l_nota.setText(ris.nota)
+        gruppo = ["", " [solo i concorsi con il 6]", " [esclusi i concorsi con il 6]"][self.c_gruppo.currentIndex()]
+        self.l_nota.setText(ris.nota + (f"\nAnalisi eseguita su {len(storico)} concorsi{gruppo}." if gruppo else ""))
         self._mappa()
 
     def _mappa(self):

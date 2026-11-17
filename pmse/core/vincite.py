@@ -125,18 +125,29 @@ def carica(archivio) -> dict[str, Vincite]:
     return dati
 
 
-def aggiorna(archivio, avanzamento=None, interrompi=None) -> int:
-    """Scarica i vincitori dei concorsi in archivio che non sono ancora noti. Solo SuperEnalotto."""
+def mancanti(archivio) -> list[date]:
+    """Concorsi in archivio di cui non si conoscono ancora i vincitori (solo SuperEnalotto)."""
     if archivio.gioco.codice != "SE":
-        return 0
+        return []
     noti = carica(archivio)
-    mancanti = [e.data for e in archivio.tutte(True) if e.data.isoformat() not in noti and e.data.year >= 1998]
-    if not mancanti:
-        return 0
-    nuovi = scarica(mancanti, avanzamento, interrompi)
+    return [e.data for e in archivio.tutte(True) if e.data.isoformat() not in noti and e.data.year >= 1998]
+
+
+def salva(archivio, nuovi: dict[str, Vincite]) -> None:
+    if not nuovi or archivio.gioco.codice != "SE":
+        return
     propri = da_json(archivio.leggi_impostazione(CHIAVE_DB))
     propri.update(nuovi)
     archivio.scrivi_impostazione(CHIAVE_DB, a_json(propri))
+
+
+def aggiorna(archivio, avanzamento=None, interrompi=None) -> int:
+    """Scarica e salva i vincitori dei concorsi in archivio che non sono ancora noti. Solo SuperEnalotto."""
+    da_fare = mancanti(archivio)
+    if not da_fare:
+        return 0
+    nuovi = scarica(da_fare, avanzamento, interrompi)
+    salva(archivio, nuovi)
     return len(nuovi)
 
 
