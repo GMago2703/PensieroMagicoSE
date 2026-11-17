@@ -20,9 +20,9 @@ class Cella(QLabel):
         super().__init__(str(numero))
         self.numero = numero
         self.setAlignment(Qt.AlignCenter)
-        self.setMinimumSize(34, 28)
+        self.setMinimumSize(30, 26)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        f = QFont("Segoe UI", 12)
+        f = QFont("Segoe UI", 11)
         self.setFont(f)
         self.imposta(CELLA_BASE, "#0b2a6b")
 

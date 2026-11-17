@@ -1,33 +1,70 @@
 """Finestra "Aggiornamento Archivio": scorre, modifica, aggiunge ed elimina
-le estrazioni una alla volta (sul modello della foto 2)."""
+le estrazioni una alla volta."""
 from __future__ import annotations
 
 from datetime import date
 
-from PySide6.QtCore import QDate, Qt
-from PySide6.QtWidgets import (QDateEdit, QDialog, QDoubleSpinBox, QGridLayout, QGroupBox, QHBoxLayout,
-                               QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox,
-                               QTableWidget, QTableWidgetItem, QVBoxLayout)
+from PySide6.QtCore import QDate, QSize, Qt
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
+from PySide6.QtWidgets import (QDateEdit, QDialog, QGridLayout, QHBoxLayout, QLabel, QMessageBox, QPushButton,
+                               QSpinBox, QToolButton, QVBoxLayout)
 
 from ..core.db import Archivio
-from ..core.modello import CATEGORIE, GIORNI, Estrazione, valida
+from ..core.modello import GIORNI, Estrazione, valida
 
 GIALLO = "background:#fff59d;"
+LATO_PULSANTE = 78          # pulsanti quadrati in alto
+LATO_ICONA = 34
 
 
-def _num(v: str):
-    v = v.strip().replace("€", "").replace(" ", "")
-    if not v:
-        return None
-    v = v.replace(".", "").replace(",", ".")
-    return float(v)
+def icona_testo(simbolo: str, colore: str) -> QIcon:
+    """Disegna un simbolo (carattere/emoji) come icona."""
+    pm = QPixmap(64, 64)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    f = QFont("Segoe UI Symbol", 34)
+    f.setBold(True)
+    p.setFont(f)
+    p.setPen(QColor(colore))
+    p.drawText(pm.rect(), Qt.AlignCenter, simbolo)
+    p.end()
+    return QIcon(pm)
 
 
-def _euro(v: float | None) -> str:
-    if v is None:
-        return ""
-    s = f"{v:,.2f}"
-    return "€ " + s.replace(",", "X").replace(".", ",").replace("X", ".")
+def _pulsante_quadrato(testo: str, simbolo: str, colore: str) -> QToolButton:
+    b = QToolButton()
+    b.setText(testo)
+    b.setIcon(icona_testo(simbolo, colore))
+    b.setIconSize(QSize(LATO_ICONA, LATO_ICONA))
+    b.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+    b.setFixedSize(LATO_PULSANTE, LATO_PULSANTE)
+    f = b.font()
+    f.setBold(True)
+    f.setPointSize(10)
+    b.setFont(f)
+    return b
+
+
+def _casella_numero(larghezza: int = 62) -> QSpinBox:
+    s = QSpinBox()
+    s.setRange(0, 90)
+    s.setSpecialValueText(" ")
+    s.setButtonSymbols(QSpinBox.NoButtons)
+    s.setAlignment(Qt.AlignCenter)
+    s.setFixedSize(larghezza, 50)
+    f = QFont("Segoe UI", 20)
+    f.setBold(True)
+    s.setFont(f)
+    s.setStyleSheet("QSpinBox { background:white; border:1px solid #888; }")
+    return s
+
+
+def _etichetta(testo: str, punti: int = 13) -> QLabel:
+    l = QLabel(testo)
+    f = QFont("Segoe UI", punti)
+    f.setBold(True)
+    l.setFont(f)
+    return l
 
 
 class EditorEstrazione(QDialog):
@@ -35,11 +72,11 @@ class EditorEstrazione(QDialog):
         super().__init__(parent)
         self.arch = archivio
         self.setWindowTitle("Aggiornamento Archivio")
-        self.setMinimumWidth(520)
         self.date = archivio.date_ordinate()
         self.indice = -1
         self.in_inserimento = False
         self.modificato = False
+        self.corrente: Estrazione | None = None
         self._costruisci()
         if nuova or not self.date:
             self.nuova()
@@ -50,13 +87,14 @@ class EditorEstrazione(QDialog):
     # ------------------------------------------------------------------ layout
     def _costruisci(self):
         v = QVBoxLayout(self)
+        v.setSpacing(14)
         barra = QHBoxLayout()
-        self.b_primo = QPushButton("⏮ Primo")
-        self.b_prec = QPushButton("◀ Prec.")
-        self.b_succ = QPushButton("Succ. ▶")
-        self.b_ultimo = QPushButton("Ultimo ⏭")
-        self.b_agg = QPushButton("➕ Aggiungi")
-        self.b_eli = QPushButton("➖ Elimina")
+        self.b_primo = _pulsante_quadrato("Primo", "⏮", "#1565c0")
+        self.b_prec = _pulsante_quadrato("Prec.", "◀", "#1565c0")
+        self.b_succ = _pulsante_quadrato("Succ.", "▶", "#1565c0")
+        self.b_ultimo = _pulsante_quadrato("Ultimo", "⏭", "#1565c0")
+        self.b_agg = _pulsante_quadrato("Aggiungi", "+", "#2e7d32")
+        self.b_eli = _pulsante_quadrato("Elimina", "−", "#c62828")
         for b in (self.b_primo, self.b_prec, self.b_succ, self.b_ultimo):
             barra.addWidget(b)
         barra.addStretch()
@@ -70,83 +108,75 @@ class EditorEstrazione(QDialog):
         self.b_agg.clicked.connect(self.nuova)
         self.b_eli.clicked.connect(self.elimina)
 
+        # Posizione, concorso e data: caselle grandi, contenuto in grassetto
         testa = QGridLayout()
-        testa.addWidget(QLabel("<b>Pos.</b>"), 0, 0)
-        testa.addWidget(QLabel("<b>Conc.</b>"), 0, 1)
-        testa.addWidget(QLabel("<b>Data</b>"), 0, 2)
-        testa.addWidget(QLabel("Montepremi"), 0, 3)
+        testa.setHorizontalSpacing(10)
+        testa.addWidget(_etichetta("Pos."), 0, 0, Qt.AlignCenter)
+        testa.addWidget(_etichetta("Conc."), 0, 1, Qt.AlignCenter)
+        testa.addWidget(_etichetta("Data"), 0, 2, Qt.AlignCenter)
+        grande = QFont("Segoe UI", 18)
+        grande.setBold(True)
         self.l_pos = QLabel()
         self.l_conc = QLabel()
-        for l in (self.l_pos, self.l_conc):
-            l.setStyleSheet(GIALLO + "padding:3px; font-weight:bold;")
+        for l, larg in ((self.l_pos, 110), (self.l_conc, 90)):
+            l.setFont(grande)
+            l.setStyleSheet(GIALLO + "border:1px solid #888; padding:4px;")
             l.setAlignment(Qt.AlignCenter)
+            l.setFixedSize(larg, 50)
         self.e_data = QDateEdit()
         self.e_data.setCalendarPopup(True)
         self.e_data.setDisplayFormat("dd/MM/yyyy")
-        self.e_data.setStyleSheet(GIALLO)
+        self.e_data.setFont(grande)
+        self.e_data.setAlignment(Qt.AlignCenter)
+        self.e_data.setFixedSize(210, 50)
+        self.e_data.setStyleSheet("QDateEdit {" + GIALLO + "}")
         self.e_data.dateChanged.connect(self._data_cambiata)
-        self.l_giorno = QLabel()
-        self.e_monte = QLineEdit()
-        self.e_monte.setStyleSheet(GIALLO + "font-weight:bold;")
+        self.l_giorno = _etichetta("", 12)
+        self.l_giorno.setAlignment(Qt.AlignCenter)
         testa.addWidget(self.l_pos, 1, 0)
         testa.addWidget(self.l_conc, 1, 1)
         testa.addWidget(self.e_data, 1, 2)
-        testa.addWidget(self.e_monte, 1, 3)
         testa.addWidget(self.l_giorno, 2, 2)
+        testa.setColumnStretch(3, 1)
         v.addLayout(testa)
 
-        box = QGroupBox("Combinazione Vincente")
-        h = QHBoxLayout(box)
-        self.s_num = []
-        for _ in range(6):
-            s = QSpinBox()
-            s.setRange(0, 90)
-            s.setSpecialValueText(" ")
-            s.setButtonSymbols(QSpinBox.NoButtons)
-            s.setAlignment(Qt.AlignCenter)
-            s.setFixedWidth(42)
-            self.s_num.append(s)
-            h.addWidget(s)
-        self.s_jolly = QSpinBox()
-        self.s_ss = QSpinBox()
-        for s in (self.s_jolly, self.s_ss):
-            s.setRange(0, 90)
-            s.setSpecialValueText(" ")
-            s.setButtonSymbols(QSpinBox.NoButtons)
-            s.setAlignment(Qt.AlignCenter)
-            s.setFixedWidth(42)
-        h.addSpacing(12)
-        h.addWidget(QLabel("Jolly"))
-        h.addWidget(self.s_jolly)
-        h.addSpacing(12)
-        h.addWidget(QLabel("SuperStar"))
-        h.addWidget(self.s_ss)
-        v.addWidget(box)
+        v.addSpacing(26)   # combinazione vincente più in basso
 
-        self.t_quote = QTableWidget(len(CATEGORIE), 3)
-        self.t_quote.setHorizontalHeaderLabels(["Categoria", "Vincitori", "Quota"])
-        self.t_quote.verticalHeader().setVisible(False)
-        self.t_quote.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        for i, cat in enumerate(CATEGORIE):
-            it = QTableWidgetItem(cat)
-            it.setFlags(Qt.ItemIsEnabled)
-            self.t_quote.setItem(i, 0, it)
-        self.t_quote.setStyleSheet("QTableWidget { background:#fff9c4; }")
-        v.addWidget(self.t_quote)
+        # Combinazione vincente: caselle e numeri più grandi, in grassetto
+        v.addWidget(_etichetta("Combinazione Vincente", 14))
+        h = QHBoxLayout()
+        h.setSpacing(6)
+        self.s_num = [_casella_numero() for _ in range(6)]
+        for s in self.s_num:
+            h.addWidget(s)
+        self.s_jolly = _casella_numero()
+        self.s_ss = _casella_numero()
+        h.addSpacing(18)
+        h.addWidget(_etichetta("Jolly", 14))
+        h.addWidget(self.s_jolly)
+        h.addSpacing(18)
+        h.addWidget(_etichetta("SuperStar", 14))
+        h.addWidget(self.s_ss)
+        h.addStretch()
+        v.addLayout(h)
 
         self.l_avvisi = QLabel()
         self.l_avvisi.setStyleSheet("color:#b71c1c;")
         self.l_avvisi.setWordWrap(True)
         v.addWidget(self.l_avvisi)
+        v.addStretch()
 
         basso = QHBoxLayout()
         self.b_ok = QPushButton("✔ Ok (salva)")
         self.b_annulla = QPushButton("✖ Annulla")
         self.b_aiuto = QPushButton("? Aiuto")
         basso.addStretch()
-        basso.addWidget(self.b_ok)
-        basso.addWidget(self.b_annulla)
-        basso.addWidget(self.b_aiuto)
+        for b in (self.b_ok, self.b_annulla, self.b_aiuto):
+            f = b.font()
+            f.setBold(True)
+            b.setFont(f)
+            b.setMinimumHeight(34)
+            basso.addWidget(b)
         v.addLayout(basso)
         self.b_ok.clicked.connect(self.salva)
         self.b_annulla.clicked.connect(self._annulla)
@@ -165,34 +195,27 @@ class EditorEstrazione(QDialog):
         self.indice = i
         self.in_inserimento = False
         e = self.arch.per_data(self.date[i])
+        self.corrente = e
         self.l_pos.setText(str(i + 1))
         self.l_conc.setText(str(e.concorso or ""))
         self.e_data.setDate(QDate(e.data.year, e.data.month, e.data.day))
-        self.e_monte.setText(_euro(e.montepremi))
         for s, n in zip(self.s_num, e.numeri):
             s.setValue(n)
         self.s_jolly.setValue(e.jolly or 0)
         self.s_ss.setValue(e.superstar or 0)
-        for r, cat in enumerate(CATEGORIE):
-            vinc, quota = e.quote.get(cat, (None, None))
-            self.t_quote.setItem(r, 1, QTableWidgetItem("" if vinc is None else f"{vinc:,}".replace(",", ".")))
-            self.t_quote.setItem(r, 2, QTableWidgetItem(_euro(quota)))
         self.l_avvisi.setText(f"Fonte: {e.fonte}" if e.fonte else "")
         self._aggiorna_pulsanti()
 
     def nuova(self):
         self.in_inserimento = True
+        self.corrente = None
         ultima = self.arch.ultima()
         self.l_pos.setText(str(len(self.date) + 1))
         self.l_conc.setText("auto")
         oggi = date.today()
         self.e_data.setDate(QDate(oggi.year, oggi.month, oggi.day))
-        self.e_monte.clear()
         for s in self.s_num + [self.s_jolly, self.s_ss]:
             s.setValue(0)
-        for r in range(len(CATEGORIE)):
-            self.t_quote.setItem(r, 1, QTableWidgetItem(""))
-            self.t_quote.setItem(r, 2, QTableWidgetItem(""))
         self.l_avvisi.setText("Nuova estrazione: inserisci data, 6 numeri, Jolly e SuperStar, poi premi Ok."
                               + (f"  (Ultima in archivio: {ultima.data:%d/%m/%Y})" if ultima else ""))
         self.s_num[0].setFocus()
@@ -207,30 +230,20 @@ class EditorEstrazione(QDialog):
         self.b_eli.setEnabled(nav)
 
     def _leggi(self) -> Estrazione:
-        quote = {}
-        for r, cat in enumerate(CATEGORIE):
-            tv = (self.t_quote.item(r, 1).text() if self.t_quote.item(r, 1) else "").replace(".", "").strip()
-            tq = self.t_quote.item(r, 2).text() if self.t_quote.item(r, 2) else ""
-            vinc = int(tv) if tv.isdigit() else None
-            quota = _num(tq)
-            if vinc is not None or quota is not None:
-                quote[cat] = (vinc, quota)
-        return Estrazione(
+        e = Estrazione(
             data=self.e_data.date().toPython(),
             numeri=[s.value() for s in self.s_num],
             jolly=self.s_jolly.value() or None,
             superstar=self.s_ss.value() or None,
-            montepremi=_num(self.e_monte.text()),
             fonte="manuale",
-            quote=quote,
         )
+        if self.corrente is not None:      # conserva eventuali dati non mostrati
+            e.montepremi = self.corrente.montepremi
+            e.quote = dict(self.corrente.quote)
+        return e
 
     def salva(self):
-        try:
-            e = self._leggi()
-        except ValueError:
-            QMessageBox.warning(self, "Dati non validi", "Controlla montepremi e quote: devono essere numeri.")
-            return
+        e = self._leggi()
         errori, avvisi = valida(e)
         if errori:
             QMessageBox.warning(self, "Dati non validi", "\n".join(errori))
@@ -273,16 +286,10 @@ class EditorEstrazione(QDialog):
         else:
             self.accept() if self.modificato else self.reject()
 
-    def closeEvent(self, ev):
-        if self.modificato:
-            self.setResult(QDialog.Accepted)
-        super().closeEvent(ev)
-
     def _aiuto(self):
         QMessageBox.information(self, "Aiuto", (
-            "Usa le frecce per scorrere l'archivio.\n"
+            "Usa i pulsanti in alto per scorrere l'archivio.\n"
             "Aggiungi: prepara una nuova estrazione vuota.\n"
             "Ok: salva l'estrazione mostrata (nuova o modificata).\n"
             "Elimina: cancella l'estrazione mostrata (con conferma).\n\n"
-            "Il numero di concorso viene calcolato automaticamente come progressivo dell'anno.\n"
-            "Montepremi e quote sono facoltativi."))
+            "Il numero di concorso viene calcolato automaticamente come progressivo dell'anno."))

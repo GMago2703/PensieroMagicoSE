@@ -13,6 +13,14 @@ from pmse.core.internet import analizza_pagina_anno  # noqa: E402
 DATI = Path(__file__).parent / "dati"
 
 
+def foto(nome, widget):
+    """Se FOTO_DIR è impostata salva un'immagine della finestra (per controllo visivo nella build)."""
+    cartella = os.environ.get("FOTO_DIR")
+    if cartella:
+        os.makedirs(cartella, exist_ok=True)
+        widget.grab().save(os.path.join(cartella, nome + ".png"))
+
+
 @pytest.fixture(scope="module")
 def app():
     return QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -38,6 +46,7 @@ def test_finestre(app, arch):
     w = FinestraPrincipale(arch, avvio_automatico=False)
     w.show()
     app.processEvents()
+    foto("home", w)
     w.p_sx.griglia.seleziona_tutti()
     w.p_sx.griglia.azzera()
     w.p_dx.griglia.mostra_sestine([[1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12], [13, 14, 15, 16, 17, 18]], 19, 20)
@@ -53,6 +62,8 @@ def test_finestre(app, arch):
 
     ed = EditorEstrazione(arch, parent=w)
     ed.show()
+    app.processEvents()
+    foto("aggiornamento_archivio", ed)
     ed._sposta(0)
     ed._sposta(1)
     e = ed._leggi()

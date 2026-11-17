@@ -6,7 +6,7 @@ from datetime import date
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QFont
 from PySide6.QtWidgets import (QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
-                               QPlainTextEdit, QPushButton, QDialog, QVBoxLayout, QWidget)
+                               QPlainTextEdit, QPushButton, QDialog, QSizePolicy, QVBoxLayout, QWidget)
 
 from .. import __version__
 from ..core import analisi, internet
@@ -23,8 +23,8 @@ SFONDO = """
 QMainWindow { background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
               stop:0 #b8860b, stop:0.35 #f4d35e, stop:0.6 #d4a017, stop:1 #8b6508); }
 QFrame#pannello { background: white; border: 2px solid #555; }
-QLabel#titolo { font-family: 'Segoe UI'; font-size: 26px; font-weight: bold; }
-QPushButton[class="lato"] { text-align: left; padding: 8px 12px; font-size: 13px; min-width: 110px; }
+QLabel#titolo { font-family: 'Segoe UI'; font-size: 24px; font-weight: bold; }
+QPushButton[class="lato"] { text-align: left; padding: 6px 10px; font-size: 12px; min-width: 100px; }
 """
 
 MENU_VUOTI = ["Sistemi", "Condizioni", "Elaborazione", "Combinazioni", "Statistiche", "Metodi"]
@@ -48,13 +48,14 @@ class Pannello(QFrame):
         t.setAlignment(Qt.AlignCenter)
         g.addWidget(t, 0, 1)
         self.griglia = Griglia90(selezionabile=selezionabile)
-        self.griglia.setMinimumSize(380, 300)
+        self.griglia.setFixedSize(360, 290)        # dimensioni come nella schermata di riferimento
         g.addWidget(self.griglia, 1, 0, 1, 2)
         self.lato = QVBoxLayout()
         g.addLayout(self.lato, 0, 2, 2, 1)
         self.sotto = QLabel()
         self.sotto.setAlignment(Qt.AlignCenter)
         g.addWidget(self.sotto, 2, 0, 1, 3)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
     def pulsante(self, testo: str, funzione) -> QPushButton:
         b = QPushButton(testo)
@@ -137,9 +138,13 @@ class FinestraPrincipale(QMainWindow):
     # -------------------------------------------------------------- centro
     def _centro(self):
         w = QWidget()
-        h = QHBoxLayout(w)
-        h.setContentsMargins(30, 30, 30, 30)
-        h.setSpacing(30)
+        esterno = QVBoxLayout(w)
+        esterno.addStretch()
+        h = QHBoxLayout()
+        esterno.addLayout(h)
+        esterno.addStretch()
+        h.setSpacing(40)
+        h.addStretch()
 
         self.p_sx = Pannello("SuperEnalotto", "#d81b60", selezionabile=True)
         self.p_sx.pulsante("📚  Archivio", self.apri_archivio)
@@ -159,12 +164,14 @@ class FinestraPrincipale(QMainWindow):
         self.p_dx.lato.addWidget(legenda)
         self.p_dx.lato.addStretch()
         self.l_sestine = QLabel("Le 3 sestine compariranno qui dopo l'elaborazione.")
-        self.l_sestine.setFont(QFont("Consolas", 11))
+        self.l_sestine.setFont(QFont("Consolas", 10))
+        self.l_sestine.setWordWrap(True)
         self.p_dx.sotto.setText("")
         self.p_dx.layout().addWidget(self.l_sestine, 3, 0, 1, 3)
 
-        h.addWidget(self.p_sx, 1)
-        h.addWidget(self.p_dx, 1)
+        h.addWidget(self.p_sx)
+        h.addWidget(self.p_dx)
+        h.addStretch()
         self.setCentralWidget(w)
 
         sb = self.statusBar()
