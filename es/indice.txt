@@ -1,0 +1,6 @@
+es/p01.html 200 15535 https://www.superenalotto.com/risultati-estrazione/17-11-2026
+es/p02.html 200 15782 https://www.superenalotto.com/risultati-estrazione/11-09-2026
+es/p03.html 200 15661 https://www.superenalotto.com/risultati-estrazione/16-02-2023
+es/p04.html 200 13878 https://www.superenalotto.com/risultati-estrazione/03-01-1998
+es/p05.html 200 15667 https://www.superenalotto.com/risultati-estrazione/22-05-2025
+es/p06.html 200 23614 https://www.superenalotto.com/vincite/quote-vincitori
