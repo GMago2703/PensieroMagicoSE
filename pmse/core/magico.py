@@ -321,10 +321,17 @@ class EsitoVerifica:
         r.append("")
         r.append(f"Jolly indovinato (fra i 6 estratti): {self.jolly_mp}   SuperStar indovinato: {self.superstar_mp}")
         r.append("")
-        diff = self.numeri_mp - self.numeri_caso
-        r.append("Lettura: differenze di pochi numeri su queste quantità sono normali oscillazioni del caso. "
-                 + ("Per ora Magico Pensiero fa meglio del caso." if diff > 0 else
-                    "Per ora Magico Pensiero non fa meglio del caso."))
+        # scarto dal valore atteso misurato in "deviazioni standard" (z): sotto 2 è normale oscillazione
+        var = 3 * 6 * (6 / 90) * (84 / 90) * (84 / 89)
+        z = (self.numeri_mp - atteso) / ((var * self.prove) ** 0.5)
+        r.append(f"Scarto di Magico Pensiero dall'atteso: {z:+.2f} deviazioni standard.")
+        if z >= 2:
+            r.append("Lettura: risultato SUPERIORE al caso in modo statisticamente significativo.")
+        elif z <= -2:
+            r.append("Lettura: risultato INFERIORE al caso in modo statisticamente significativo.")
+        else:
+            r.append("Lettura: risultato in linea con il caso (le differenze sono normali oscillazioni). "
+                     "Per giudicare servono molti concorsi: prova con 500 o più.")
         return "\n".join(r)
 
 
