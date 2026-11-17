@@ -102,6 +102,40 @@ jobs:
         with:
           name: PensieroMagico-apk
           path: PensieroMagico.apk
+
+  emulatore:
+    needs: apk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: PensieroMagico-apk
+      - name: Abilita KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Prova l'APK su un emulatore Android (archivi veri da Internet)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash mobile/prova_emulatore.sh
+      - name: Pubblica schermate e log dell'emulatore sul ramo "foto-emulatore"
+        if: always()
+        run: |
+          ls emu || exit 0
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git checkout --orphan emu-tmp
+          git rm -rf --cached . -q
+          git add -f emu/*
+          git commit -q -m "Prova su emulatore ${{ github.run_number }}"
+          git push -f -q origin emu-tmp:foto-emulatore
       - name: Pubblica la release
         uses: softprops/action-gh-release@v2
         with:

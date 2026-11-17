@@ -549,6 +549,18 @@ class PaginaAI(Pagina):
 
 
 # ------------------------------------------------------------------ applicazione
+def autotest_richiesto() -> bool:
+    """Vero solo se l'app è stata avviata dalla build con: am start ... --es autotest 1"""
+    if os.environ.get("PMSE_AUTOTEST"):
+        return True
+    try:
+        from jnius import autoclass
+        intent = autoclass("org.kivy.android.PythonActivity").mActivity.getIntent()
+        return intent is not None and intent.getStringExtra("autotest") == "1"
+    except Exception:
+        return False
+
+
 class PensieroMagicoApp(App):
     title = "Pensiero Magico"
 
@@ -567,6 +579,38 @@ class PensieroMagicoApp(App):
             self.sm.add_widget(p)
         Window.bind(on_keyboard=self._tasto)
         return self.sm
+
+    def on_start(self):
+        if autotest_richiesto():
+            threading.Thread(target=self._autotest, daemon=True).start()
+
+    def _autotest(self):
+        """Prova sul dispositivo (usata dalla build con l'emulatore): scarica davvero gli archivi da
+        Internet, genera, verifica. Scrive l'esito nel log di Android con la parola AUTOTEST."""
+        import time
+        from kivy.clock import Clock as _C
+        self.occupato = True
+        try:
+            import numpy
+            import sqlite3
+            print(f"AUTOTEST avvio: numpy {numpy.__version__}, sqlite {sqlite3.sqlite_version}")
+            for g in (SE, EJ):
+                s = servizi.Servizio(self.cartella, g)
+                t0 = time.time()
+                esito = s.aggiorna()
+                print(f"AUTOTEST {g.codice} archivio: {s.conta()} estrazioni (+{esito.unione.nuove}) "
+                      f"in {time.time() - t0:.0f}s, ultima {s.ultima().data}")
+                r = s.genera()
+                print(f"AUTOTEST {g.codice} Magico Pensiero: {[x.numeri for x in r.sestine]} {r.jolly} {r.superstar}")
+                es, _ = s.verifica(20)
+                print(f"AUTOTEST {g.codice} verifica: {es.prove} concorsi, {es.numeri_mp} numeri indovinati")
+                s.chiudi()
+            print("AUTOTEST FINE OK")
+        except Exception:
+            print("AUTOTEST ERRORE " + traceback.format_exc().replace("\n", " | "))
+        finally:
+            self.occupato = False
+            _C.schedule_once(lambda dt: (self.pagine["home"].on_pre_enter(), self.vai("magico")), 0)
 
     def on_stop(self):
         try:
