@@ -199,9 +199,10 @@ def costruisci_dossier(storico: Storico, r: magico.RisultatoMagico, verifica: st
     out.append("")
 
     out.append("## Proposta dell'algoritmo Magico Pensiero 0.1")
+    MAX_COMUNI = "max numeri in comune con l'archivio"
     for i, s in enumerate(r.sestine, 1):
         out.append(f"{comb} {i}: {' '.join(map(str, s.numeri))} (voto {s.voto}; max in comune con l'archivio "
-                   f"{s.dettaglio.get("max numeri in comune con l'archivio", '?')})")
+                   f"{s.dettaglio.get(MAX_COMUNI, '?')})")
     out.append(f"euronumeri {r.jolly} {r.superstar}" if g.is_ej else f"jolly {r.jolly}; superstar {r.superstar}")
     out.append(f"Migliori candidate ({comb};voto;max numeri in comune con l'archivio):")
     comuni = r.in_comune_migliori or [""] * len(r.migliori)
