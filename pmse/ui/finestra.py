@@ -187,7 +187,7 @@ class FinestraPrincipale(QMainWindow):
         self._azione(m, "🤖 Magico Pensiero + intelligenza artificiale (Gemini o Claude)...", self.claude)
         m.addSeparator()
         self._azione(m, "Impostazioni dell'algoritmo...", self.impostazioni_magico)
-        self._azione(m, "Verifica storica dell'algoritmo...", self.verifica_magico)
+        self._azione(m, "Verifica storica (previsioni su quanto già avvenuto)...", self.verifica_magico)
         self._azione(m, "Storico delle previsioni...", self.storico_magico)
         self._azione(m, "📈 Analisi delle previsioni e apprendimento...", self.apprendimento)
 

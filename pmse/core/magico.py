@@ -78,6 +78,8 @@ class Impostazioni:
     stat_voci: dict[str, list] = field(default_factory=dict)     # voce -> [valutazioni, somma posizioni]
     stat_filtri: dict[str, list] = field(default_factory=dict)   # filtro -> [valutazioni, vincenti scartate]
     soglia_filtri: float = 0.25          # oltre questa quota di vincenti scartate il filtro si allenta
+    appreso_da: str = ""                 # periodo di estrazioni già conteggiate dall'apprendimento
+    appreso_a: str = ""                  # (evita di contare due volte lo stesso concorso)
     # forma delle sestine (regolata anche dall'apprendimento)
     pari_min: int = 2
     pari_max: int = 4
@@ -491,6 +493,29 @@ class EsitoVerifica:
         return "\n".join(r)
 
 
+def dettaglio_per_ai(es: EsitoVerifica, ultime: int = 25) -> str:
+    """Esito della verifica + ultimi concorsi in forma compatta, per l'intelligenza artificiale."""
+    g = GIOCHI.get(es.gioco, SE)
+    righe = [es.testo(), "", f"Dettaglio degli ultimi {min(ultime, len(es.dettagli))} concorsi verificati "
+             f"(data; estratti; {g.nome_comb_pl} che l'algoritmo avrebbe proposto prima di quel concorso → punti; "
+             f"numeri presi):"]
+    for d, sest, estr, punti, *_ in es.dettagli[-ultime:]:
+        presi = sorted({n for s in sest for n in s} & set(estr))
+        righe.append(f"{d:%d/%m/%Y}; {' '.join(map(str, estr))}; " +
+                     " | ".join(f"{' '.join(map(str, s))} → {p}" for s, p in zip(sest, punti)) +
+                     f"; presi: {' '.join(map(str, presi)) or 'nessuno'}")
+    # numeri usciti spesso ma mai proposti, e proposti spesso ma mai usciti (nel periodo verificato)
+    from collections import Counter
+    proposti = Counter(n for _, sest, *_r in es.dettagli for s in sest for n in set(s))
+    usciti = Counter(n for _, _s, estr, *_r in es.dettagli for n in estr)
+    presi = Counter(n for _, sest, estr, *_r in es.dettagli for n in {x for s in sest for x in s} & set(estr))
+    righe.append("Numeri proposti più spesso (volte proposto/volte preso): " +
+                 ", ".join(f"{n}({v}/{presi[n]})" for n, v in proposti.most_common(10)))
+    righe.append("Numeri usciti più spesso nel periodo e quante volte erano stati proposti: " +
+                 ", ".join(f"{n}({v}/{proposti[n]})" for n, v in usciti.most_common(10)))
+    return "\n".join(righe)
+
+
 def verifica_storica(storico: Storico, concorsi: int = 100, imp: Impostazioni | None = None,
                      avanzamento=None, interrompi=None) -> EsitoVerifica:
     g = gioco_di(storico)
@@ -524,7 +549,8 @@ def verifica_storica(storico: Storico, concorsi: int = 100, imp: Impostazioni | 
         else:
             es.jolly_mp += int(r.jolly in estratta)
             es.superstar_mp += int(r.superstar is not None and r.superstar == storico[i][3])
-        es.dettagli.append((storico[i][0], [s.numeri for s in r.sestine], sorted(estratta), punti))
+        es.dettagli.append((storico[i][0], [s.numeri for s in r.sestine], sorted(estratta), punti,
+                            (r.jolly, r.superstar), (storico[i][2], storico[i][3])))
         if avanzamento:
             avanzamento(i - inizio + 1, n - inizio)
     return es

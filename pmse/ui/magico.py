@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from datetime import date
 
-from PySide6.QtCore import QThread, Signal
-from PySide6.QtWidgets import (QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMessageBox,
+from PySide6.QtCore import QSize, Qt, QThread, Signal
+from PySide6.QtGui import QColor, QTextDocument
+from PySide6.QtWidgets import (QComboBox, QDialog, QStyle, QStyledItemDelegate, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMessageBox,
                                QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QTableWidget, QVBoxLayout)
 
 from ..core import magico, personalizzate
@@ -219,49 +220,111 @@ class Verificatore(QThread):
     avanzamento = Signal(int, int)
     finito = Signal(object)
 
-    def __init__(self, storico, concorsi, imp):
+    def __init__(self, storico, concorsi, imp, apprendi: bool = False):
         super().__init__()
-        self.storico, self.concorsi, self.imp = storico, concorsi, imp
+        self.storico, self.concorsi, self.imp, self.apprendi = storico, concorsi, imp, apprendi
         self._stop = False
 
     def run(self):
         es = magico.verifica_storica(self.storico, self.concorsi, self.imp,
                                      lambda i, n: self.avanzamento.emit(i, n), lambda: self._stop)
-        self.finito.emit(es)
+        appreso = None
+        if self.apprendi and es.prove and not self._stop:
+            from ..core import apprendimento
+            appreso = apprendimento.allena(self.storico, self.imp, self.concorsi, interrompi=lambda: self._stop)
+        self.finito.emit((es, appreso))
+
+
+def _html_numeri(numeri, evidenzia: set, colore: str = "#c62828") -> str:
+    """Numeri separati da spazi, con quelli 'presi' evidenziati (sfondo colorato e grassetto)."""
+    parti = []
+    for n in numeri:
+        if n in evidenzia:
+            parti.append(f"<span style='background:{colore}; color:white; font-weight:bold'>&nbsp;{n}&nbsp;</span>")
+        else:
+            parti.append(f"&nbsp;{n}&nbsp;")
+    return " ".join(parti)
+
+
+class DelegatoHtml(QStyledItemDelegate):
+    """Disegna le celle della tabella come testo formattato (per evidenziare i numeri)."""
+
+    def paint(self, painter, option, index):
+        testo = index.data(Qt.UserRole + 2)
+        if not testo:
+            return super().paint(painter, option, index)
+        self.initStyleOption(option, index)
+        painter.save()
+        option.text = ""
+        option.widget.style().drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
+        doc = QTextDocument()
+        doc.setDefaultFont(option.font)
+        doc.setHtml(testo)
+        painter.translate(option.rect.left() + 4, option.rect.top() + (option.rect.height() - doc.size().height()) / 2)
+        doc.drawContents(painter)
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        testo = index.data(Qt.UserRole + 2)
+        if not testo:
+            return super().sizeHint(option, index)
+        doc = QTextDocument()
+        doc.setDefaultFont(option.font)
+        doc.setHtml(testo)
+        return QSize(int(doc.idealWidth()) + 10, int(doc.size().height()) + 4)
 
 
 class FinestraVerifica(QDialog):
+    """Verifica storica = previsioni su quanto già avvenuto: per ognuno degli ultimi N concorsi rifà
+    Magico Pensiero con i soli dati precedenti e confronta le combinazioni con quella estratta,
+    evidenziando i numeri in comune. I risultati possono correggere l'algoritmo e vengono passati all'AI."""
+
     def __init__(self, arch: Archivio, parent=None):
         super().__init__(parent)
+        from PySide6.QtWidgets import QCheckBox
         self.arch = arch
         self.thread = None
+        self.esito = None
         g = arch.gioco
-        self.setWindowTitle(f"Magico Pensiero {g.nome} – verifica storica")
-        self.resize(900, 640)
+        self.setWindowTitle(f"Magico Pensiero {g.nome} – verifica storica (previsioni su quanto già avvenuto)")
+        self.resize(1250, 760)
         v = QVBoxLayout(self)
-        cosa = "della cinquina con quelli di una cinquina scelta a caso" if g.is_ej else \
-            "delle 3 sestine con quelli di 3 sestine scelte a caso"
+        cosa = "la cinquina e gli Euronumeri" if g.is_ej else "le 3 sestine, il Jolly e il SuperStar"
         v.addWidget(QLabel(
-            "Rifà il calcolo «come se» fossimo prima di ognuno degli ultimi N concorsi (usando solo le estrazioni "
-            f"precedenti) e confronta i punti {cosa}."))
+            f"Per ognuno degli ultimi N concorsi il programma rifà il calcolo «come se» fosse il giorno prima, usando "
+            f"solo le estrazioni precedenti, e confronta {cosa} che avrebbe proposto con la combinazione realmente "
+            "estratta. I numeri in comune sono <span style='background:#c62828; color:white'>&nbsp;evidenziati&nbsp;"
+            "</span> sia negli estratti sia nelle combinazioni proposte."))
         h = QHBoxLayout()
-        h.addWidget(QLabel("Ultimi concorsi da provare:"))
+        h.addWidget(QLabel("Ultimi concorsi da verificare (10-1000):"))
         self.s_n = QSpinBox()
-        self.s_n.setRange(10, 3000)
+        self.s_n.setRange(10, 1000)
         self.s_n.setValue(200)
         h.addWidget(self.s_n)
+        self.ck_appr = QCheckBox("Usa i risultati per correggere l'algoritmo (apprendimento)")
+        self.ck_appr.setChecked(True)
+        h.addWidget(self.ck_appr)
         self.b_via = QPushButton("▶ Avvia verifica")
         self.b_via.clicked.connect(self.avvia)
         h.addWidget(self.b_via)
         h.addStretch()
+        h.addWidget(QLabel("Mostra:"))
+        self.c_filtro = QComboBox()
+        self.c_filtro.addItems(["tutti i concorsi", "solo con almeno 2 punti", "solo con almeno 3 punti",
+                                "solo con almeno 4 punti"])
+        self.c_filtro.currentIndexChanged.connect(self._mostra)
+        h.addWidget(self.c_filtro)
         v.addLayout(h)
         self.barra = QProgressBar()
         v.addWidget(self.barra)
         self.testo = QPlainTextEdit()
         self.testo.setReadOnly(True)
-        v.addWidget(self.testo, 1)
+        self.testo.setMaximumHeight(230)
+        v.addWidget(self.testo)
         self.tab = QTableWidget()
         self.tab.verticalHeader().setVisible(False)
+        self.tab.setItemDelegate(DelegatoHtml(self.tab))
+        self.tab.setSelectionBehavior(QTableWidget.SelectRows)
         v.addWidget(self.tab, 1)
 
     def avvia(self):
@@ -271,24 +334,81 @@ class FinestraVerifica(QDialog):
             return
         self.b_via.setEnabled(False)
         self.testo.setPlainText("Calcolo in corso...")
-        self.thread = Verificatore(storico, self.s_n.value(), carica_impostazioni(self.arch))
+        self.thread = Verificatore(storico, self.s_n.value(), carica_impostazioni(self.arch), self.ck_appr.isChecked())
         self.thread.avanzamento.connect(lambda i, n: (self.barra.setMaximum(n), self.barra.setValue(i)))
         self.thread.finito.connect(self._finito)
         self.thread.start()
 
-    def _finito(self, es: magico.EsitoVerifica):
+    def _finito(self, risultato):
+        es, appreso = risultato
         self.b_via.setEnabled(True)
-        self.testo.setPlainText(es.testo())
-        if es.prove:      # l'esito viene passato a Claude come informazione
-            self.arch.scrivi_impostazione("magico_ultima_verifica", es.testo())
-        righe = [[d.strftime("%d/%m/%Y"), " ".join(map(str, estr)),
-                  *[" ".join(map(str, s)) for s in sest], *punti, max(punti)]
-                 for d, sest, estr, punti in reversed(es.dettagli)]
+        self.esito = es
+        testo = es.testo()
+        if es.prove:      # l'esito (con il dettaglio dei concorsi) viene passato all'intelligenza artificiale
+            self.arch.scrivi_impostazione("magico_ultima_verifica", magico.dettaglio_per_ai(es))
+        if appreso is not None:
+            imp, correzioni, fatti = appreso
+            self.arch.scrivi_impostazione(magico.CHIAVE_IMP, imp.a_json())
+            testo += (f"\n\nApprendimento: {fatti} concorsi nuovi conteggiati"
+                      + (" (gli altri erano già stati conteggiati in precedenza)." if fatti < es.prove else "."))
+            testo += ("\nCorrezioni ai filtri: " + "; ".join(correzioni)) if correzioni else \
+                "\nNessun filtro ha avuto bisogno di correzioni."
+            eff = magico.pesi_effettivi(imp)
+            testo += "\nPesi effettivi ora: " + ", ".join(f"{magico.VOCI[k]} {v:.3f}" for k, v in eff.items())
+        testo += "\n\nQuesti risultati verranno usati anche dall'intelligenza artificiale (pulsante 🤖 AI)."
+        self.testo.setPlainText(testo)
+        self._mostra()
+
+    def _mostra(self, *_):
+        es = self.esito
+        if not es:
+            return
         g = self.arch.gioco
         C = g.combinazioni_magico
+        minimo = [0, 2, 3, 4][self.c_filtro.currentIndex()]
         nomi = [g.C()] if C == 1 else [f"{g.C()} {i}" for i in range(1, C + 1)]
-        punti = ["Punti"] if C == 1 else [f"Punti {i}" for i in range(1, C + 1)]
-        riempi_tabella(self.tab, ["Concorso del", "Estratti", *nomi, *punti, "Migliore"], righe)
+        punti_col = ["Punti"] if C == 1 else [f"Punti {i}" for i in range(1, C + 1)]
+        speciali = ["Euronumeri previsti", "Euronumeri estratti"] if g.is_ej else \
+            ["Jolly previsto", "SuperStar previsto", "Jolly / SuperStar estratti"]
+        colonne = ["Concorso del", "Estratti", *nomi, *punti_col, "Migliore", *speciali]
+        righe, html = [], []
+        for d, sest, estr, punti, prev, vero in reversed(es.dettagli):
+            if max(punti) < minimo:
+                continue
+            proposti = {n for s in sest for n in s}
+            presi = proposti & set(estr)
+            if g.is_ej:
+                euro_v = {vero[0], vero[1]}
+                sp_testo = [f"{prev[0]} {prev[1]}", f"{vero[0]} {vero[1]}"]
+                sp_html = [_html_numeri(prev, euro_v, "#1565c0"), _html_numeri(vero, {prev[0], prev[1]}, "#1565c0")]
+            else:
+                sp_testo = [prev[0], prev[1] or "-", f"{vero[0]} / {vero[1] or '-'}"]
+                j_ok = prev[0] in estr or prev[0] == vero[0]
+                ss_ok = prev[1] is not None and prev[1] == vero[1]
+                sp_html = [_html_numeri([prev[0]], {prev[0]} if j_ok else set(), "#ef6c00"),
+                           _html_numeri([prev[1]] if prev[1] else ["-"], {prev[1]} if ss_ok else set(), "#b8860b"),
+                           f"{vero[0]} / {vero[1] or '-'}"]
+            righe.append([d.strftime("%d/%m/%Y"), " ".join(map(str, estr)), *[" ".join(map(str, s)) for s in sest],
+                          *punti, max(punti), *sp_testo])
+            html.append([None, _html_numeri(estr, presi), *[_html_numeri(s, set(estr)) for s in sest],
+                         *[None] * (C + 1), *sp_html])
+        riempi_tabella(self.tab, colonne, righe)
+        self.tab.setSortingEnabled(False)
+        for r, riga in enumerate(html):
+            migliore = righe[r][2 + 2 * C]
+            for c, h in enumerate(riga):
+                it = self.tab.item(r, c)
+                if it is None:
+                    continue
+                if h:
+                    it.setData(Qt.UserRole + 2, h)
+                if migliore >= 3:
+                    it.setBackground(QColor("#c8e6c9"))
+                elif migliore == 2:
+                    it.setBackground(QColor("#f1f8e9"))
+        self.tab.resizeColumnsToContents()
+        for c in range(1, 2 + C):
+            self.tab.setColumnWidth(c, max(self.tab.columnWidth(c), 34 * g.k))
 
     def closeEvent(self, ev):
         if self.thread and self.thread.isRunning():
@@ -514,6 +634,7 @@ class FinestraApprendimento(QDialog):
         imp = carica_impostazioni(self.arch)
         base = magico.Impostazioni.predefinite(self.arch.gioco)
         imp.stat_voci, imp.stat_filtri = {}, {}
+        imp.appreso_da, imp.appreso_a = "", ""
         for campo in ("pari_min", "pari_max", "alti_min", "alti_max", "consecutivi_max", "somma_percentile",
                       "max_stessa_decina"):
             setattr(imp, campo, getattr(base, campo))

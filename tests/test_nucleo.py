@@ -369,3 +369,19 @@ def test_gemini(arch):
     assert rc.token_ingresso == 200 and rc.token_uscita == 50
     with mock.patch("urllib.request.urlopen", return_value=R(json.dumps(risposta({"x": 1})).encode())):
         assert "Collegamento riuscito" in claude_ai.prova_chiave_gemini("AIza", "gemini-3.8-flash")
+
+
+def test_verifica_dettaglio_e_no_doppio_conteggio(arch):
+    from pmse.core import apprendimento as ap, magico
+    arch.unisci(storico_finto(400))
+    st = arch.sestine()
+    es = magico.verifica_storica(st, 20)
+    assert len(es.dettagli[0]) == 6
+    testo = magico.dettaglio_per_ai(es, 5)
+    assert "Dettaglio degli ultimi 5 concorsi" in testo and "presi:" in testo
+    imp = magico.Impostazioni()
+    imp, _, fatti = ap.allena(st, imp, 50)
+    assert fatti == 50
+    imp, _, fatti2 = ap.allena(st, imp, 80)          # i 50 già contati non si ricontano
+    assert fatti2 == 30
+    assert imp.stat_voci["eco"][0] == 80

@@ -6,6 +6,7 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 QtWidgets = pytest.importorskip("PySide6.QtWidgets")
+from PySide6.QtCore import Qt  # noqa: E402
 
 from pmse.core.db import Archivio  # noqa: E402
 from pmse.core.internet import analizza_pagina_anno  # noqa: E402
@@ -157,9 +158,14 @@ def test_nuove_finestre(app, arch):
     v.s_n.setValue(30)
     v.show()
     v.avvia()
-    v.thread.wait(60000)
+    v.thread.wait(120000)
     app.processEvents()
+    assert v.esito and v.esito.prove == 30 and v.tab.rowCount() == 30
+    assert v.tab.item(0, 1).data(Qt.UserRole + 2)            # numeri evidenziati
+    assert "Dettaglio degli ultimi" in arch.leggi_impostazione("magico_ultima_verifica")
     foto("magico_verifica", v)
+    v.c_filtro.setCurrentIndex(1)
+    app.processEvents()
     v.close()
     from pmse.core import claude_ai
     from pmse.ui.claude import FinestraClaude
@@ -289,9 +295,11 @@ def test_pensiero_magico_ej(app, tmp_path):
     FinestraSpiegazione(r, w).close()
     v = FinestraVerifica(arch, w)
     v.s_n.setValue(30)
+    v.show()
     v.avvia()
-    v.thread.wait(60000)
+    v.thread.wait(120000)
     app.processEvents()
+    assert v.tab.rowCount() == 30
     foto("ej_verifica", v)
     v.close()
     cl = FinestraClaude(arch, w)

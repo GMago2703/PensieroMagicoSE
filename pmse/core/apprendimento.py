@@ -168,6 +168,17 @@ def valuta(passato: Storico, estratta, imp: magico.Impostazioni, previsioni: lis
     return val
 
 
+def gia_appreso(imp: magico.Impostazioni, d: date, periodo: tuple[str, str] | None = None) -> bool:
+    da, a = periodo if periodo else (imp.appreso_da, imp.appreso_a)
+    return bool(da and a and da <= d.isoformat() <= a)
+
+
+def segna_appreso(imp: magico.Impostazioni, d: date) -> None:
+    iso = d.isoformat()
+    imp.appreso_da = min(imp.appreso_da, iso) if imp.appreso_da else iso
+    imp.appreso_a = max(imp.appreso_a, iso) if imp.appreso_a else iso
+
+
 def aggiorna(imp: magico.Impostazioni, prestazioni: dict[str, float], filtri: dict[str, bool]) -> list[str]:
     """Registra l'esito nelle statistiche dell'algoritmo e, se serve, allenta i filtri che
     scartano troppo spesso le vere combinazioni vincenti. Restituisce le correzioni fatte."""
@@ -247,7 +258,10 @@ def elabora_nuove(archivio) -> list[Valutazione]:
         prev = [p for p in previsioni if p.get("dopo") == dopo]
         val = valuta(storico[:i], storico[i], imp, prev, m[:i])
         val.pesi_prima = magico.pesi_effettivi(imp)
-        val.correzioni = aggiorna(imp, val.prestazioni, val.filtri_superati)
+        if not gia_appreso(imp, storico[i][0]):        # mai contare due volte lo stesso concorso
+            val.correzioni = aggiorna(imp, val.prestazioni, val.filtri_superati)
+            if imp.apprendimento:
+                segna_appreso(imp, storico[i][0])
         val.pesi_dopo = magico.pesi_effettivi(imp)
         for p in prev:
             p["valutata"] = True
@@ -268,9 +282,12 @@ def allena(storico: Storico, imp: magico.Impostazioni, concorsi: int, avanzament
     inizio = max(100, n - concorsi)
     correzioni: list[str] = []
     fatti = 0
+    periodo = (imp.appreso_da, imp.appreso_a)          # concorsi già conteggiati prima di iniziare
     for i in range(inizio, n):
         if interrompi and interrompi():
             break
+        if gia_appreso(imp, storico[i][0], periodo):   # già conteggiato in precedenza
+            continue
         passato = storico[:i]
         _, voci, _, _ = magico.calcola_punteggi(passato, imp, m[:i])
         estratti = sorted(storico[i][1])
@@ -278,6 +295,8 @@ def allena(storico: Storico, imp: magico.Impostazioni, concorsi: int, avanzament
         filtri = _forma_ok(estratti, passato, imp)
         for c in aggiorna(imp, prest, filtri):
             correzioni.append(f"{storico[i][0]:%d/%m/%Y}: {c}")
+        if imp.apprendimento:
+            segna_appreso(imp, storico[i][0])
         fatti += 1
         if avanzamento:
             avanzamento(i - inizio + 1, n - inizio)
