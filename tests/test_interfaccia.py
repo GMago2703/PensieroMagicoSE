@@ -322,3 +322,44 @@ def test_pensiero_magico_ej(app, tmp_path):
         w.cambia_programma("SE")
         apri.assert_called_once_with("SE")
     w.close()
+
+
+def test_menu_disattivi(app, tmp_path):
+    """Sistemi, Condizioni, Sviluppo, Combinazioni, Statistiche: voci inserite ma tutte disattivate."""
+    from pmse.core.gioco import EJ, SE
+    from pmse.ui.finestra import FinestraPrincipale
+
+    escluse = {"Commento", "Partecipanti", "Agenda delle giocate", "Preset", "Resti", "Baricentri",
+               "Specchi", "Vortici", "Link", "Super link", "Punti tra", "Gemelli tra", "Exit poll",
+               "Inserimento picchetti", "Genera da picchetto", "Trasmissione al terminale Sisal",
+               "Tutti gli ambi", "Ritardo di primo livello", "Ricerca per fasce", "Elaborazione"}
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"m_{g.codice}.db", gioco=g)
+        w = FinestraPrincipale(a, avvio_automatico=False)
+        menu = {m.title().replace("&", ""): m for m in
+                (x.menu() for x in w.menuBar().actions()) if m is not None}
+        for nome in ("Sistemi", "Condizioni", "Sviluppo", "Combinazioni", "Statistiche"):
+            m = menu[nome]
+            voci = [x for x in m.actions() if not x.isSeparator()]
+            assert len(voci) >= 4, nome
+            for x in voci:
+                testo = x.text().split("\t")[0]
+                assert not x.isEnabled(), (nome, testo)
+                assert testo.lower() not in {e.lower() for e in escluse}, (nome, testo)
+        stat = [x.text() for x in menu["Statistiche"].actions()]
+        assert ("Numeri SuperStar" in stat) == (g is SE)
+        assert ("Euronumeri" in stat) == (g is EJ)
+        assert "Elaborazione" not in menu
+        # le funzioni attive restano attive
+        assert any(x.isEnabled() for x in menu["Archivio"].actions())
+        w.show()
+        app.processEvents()
+        if g is SE:
+            for nome in ("Sistemi", "Condizioni", "Sviluppo", "Combinazioni", "Statistiche"):
+                m = menu[nome]
+                m.popup(w.mapToGlobal(w.rect().topLeft()))
+                app.processEvents()
+                foto("menu_" + nome.lower(), m)
+                m.close()
+        w.close()
+        a.chiudi()

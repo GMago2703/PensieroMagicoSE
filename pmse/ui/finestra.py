@@ -34,7 +34,29 @@ QLabel#titolo { font-family: 'Segoe UI Black', 'Segoe UI'; font-size: 26px; font
 QPushButton[class="lato"] { text-align: left; padding: 6px 10px; font-size: 12px; min-width: 100px; }
 """
 
-MENU_VUOTI = ["Sistemi", "Condizioni", "Sviluppo", "Combinazioni", "Statistiche", "Metodi"]
+MENU_VUOTI = ["Metodi"]
+
+# Menu in stile Enavision, inseriti ma non ancora attivi ("-" = separatore,
+# (nome, [voci]) = sottomenu). La voce "SUPERSTAR" diventa il nome giusto per ogni gioco.
+MENU_DISATTIVI = [
+    ("Sistemi", ["Nuovo", "-", "Carica\tF3", "Salva\tF2", "Salva come", "Cancella", "-", "Uscita"]),
+    ("Condizioni", ["Fisse", "Somme\tCtrl+S", "Consecutività numerica", "Numero di sequenze",
+                    "Pari e dispari\tCtrl+P", "Numero di cifre", "Consecutività differenziata",
+                    "Presenza delle distanze", "Distanze globali", "Distanze specifiche", "Posizioni",
+                    "Interruzioni", "Simmetrie", "Ripetizioni", "Ritardi e IC",
+                    "Combinazioni speciali", "Combinazioni filtro\tCtrl+F", "Sequele",
+                    "Personalizzata", "-", "Quadri\tCtrl+Q"]),
+    ("Sviluppo", ["Impostazioni", "Sviluppo\tF5", "-", "Calcolo garanzie",
+                  "Analisi statistica condizionato", "Rendimento delle condizioni", "-",
+                  "Editor di formazioni numeriche"]),
+    ("Combinazioni", [("Visualizzazione", []), "-", ("Spoglio", []), ("Spoglio storico", []),
+                      "Spoglio multiplo", "Combinazione test", "-", "Salva", "-",
+                      "Conversione formati", "Operazioni", "-", "Editor di combinazioni",
+                      "Editor basi e varianti"]),
+    ("Statistiche", ["Tutti i numeri", "SUPERSTAR", "-", "Tabellone dei ritardi",
+                     "Numeri caldi e freddi", "Ritardo di posizione", "Classifica delle condizioni",
+                     "-", ("Combinazioni", [])]),
+]
 MENU_VUOTI_DOPO = ["Stampe", "Ricevitoria", "Impostazioni"]
 
 
@@ -167,6 +189,27 @@ class FinestraPrincipale(QMainWindow):
         m = self.menuBar().addMenu(nome)
         self._azione(m, "(in preparazione)", abilitata=False)
 
+    def _riempi_disattivo(self, menu, voci):
+        for v in voci:
+            if v == "-":
+                menu.addSeparator()
+            elif isinstance(v, tuple):
+                sotto = menu.addMenu(v[0])
+                self._riempi_disattivo(sotto, v[1] or ["(in preparazione)"])
+                sotto.setEnabled(False)
+            else:
+                if v == "SUPERSTAR":
+                    v = "Numeri SuperStar" if self.g.codice == "SE" else "Euronumeri"
+                a = QAction(v, self)     # il testo dopo \t compare come scorciatoia, senza attivarla
+                a.setEnabled(False)
+                a.setToolTip("In preparazione")
+                menu.addAction(a)
+
+    def _menu_disattivo(self, nome, voci):
+        m = self.menuBar().addMenu(nome)
+        m.setToolTipsVisible(True)
+        self._riempi_disattivo(m, voci)
+
     def _selettore(self):
         """Menu in alto a sinistra: scelta tra Pensiero Magico SE e Pensiero Magico EJ."""
         b = QToolButton(self)
@@ -200,6 +243,8 @@ class FinestraPrincipale(QMainWindow):
     def _menu(self):
         mb = self.menuBar()
         self._selettore()
+        for nome, voci in MENU_DISATTIVI:
+            self._menu_disattivo(nome, voci)
         for nome in MENU_VUOTI:
             self._menu_vuoto(nome)
 
