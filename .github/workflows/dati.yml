@@ -1,13 +1,12 @@
-name: Dati vincite SuperEnalotto
+name: Dati vincite e quote (solo manuale)
+# Rigenera gli archivi iniziali delle vincite inclusi nel programma (pmse/dati/vincite_se.json e
+# vincite_ej.json). Serve solo ogni tanto: si avvia a mano da GitHub (Actions → Run workflow).
 on:
-  push:
-    branches: [ main ]
-    paths: [ ".github/workflows/dati.yml" ]
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
-  vincite:
+  superenalotto:
     runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
@@ -16,7 +15,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install numpy
-      - name: Scarica i vincitori di tutti i concorsi
+      - name: Scarica vincitori e quote di tutti i concorsi
         run: python strumenti/scarica_vincite.py
       - name: Pubblica sul ramo "dati-vincite"
         run: |
@@ -25,3 +24,21 @@ jobs:
           git checkout --orphan dv-tmp; git rm -rf --cached . -q
           mkdir -p dv && cp /tmp/v.json dv/vincite_se.json
           git add -f dv; git commit -q -m "vincite"; git push -f -q origin dv-tmp:dati-vincite
+  eurojackpot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy
+      - name: Scarica le quote di tutti i concorsi
+        run: python strumenti/scarica_vincite_ej.py
+      - name: Pubblica sul ramo "dati-vincite-ej"
+        run: |
+          git config user.name "github-actions"; git config user.email "actions@github.com"
+          cp pmse/dati/vincite_ej.json /tmp/v.json
+          git checkout --orphan dv-tmp; git rm -rf --cached . -q
+          mkdir -p dv && cp /tmp/v.json dv/vincite_ej.json
+          git add -f dv; git commit -q -m "quote ej"; git push -f -q origin dv-tmp:dati-vincite-ej

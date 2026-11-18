@@ -631,9 +631,7 @@ class FinestraPrincipale(QMainWindow):
             return
         self.l_jackpot.setText(f"<span style='font-size:17px; font-weight:bold'>{riga}</span>"
                                + (f"<br><span style='font-size:11px'>{det}</span>" if det else ""))
-        self.l_jackpot.setToolTip("Letto da Internet il " + (j.letto.replace("T", " alle ") if j.letto else "") +
-                                  ". Il valore medio è una stima: ogni estrazione è indipendente e la lotteria "
-                                  "restituisce in media meno di quanto si spende.")
+        self.l_jackpot.setToolTip("Letto da Internet il " + (j.letto.replace("T", " alle ") if j.letto else ""))
         self.l_jackpot.setVisible(True)
 
     def _aggiorna_jackpot(self):

@@ -139,10 +139,4 @@ def testo(j: Jackpot) -> tuple[str, str]:
         return "", ""
     imp = f"{j.importo:,.0f} €".replace(",", ".")
     riga = (f"💰 Jackpot del prossimo concorso: {imp}" if j.preciso else f"💰 Jackpot: circa {imp}")
-    det = j.nota
-    if j.valore_colonna and j.costo_colonna:
-        v = f"{j.valore_colonna:.2f}".replace(".", ",")
-        c = f"{j.costo_colonna:.2f}".replace(".", ",")
-        det = (det + " – " if det else "") + (f"in media una colonna da {c} € ne «vale» {v} "
-                                             f"(stima, dopo le tasse)")
-    return riga, det
+    return riga, j.nota
