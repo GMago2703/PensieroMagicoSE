@@ -1,0 +1,24 @@
+name: Dati quote Eurojackpot
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  quote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy
+      - name: Scarica le quote di tutti i concorsi
+        run: python strumenti/scarica_vincite_ej.py
+      - name: Pubblica sul ramo "dati-vincite-ej"
+        run: |
+          git config user.name "github-actions"; git config user.email "actions@github.com"
+          cp pmse/dati/vincite_ej.json /tmp/v.json
+          git checkout --orphan dv-tmp; git rm -rf --cached . -q
+          mkdir -p dv && cp /tmp/v.json dv/vincite_ej.json
+          git add -f dv; git commit -q -m "quote ej"; git push -f -q origin dv-tmp:dati-vincite-ej

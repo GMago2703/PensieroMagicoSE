@@ -103,7 +103,7 @@ def _importo(s: str, d: date) -> float | None:
 def jackpot_da_pagina(html: str) -> float | None:
     """Il jackpot del prossimo concorso scritto nelle pagine di superenalotto.com."""
     testo = re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", " ", html)))
-    m = _RE_JACKPOT.search(testo)
+    m = _RE_JACKPOT.search(testo) or re.search(r"JACKPOT\s+([\d.]+(?:,\d+)?)\s*€", testo)
     if not m:
         return None
     return float(m.group(1).replace(".", "").replace(",", "."))
