@@ -628,7 +628,7 @@ class EditorSistema(QDialog):
             for nn, ff, p, col in righe:
                 i = self.t_pronti.rowCount()
                 self.t_pronti.insertRow(i)
-                it = QTableWidgetItem(f"{k - p} → n-{k - p}: almeno {p} se {k}")
+                it = QTableWidgetItem(f"n-{k - p}: almeno {p} se {k}")
                 it.setData(Qt.UserRole, p)
                 for j, val in enumerate([str(nn), str(ff), None, str(col)]):
                     self.t_pronti.setItem(i, j, it if val is None else QTableWidgetItem(val))
