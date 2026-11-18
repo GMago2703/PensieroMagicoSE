@@ -4,7 +4,7 @@ from __future__ import annotations
 from html import escape
 
 from PySide6.QtCore import QMarginsF
-from PySide6.QtGui import QFont, QPageLayout, QPageSize, QTextDocument
+from PySide6.QtGui import QFont, QPageLayout, QPageSize, QPdfWriter, QTextDocument
 from PySide6.QtPrintSupport import QPrinter, QPrintPreviewDialog
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QPushButton
 
@@ -44,11 +44,15 @@ def _stampa_doc(doc: QTextDocument, printer: QPrinter):
 
 
 def salva_pdf(percorso: str, titolo: str, testo: str) -> None:
-    p = _stampante()
-    p.setOutputFormat(QPrinter.PdfFormat)
-    p.setOutputFileName(percorso)
-    p.setDocName(titolo)
-    _stampa_doc(documento(titolo, testo), p)
+    doc = documento(titolo, testo)
+    w = QPdfWriter(percorso)
+    w.setTitle(titolo)
+    w.setCreator("Pensiero Magico")
+    w.setResolution(600)
+    w.setPageSize(QPageSize(QPageSize.A4))
+    w.setPageMargins(QMarginsF(13, 13, 13, 13), QPageLayout.Millimeter)
+    _stampa_doc(doc, w)
+    del w
 
 
 def salva_txt(percorso: str, titolo: str, testo: str) -> None:

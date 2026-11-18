@@ -514,6 +514,7 @@ def test_statistiche_e_stampe(app, tmp_path):
     from pmse.core.modello import Estrazione
     from pmse.ui import stampa as sp
     from pmse.ui import statistiche as ust
+    padre = QtWidgets.QWidget()
     for g in (SE, EJ):
         a = Archivio(tmp_path / f"st_{g.codice}.db", gioco=g)
         rnd, ests, d = _r.Random(4), [], _d(2012, 3, 30)
@@ -529,14 +530,14 @@ def test_statistiche_e_stampe(app, tmp_path):
             d += _td(days=1)
         a.unisci(ests)
         for s in st.statistiche_del_gioco(g):
-            f = ust.FinestraStatistica(a, s.codice)
+            f = ust.FinestraStatistica(a, s.codice, padre)
             assert f.t.rowCount() > 0, s.codice
             titolo, testo, _ = f._da_stampare()
             assert testo.count("\n") > 3
             if g is SE and s.codice in ("numeri", "tabellone", "condizioni", "caldi"):
                 foto(f"statistiche_{s.codice}", f)
             f.close()
-        v = ust.FinestraVerificaColonne(a)
+        v = ust.FinestraVerificaColonne(a, padre)
         v.sp_n.setValue(3)
         v.genera()
         v.verifica()
@@ -548,7 +549,7 @@ def test_statistiche_e_stampe(app, tmp_path):
         sv = sis.sviluppa(s)
         s.colonne = sv.colonne.tolist()
         sis.salva(a, s)
-        ft = ust.FinestraTabulato(a)
+        ft = ust.FinestraTabulato(a, padre)
         ft.cb_gar.setChecked(True)
         testo = ft.anteprima.toPlainText()
         assert "TABULATO DEL SISTEMA" in testo and "CALCOLO GARANZIE" in testo and "COLONNE" in testo
@@ -562,3 +563,5 @@ def test_statistiche_e_stampe(app, tmp_path):
         ft.close()
         assert "/" in ust.stampa_estrazioni(None, a, 5)
         a.chiudi()
+    padre.deleteLater()
+    app.processEvents()
