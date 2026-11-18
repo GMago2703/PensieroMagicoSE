@@ -524,8 +524,8 @@ class Scena(QWidget):
         self.copione = None
         self.istantaneo = False
         self.alla_fine = None
-        from .suoni import Suoni
-        self.suoni = Suoni(self)
+        from .suoni import condivisi
+        self.suoni = condivisi()
         self.orologio = QElapsedTimer()
         self.timer = QTimer(self)
         self.timer.setInterval(16)

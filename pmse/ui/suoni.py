@@ -212,3 +212,19 @@ class Suoni:
     def zitto(self):
         for nome in self.effetti:
             self.ferma(nome)
+
+
+_CONDIVISI: Suoni | None = None
+
+
+def condivisi() -> Suoni:
+    """Un solo insieme di suoni per tutto il programma, legato all'applicazione (si chiude con lei)."""
+    global _CONDIVISI
+    if _CONDIVISI is None:
+        try:
+            from PySide6.QtWidgets import QApplication
+            app = QApplication.instance()
+        except Exception:
+            app = None
+        _CONDIVISI = Suoni(app)
+    return _CONDIVISI
