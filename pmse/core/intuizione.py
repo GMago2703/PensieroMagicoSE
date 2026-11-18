@@ -285,8 +285,8 @@ def proponi(conversa, testo_quadro: str, g: Gioco, ctx: cnd.Contesto, budget: fl
                 problema = ("Il sistema sviluppato ha 0 colonne: le condizioni sono troppo strette per questi "
                             "numeri. Allargale o cambiale.")
             elif n > max_col:
-                problema = (f"Il sistema sviluppato ha {n} colonne ({sis.costo(n, g, prezzi):.2f} €): supera il "
-                            f"budget di {max_col} colonne ({budget:.2f} €). Rendilo più piccolo (meno numeri, "
+                problema = (f"Il sistema sviluppato ha {n} colonne ({sis._euro(sis.costo(n, g, prezzi))} €): supera "
+                            f"il budget di {max_col} colonne ({sis._euro(budget)} €). Rendilo più piccolo (meno numeri, "
                             "condizioni più strette, oppure una riduzione con garanzia più bassa).")
         except (ErroreClaude, ValueError) as ex:
             problema = f"La proposta non è valida: {ex}"

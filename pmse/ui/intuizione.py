@@ -257,9 +257,9 @@ class FinestraIntuizione(QDialog):
         html = [f"<h3>💡 {_esc(p.titolo) or 'La sua intuizione'}</h3>",
                 f"<p>{_esc(p.intuizione)}</p>",
                 "<h4>Il sistema</h4><pre style='font-family:Consolas'>" + _esc(s.descrizione()) + "</pre>",
-                f"<p><b>{len(s.colonne)} colonne</b> – costo {euro} € "
-                f"(integrale {s.info.get('integrale', 0):,}, possibili {s.info.get('possibili', 0):,})</p>"
-                .replace(",", ".")]
+                f"<p><b>{len(s.colonne)} colonne</b> – costo {euro} € (integrale "
+                f"{sis._migliaia(int(s.info.get('integrale', 0)))}, possibili "
+                f"{sis._migliaia(int(s.info.get('possibili', 0)))})</p>"]
         for titolo, t in (("Perché questi numeri", p.perche_numeri), ("Perché queste condizioni", p.perche_condizioni),
                           ("Perché questa riduzione", p.perche_riduzione), ("Affidabilità", p.affidabilita)):
             if t:
