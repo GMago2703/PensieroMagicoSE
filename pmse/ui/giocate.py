@@ -670,10 +670,13 @@ class FinestraSimulatore(QDialog):
         self.l_ris.setHtml("".join(h))
         ordine = gc.ORDINE_EJ if self.g.is_ej else gc.ORDINE_SE
         pc = s.per_categoria()
+        ign = gc.Esito([], 0, s.vincite, 0).ignote()
         cats = [c for c in ordine if c in pc]
         self.t_cat.setRowCount(len(cats))
         for i, c in enumerate(cats):
-            for j, x in enumerate([gc.nome_categoria(c), str(pc[c][0]), euro(pc[c][1])]):
+            imp = euro(pc[c][1]) if not ign.get(c) else (
+                "da verificare" if ign[c] == pc[c][0] else f"{euro(pc[c][1])} + {ign[c]} da verificare")
+            for j, x in enumerate([gc.nome_categoria(c), str(pc[c][0]), imp]):
                 it = QTableWidgetItem(x)
                 it.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter if j else Qt.AlignLeft | Qt.AlignVCenter)
                 self.t_cat.setItem(i, j, it)

@@ -24,7 +24,7 @@ ORDINE_EJ = ["5+2", "5+1", "5+0", "4+2", "4+1", "4+0", "3+2", "2+2", "3+1", "3+0
 
 def nome_categoria(c: str) -> str:
     if c.startswith("SS"):
-        return f"{c[2:]} punti + SuperStar"
+        return f"{c[2:]} {'punto' if c[2:] == '1' else 'punti'} + SuperStar"
     if "+" in c and c not in ("5+1",):
         a, b = c.split("+")
         return f"{a} + {b}" if b != "0" else f"{a} numeri"
@@ -115,6 +115,14 @@ class Esito:
             x[0] += 1
             x[1] += v.importo or 0
         return {k: (a, b) for k, (a, b) in out.items()}
+
+    def ignote(self) -> dict[str, int]:
+        """Per categoria: quante vincite hanno la quota ancora sconosciuta."""
+        out: dict[str, int] = {}
+        for v in self.vincite:
+            if v.importo is None:
+                out[v.categoria] = out.get(v.categoria, 0) + 1
+        return out
 
     def migliore(self) -> Vincita | None:
         return max(self.vincite, key=lambda v: v.importo or 0, default=None)

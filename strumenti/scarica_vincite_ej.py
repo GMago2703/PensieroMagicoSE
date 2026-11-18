@@ -7,9 +7,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from pmse.core import internet, vincite_ej  # noqa: E402
 from pmse.core.gioco import EJ  # noqa: E402
 
+from datetime import date, timedelta  # noqa: E402
+
 t = time.time()
-estr = internet.scarica_anni(internet.anni_da_aggiornare(None, EJ), gioco=EJ)
-date_c = sorted({e.data for e in estr})
+# date dei concorsi: venerdì dal 23/03/2012, anche il martedì dal 29/03/2022 (le date senza concorso non
+# hanno pagina e vengono saltate)
+date_c = []
+d = date(2012, 3, 23)
+while d <= date.today():
+    if d.weekday() == 4 or (d.weekday() == 1 and d >= date(2022, 3, 29)):
+        date_c.append(d)
+    d += timedelta(days=1)
 print(f"{len(date_c)} concorsi da leggere")
 dati = vincite_ej.incluse()
 mancanti = [d for d in date_c if d.isoformat() not in dati]
