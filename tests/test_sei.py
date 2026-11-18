@@ -62,10 +62,14 @@ def test_memoria_vincite(tmp_path):
     estr, vinc = mondo(50, False)
     a.unisci(estr)
     noti = vincite.carica(a)
+    completi = {k for k, v in noti.items() if v.q3 is not None}      # vincitori e quote già noti
     mancanti = vincite.mancanti(a)
-    assert len(mancanti) == 50 - sum(1 for e in estr if e.data.isoformat() in noti)
-    vincite.salva(a, {k: vinc[k] for k in list(vinc)[:10]})
-    assert len(vincite.mancanti(a)) == len(mancanti) - sum(1 for k in list(vinc)[:10] if k not in noti)
+    assert len(mancanti) == 50 - sum(1 for e in estr if e.data.isoformat() in completi)
+    salvati = {k: vinc[k] for k in list(vinc)[:10]}
+    for v in salvati.values():
+        v.q3 = 10.0
+    vincite.salva(a, salvati)
+    assert len(vincite.mancanti(a)) == len(mancanti) - sum(1 for k in salvati if k not in completi)
     con6 = {date.fromisoformat(k) for k, v in list(vinc.items())[:10] if v.p6}
     assert con6 <= vincite.date_con_6(a)
     a.chiudi()

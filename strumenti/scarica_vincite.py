@@ -12,7 +12,7 @@ estr = internet.scarica_anni(internet.anni_da_aggiornare(None, SE), gioco=SE)
 date_c = sorted({e.data for e in estr if e.data.year >= 1998})
 print(f"{len(date_c)} concorsi da leggere")
 dati = vincite.incluse()
-mancanti = [d for d in date_c if d.isoformat() not in dati]
+mancanti = [d for d in date_c if d.isoformat() not in dati or dati[d.isoformat()].q3 is None]
 
 
 def av(testo, i, n):

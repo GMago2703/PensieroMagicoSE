@@ -29,6 +29,9 @@ FILE_INCLUSO = Path(__file__).resolve().parent.parent / "dati" / "vincite_se.jso
 CHIAVE_DB = "vincite_se"
 CATEGORIE = [("6 punti", "p6"), ("5 punti + Jolly", "p51"), ("5 punti", "p5"), ("4 punti", "p4"),
              ("3 punti", "p3"), ("2 punti", "p2")]
+LIRE_PER_EURO = 1936.27
+_RE_SS = re.compile(r"([0-5]) punti \+ SuperStar\s+(-|[\d.]+(?:,\d+)?\s*€)\s+([\d.]+)")
+_RE_JACKPOT = re.compile(r"prossimo jackpot del SuperEnalotto è di\s*([\d.]+(?:,\d+)?)\s*€", re.I)
 _RE_CAT = re.compile(r"(6 punti|5 punti \+ Jolly|5 punti|4 punti|3 punti|2 punti)\s+(-|[\d.]+(?:,\d+)?\s*€)\s+([\d.]+)")
 
 
@@ -42,6 +45,14 @@ class Vincite:
     p3: int = 0
     p2: int | None = None
     premio6: str = ""         # come scritto sul sito (euro; prima del 2002 in lire)
+    # quote (premio per vincitore) in EURO; None = non nota. Prima del 2002 il sito riporta lire: convertite
+    q6: float | None = None
+    q51: float | None = None
+    q5: float | None = None
+    q4: float | None = None
+    q3: float | None = None
+    q2: float | None = None
+    qs: dict | None = None    # SuperStar: {"5": quota, "4": ..., "0": ...} in euro
 
     @property
     def vinto_6(self) -> bool:
@@ -65,9 +76,44 @@ def analizza_pagina(html: str, d: date) -> Vincite | None:
         visti.add(nome)
         campo = dict(CATEGORIE)[nome]
         setattr(v, campo, int(m.group(3).replace(".", "")))
+        setattr(v, "q" + campo[1:], _importo(m.group(2), d))
         if campo == "p6" and m.group(2) != "-":
             v.premio6 = m.group(2).strip()
+    if fine > 0:
+        ss = {}
+        for m in _RE_SS.finditer(testo[fine:fine + 1500]):
+            q = _importo(m.group(2), d)
+            if m.group(1) not in ss and q is not None:
+                ss[m.group(1)] = q
+        v.qs = ss or None
     return v if "6 punti" in visti else None
+
+
+def _importo(s: str, d: date) -> float | None:
+    s = s.replace("€", "").strip()
+    if not s or s == "-":
+        return None
+    try:
+        x = float(s.replace(".", "").replace(",", "."))
+    except ValueError:
+        return None
+    return round(x / LIRE_PER_EURO, 2) if d.year < 2002 else x
+
+
+def jackpot_da_pagina(html: str) -> float | None:
+    """Il jackpot del prossimo concorso scritto nelle pagine di superenalotto.com."""
+    testo = re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", " ", html)))
+    m = _RE_JACKPOT.search(testo)
+    if not m:
+        return None
+    return float(m.group(1).replace(".", "").replace(",", "."))
+
+
+def quota(v: "Vincite", categoria: str) -> float | None:
+    """Quota in euro di una categoria ("6", "5+1", "5", "4", "3", "2" oppure "SS3" = 3 punti + SuperStar)."""
+    if categoria.startswith("SS"):
+        return (v.qs or {}).get(categoria[2:])
+    return getattr(v, {"6": "q6", "5+1": "q51", "5": "q5", "4": "q4", "3": "q3", "2": "q2"}[categoria], None)
 
 
 def scarica_concorso(d: date, timeout: int = 30) -> Vincite | None:
@@ -102,7 +148,8 @@ def da_json(testo: str | None) -> dict[str, Vincite]:
     if not testo:
         return {}
     try:
-        return {k: Vincite(**v) for k, v in json.loads(testo).items()}
+        campi = set(Vincite.__dataclass_fields__)
+        return {k: Vincite(**{a: b for a, b in v.items() if a in campi}) for k, v in json.loads(testo).items()}
     except Exception:
         return {}
 
@@ -126,11 +173,12 @@ def carica(archivio) -> dict[str, Vincite]:
 
 
 def mancanti(archivio) -> list[date]:
-    """Concorsi in archivio di cui non si conoscono ancora i vincitori (solo SuperEnalotto)."""
+    """Concorsi in archivio di cui non si conoscono ancora i vincitori o le quote (solo SuperEnalotto)."""
     if archivio.gioco.codice != "SE":
         return []
     noti = carica(archivio)
-    return [e.data for e in archivio.tutte(True) if e.data.isoformat() not in noti and e.data.year >= 1998]
+    return [e.data for e in archivio.tutte(True) if e.data.year >= 1998 and
+            (e.data.isoformat() not in noti or noti[e.data.isoformat()].q3 is None)]
 
 
 def salva(archivio, nuovi: dict[str, Vincite]) -> None:
