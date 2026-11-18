@@ -69,3 +69,23 @@ def test_memoria_vincite(tmp_path):
     con6 = {date.fromisoformat(k) for k, v in list(vinc.items())[:10] if v.p6}
     assert con6 <= vincite.date_con_6(a)
     a.chiudi()
+
+
+def test_popolarita_e_magico(tmp_path):
+    from pmse.core import magico, popolarita
+    estr, vinc = mondo(2500, True)
+    m = popolarita.costruisci(estr, vinc)
+    assert m.r2 > 0.3                                         # nel mondo finto i numeri 1-31 sono più giocati
+    assert m.percentile([1, 5, 9, 14, 22, 30]) > m.percentile([40, 52, 63, 71, 80, 88])
+    assert popolarita.ModelloPopolarita.da_json(m.a_json()).r2 == m.r2
+    a = Archivio(tmp_path / "a.db", gioco=SE)
+    a.unisci(estr)
+    vincite.salva(a, vinc)
+    mp = popolarita.per_archivio(a)
+    assert mp and popolarita.per_archivio(a).firma == mp.firma            # in memoria, non ricalcolato
+    imp = magico.Impostazioni.predefinite(SE)
+    imp.evita_popolari, imp.soglia_popolari = True, 20
+    r = magico.genera(a.sestine(), imp, popolarita=mp)
+    chiave = "popolarità stimata (percentile, 0 = la meno giocata)"
+    assert all(s.dettaglio[chiave] <= 30 for s in r.sestine)
+    a.chiudi()

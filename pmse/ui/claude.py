@@ -7,7 +7,7 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit,
                                QProgressBar, QPushButton, QTextBrowser, QVBoxLayout)
 
-from ..core import claude_ai, laboratorio, magico
+from ..core import claude_ai, laboratorio, magico, popolarita
 from ..core.db import Archivio
 from .griglia import COLORE_JOLLY, COLORI_SESTINE, Griglia90
 from .magico import carica_impostazioni, punteggi_personalizzati
@@ -210,7 +210,8 @@ class FinestraClaude(QDialog):
             QMessageBox.warning(self, self.nome_ai, "Servono almeno 100 estrazioni in archivio.")
             return None
         imp = carica_impostazioni(self.arch)
-        self.base = magico.genera(storico, imp, punteggi_personalizzati(self.arch, imp, storico))
+        self.base = magico.genera(storico, imp, punteggi_personalizzati(self.arch, imp, storico),
+                                  popolarita=popolarita.per_archivio(self.arch))
         self.gia_uscite = {tuple(x[1]) for x in storico}
         self.matrice = magico.matrice(storico)
         from ..core import apprendimento

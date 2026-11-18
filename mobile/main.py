@@ -391,14 +391,27 @@ class PaginaMagico(Pagina):
             for w in palle_previsione(self.g, p["sestine"], p["jolly"], p["superstar"]):
                 sch.add_widget(w)
             c.add_widget(sch)
-        if not any(p.get("origine", "Algoritmo") == "Algoritmo" for p in prev):
-            c.add_widget(bottone("Genera con Magico Pensiero", self._genera, ARANCIO))
+        if not self.g.is_ej:
+            attivo = self.s.poco_giocate()
+            c.add_widget(bottone(("Poco giocate: SÌ" if attivo else "Poco giocate: NO") + " (tocca per cambiare)",
+                                 self._cambia_poco_giocate, "#b8860b" if attivo else "#607d8b", alto=dp(46)))
+        gia = any(p.get("origine", "Algoritmo") == "Algoritmo" for p in prev)
+        c.add_widget(bottone("Genera di nuovo" if gia else "Genera con Magico Pensiero", self._genera, ARANCIO))
         c.add_widget(bottone("Chiedi all'intelligenza artificiale", lambda: self.app.vai("ai"), VERDE))
         c.add_widget(Testo(
             "Magico Pensiero combina eco, affinità, tendenza, maturità e storico dei numeri, scarta le "
             "combinazioni con forma insolita o troppo simili a quelle già uscite e impara da sola dopo ogni "
-            "estrazione (quando aggiorni l'archivio). Per lo stesso concorso la proposta dell'algoritmo è "
+            "estrazione (quando aggiorni l'archivio). Con le stesse impostazioni la proposta per un concorso è "
             "sempre la stessa.", (1, 1, 1, 0.85), font_size=sp(13)))
+
+    def _cambia_poco_giocate(self):
+        self.s.imposta_poco_giocate(not self.s.poco_giocate())
+        avviso("Combinazioni poco giocate",
+               ("Attivo: Magico Pensiero sceglierà solo combinazioni poco giocate. La probabilità di vincere non "
+                "cambia, ma in caso di vincita il premio si divide con meno persone." if self.s.poco_giocate() else
+                "Disattivato: Magico Pensiero sceglie senza guardare quanto sono giocate le combinazioni.") +
+               "\n\nTocca 'Genera di nuovo' per una proposta con la nuova impostazione.")
+        self.mostra()
 
     def _genera(self):
         def lavoro():

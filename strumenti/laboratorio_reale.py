@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from pmse.core import analisi_sei, internet, laboratorio, vincite  # noqa: E402
+from pmse.core import analisi_sei, internet, laboratorio, popolarita, vincite  # noqa: E402
 from pmse.core.gioco import EJ, SE  # noqa: E402
 
 cartella = Path(os.environ.get("CARTELLA", "foto_android"))
@@ -38,7 +38,18 @@ for g in (SE, EJ):
         print(testo)
         if g.codice == "SE":
             rs = analisi_sei.esegui(estr, vincite.incluse(), volte=10000)
-            (cartella / "concorsi_con_il_6.txt").write_text(rs.testo(), encoding="utf-8")
+            mp = popolarita.costruisci(estr, vincite.incluse())
+            righe_p = [f"MODELLO DI POPOLARITÀ: R² fuori campione {mp.r2:.3f} su {mp.concorsi} concorsi",
+                       "Più giocati: " + ", ".join(f"{n} (+{e:.0f}%)" for n, e in mp.numeri()[:15]),
+                       "Meno giocati: " + ", ".join(f"{n} ({e:.0f}%)" for n, e in mp.numeri()[-15:]),
+                       f"Peso delle coppie consecutive: {mp.pesi[90]:+.3f}",
+                       "Popolarità (percentile) delle sestine del 6: " +
+                       ", ".join(str(mp.percentile(c.numeri)) for c in rs.sei)]
+            pct6 = [mp.percentile(c.numeri) for c in rs.sei]
+            righe_p.append(f"Media percentile sestine del 6: {sum(pct6) / len(pct6):.1f} (50 = come il caso)")
+            (cartella / "concorsi_con_il_6.txt").write_text(rs.testo() + "\n\n" + "\n".join(righe_p),
+                                                             encoding="utf-8")
+            print("\n".join(righe_p))
             print(rs.testo())
     except Exception as ex:
         print(f"{g.nome}: non riuscito: {ex}")

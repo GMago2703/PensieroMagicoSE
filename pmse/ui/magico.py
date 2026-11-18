@@ -5,11 +5,11 @@ from datetime import date
 
 from PySide6.QtCore import QSize, Qt, QThread, Signal
 from PySide6.QtGui import QColor, QTextDocument
-from PySide6.QtWidgets import (QComboBox, QDialog, QStyle, QStyledItemDelegate, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMessageBox,
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QStyle, QStyledItemDelegate, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMessageBox,
                                QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSpinBox, QTableWidget,
                                QVBoxLayout, QWidget)
 
-from ..core import magico, personalizzate
+from ..core import magico, personalizzate, popolarita
 from ..core.db import Archivio
 from .analisi import riempi_tabella
 from .schermo import adatta_schermo
@@ -43,7 +43,8 @@ def punteggi_personalizzati(arch: Archivio, imp: magico.Impostazioni, storico) -
 def genera(arch: Archivio) -> magico.RisultatoMagico:
     imp = carica_impostazioni(arch)
     storico = arch.sestine()
-    return magico.genera(storico, imp, punteggi_personalizzati(arch, imp, storico))
+    return magico.genera(storico, imp, punteggi_personalizzati(arch, imp, storico),
+                         popolarita=popolarita.per_archivio(arch))
 
 
 class FinestraImpostazioni(QDialog):
@@ -130,6 +131,38 @@ class FinestraImpostazioni(QDialog):
         v.addWidget(g3)
         self._anteprima_limiti()
 
+        # combinazioni poco giocate (solo SuperEnalotto: servono i dati dei vincitori)
+        self.cb_pop = QCheckBox("Evita le combinazioni molto giocate")
+        self.s_pop = QSpinBox()
+        self.s_pop.setRange(5, 90)
+        self.s_pop.setSingleStep(5)
+        self.s_pop.setSuffix(" %")
+        self.cb_pop.setChecked(imp.evita_popolari)
+        self.s_pop.setValue(imp.soglia_popolari)
+        if not arch.gioco.is_ej:
+            g4 = QGroupBox("Combinazioni poco giocate (premio diviso con meno persone)")
+            f4 = QFormLayout(g4)
+            spieg4 = QLabel("La probabilità di vincere è la stessa per ogni combinazione, ma se una combinazione "
+                            "è giocata da molti, in caso di vincita il premio si divide tra tutti. La popolarità "
+                            "di ogni combinazione è stimata dai vincitori di 3 punti di ogni concorso passato.")
+            spieg4.setWordWrap(True)
+            f4.addRow(spieg4)
+            f4.addRow(self.cb_pop)
+            f4.addRow("Tieni solo le combinazioni meno giocate del", self.s_pop)
+            self.l_pop = QLabel()
+            self.l_pop.setWordWrap(True)
+            m_pop = popolarita.ModelloPopolarita.da_json(arch.leggi_impostazione(popolarita.CHIAVE))
+            if m_pop:
+                piu = ", ".join(str(n) for n, _ in m_pop.numeri()[:10])
+                meno = ", ".join(str(n) for n, _ in m_pop.numeri()[-10:])
+                self.l_pop.setText(f"Numeri più giocati: {piu}.<br>Numeri meno giocati: {meno}.<br>"
+                                   f"Qualità del modello (R² fuori campione): {m_pop.r2:.2f} su {m_pop.concorsi} "
+                                   "concorsi.")
+            else:
+                self.l_pop.setText("Il modello si calcola alla prima generazione (servono i vincitori dei concorsi).")
+            f4.addRow(self.l_pop)
+            v.addWidget(g4)
+
         h = QHBoxLayout()
         b_def = QPushButton("Ripristina predefiniti")
         b_def.clicked.connect(self._predefiniti)
@@ -175,6 +208,8 @@ class FinestraImpostazioni(QDialog):
         self.c_lim.setCurrentIndex(0)
         self.s_soglia.setValue(imp.soglia_archivio)
         self.s_fin.setValue(imp.finestra_archivio)
+        self.cb_pop.setChecked(imp.evita_popolari)
+        self.s_pop.setValue(imp.soglia_popolari)
 
     def _salva(self):
         imp = carica_impostazioni(self.arch)      # conserva statistiche e filtri appresi
@@ -184,6 +219,7 @@ class FinestraImpostazioni(QDialog):
         imp.nitidezza, imp.max_comuni = self.s_nit.value(), self.s_com.value()
         imp.limite_archivio = self._imp_limiti().limite_archivio
         imp.soglia_archivio, imp.finestra_archivio = self.s_soglia.value(), self.s_fin.value()
+        imp.evita_popolari, imp.soglia_popolari = self.cb_pop.isChecked(), self.s_pop.value()
         if not any(imp.pesi.values()) and not imp.personalizzate:
             QMessageBox.warning(self, "Impostazioni", "Almeno una voce deve avere peso maggiore di zero.")
             return

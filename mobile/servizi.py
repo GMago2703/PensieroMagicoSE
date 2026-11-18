@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
-from pmse.core import apprendimento, claude_ai, internet, laboratorio, magico, personalizzate, vincite
+from pmse.core import apprendimento, claude_ai, internet, laboratorio, magico, personalizzate, popolarita, vincite
 from pmse.core.db import Archivio, EsitoUnione
 from pmse.core.gioco import EJ, GIOCHI, SE, Gioco
 
@@ -121,10 +121,18 @@ class Servizio:
     def genera(self, salva: bool = True) -> magico.RisultatoMagico:
         storico = self.arch.sestine()
         imp = self.impostazioni()
-        r = magico.genera(storico, imp, self._extra(imp, storico))
+        r = magico.genera(storico, imp, self._extra(imp, storico), popolarita=popolarita.per_archivio(self.arch))
         if salva:
             magico.salva_previsione(self.arch, r)
         return r
+
+    def poco_giocate(self) -> bool:
+        return self.impostazioni().evita_popolari
+
+    def imposta_poco_giocate(self, attivo: bool) -> None:
+        imp = self.impostazioni()
+        imp.evita_popolari = bool(attivo)
+        self.arch.scrivi_impostazione(magico.CHIAVE_IMP, imp.a_json())
 
     def previsioni_attuali(self) -> list[dict]:
         """Le previsioni già fatte per il prossimo concorso (algoritmo e/o AI), la più recente per prima."""
@@ -206,7 +214,7 @@ class Servizio:
         if len(storico) < 100:
             raise ValueError("Servono almeno 100 estrazioni in archivio.")
         imp = self.impostazioni()
-        base = magico.genera(storico, imp, self._extra(imp, storico))
+        base = magico.genera(storico, imp, self._extra(imp, storico), popolarita=popolarita.per_archivio(self.arch))
         gia_uscite = {tuple(x[1]) for x in storico}
         m = magico.matrice(storico)
         dossier = claude_ai.costruisci_dossier(storico, base,

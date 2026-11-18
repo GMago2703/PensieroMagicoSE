@@ -88,6 +88,8 @@ class Impostazioni:
     consecutivi_max: int = 1
     somma_percentile: int = 10           # somma tra il percentile X e 100-X dello storico
     max_stessa_decina: int = 2
+    evita_popolari: bool = False         # SuperEnalotto: solo combinazioni poco giocate (premio meno diviso)
+    soglia_popolari: int = 40            # percentile massimo di popolarità ammesso (0-100)
 
     def a_json(self) -> str:
         return json.dumps(asdict(self))
@@ -355,7 +357,10 @@ def punteggi_euronumeri(storico: Storico, imp: Impostazioni) -> np.ndarray:
 
 
 def genera(storico: Storico, imp: Impostazioni | None = None,
-           extra: dict[str, dict[int, float]] | None = None, m: np.ndarray | None = None) -> RisultatoMagico:
+           extra: dict[str, dict[int, float]] | None = None, m: np.ndarray | None = None,
+           popolarita=None) -> RisultatoMagico:
+    """popolarita: modello pmse.core.popolarita (solo SuperEnalotto) per stimare quanto è giocata ogni
+    combinazione; con imp.evita_popolari si tengono solo le candidate poco giocate."""
     g = gioco_di(storico)
     imp = imp or Impostazioni.predefinite(g)
     K, N, quante = g.k, g.n, g.combinazioni_magico
@@ -390,6 +395,13 @@ def genera(storico: Storico, imp: Impostazioni | None = None,
         if ok.sum() >= 3:
             break
     cand, in_comune = cand[ok], in_comune[ok]
+    pct = popolarita.percentili(cand) if popolarita is not None and not g.is_ej else None
+    if pct is not None and imp.evita_popolari:
+        for allarga in range(0, 61, 10):     # poche candidate sotto la soglia: la si alza un po'
+            ok = pct <= imp.soglia_popolari + allarga
+            if ok.sum() >= 3:
+                break
+        cand, in_comune, pct = cand[ok], in_comune[ok], pct[ok]
 
     # 3. voto
     media = punteggi[cand].mean(axis=1)
@@ -414,7 +426,8 @@ def genera(storico: Storico, imp: Impostazioni | None = None,
                 "max numeri in comune con l'archivio": int(in_comune[i]),
                 "punteggio medio numeri": round(float(media[i]), 3),
                 "legame tra i numeri": round(float(coppie_n[i]), 3),
-                "tipicità della forma": round(float(tipicita[i]), 3)}))
+                "tipicità della forma": round(float(tipicita[i]), 3),
+                **({"popolarità stimata (percentile, 0 = la meno giocata)": int(pct[i])} if pct is not None else {})}))
         if len(scelte) == quante:
             break
     if g.is_ej:          # Eurojackpot: i 2 Euronumeri con punteggio più alto

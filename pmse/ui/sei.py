@@ -6,7 +6,7 @@ import html
 from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QMessageBox, QProgressBar, QPushButton, QTextBrowser,
                                QVBoxLayout)
 
-from ..core import analisi_sei, vincite
+from ..core import analisi_sei, popolarita, vincite
 from ..core.db import Archivio
 from .internet import ScaricaVincitori
 from .schermo import adatta_schermo
@@ -78,7 +78,19 @@ class FinestraSei(QDialog):
             self.testo.setHtml(f"<p>{html.escape(str(ex))}</p><p>Usa <b>Internet → Aggiorna i vincitori del 6</b> "
                                "e, se l'archivio è vuoto, scarica prima le estrazioni.</p>")
             return
-        self.testo.setHtml(rapporto_html(self.risultato))
+        extra = ""
+        m = popolarita.per_archivio(self.arch)
+        if m:
+            piu = ", ".join(f"{n} (+{e:.0f}%)" for n, e in m.numeri()[:12])
+            meno = ", ".join(f"{n} ({e:.0f}%)" for n, e in m.numeri()[-12:])
+            extra = ("<h3>Quanto sono giocati i numeri</h3>"
+                     f"<p>Stima dai vincitori di 3 punti di {m.concorsi} concorsi (qualità del modello, R² fuori "
+                     f"campione: <b>{m.r2:.2f}</b>; 0 = nessuna capacità, 1 = perfetta).</p>"
+                     f"<p><b>Più giocati:</b> {piu}<br><b>Meno giocati:</b> {meno}</p>"
+                     "<p style='color:#555'>Nelle impostazioni di Magico Pensiero puoi chiedere di evitare le "
+                     "combinazioni molto giocate: non aumenta la probabilità di vincere, ma in caso di vincita il "
+                     "premio si divide con meno persone.</p>")
+        self.testo.setHtml(rapporto_html(self.risultato) + extra)
 
     def _archivio(self):
         from .archivio import FinestraArchivio

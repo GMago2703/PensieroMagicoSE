@@ -54,6 +54,10 @@ jobs:
   apk:
     needs: prova
     runs-on: ubuntu-22.04
+    outputs:
+      firmata: ${{ steps.firma.outputs.firmata }}
+    env:
+      FIRMA_PW: ${{ secrets.APK_FIRMA_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -77,7 +81,35 @@ jobs:
           cp -r pmse/core mobile/pmse/core
           cp -r pmse/dati mobile/pmse/dati
           find mobile -name __pycache__ -prune -exec rm -rf {} +
-      - name: Recupera la cache di buildozer
+          # numero di versione interno sempre crescente: Android accetta l'aggiornamento solo così
+          sed -i "s/^android.minapi = .*/&\nandroid.numeric_version = $((1000 + ${{ github.run_number }}))/" mobile/buildozer.spec
+          grep numeric_version mobile/buildozer.spec
+      - name: Chiave di firma fissa (cifrata nel repository con il segreto APK_FIRMA_PASSWORD)
+        id: firma
+        run: |
+          if [ -z "$FIRMA_PW" ]; then
+            echo "Segreto APK_FIRMA_PASSWORD assente: APK di prova con firma temporanea (non aggiornabile)."
+            echo "firmata=no" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          CH=mobile/firma/pensieromagico.keystore.enc
+          if [ -f "$CH" ]; then
+            # password sbagliata = errore: mai creare una chiave nuova, romperebbe gli aggiornamenti
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$CH" -out "$RUNNER_TEMP/pm.keystore" -pass env:FIRMA_PW
+            keytool -list -keystore "$RUNNER_TEMP/pm.keystore" -storepass "$FIRMA_PW" -alias pensieromagico > /dev/null
+          else
+            keytool -genkeypair -keystore "$RUNNER_TEMP/pm.keystore" -alias pensieromagico -keyalg RSA \
+              -keysize 4096 -validity 36500 -storepass "$FIRMA_PW" -keypass "$FIRMA_PW" \
+              -dname "CN=Pensiero Magico, O=GMago2703, C=IT"
+            mkdir -p mobile/firma
+            openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$RUNNER_TEMP/pm.keystore" -out "$CH" -pass env:FIRMA_PW
+            git config user.name "github-actions"; git config user.email "actions@github.com"
+            git stash -q || true
+            git add "$CH"
+            git commit -q -m "Chiave di firma dell'APK (cifrata) [skip ci]"
+            git pull -q --rebase origin main && git push -q origin HEAD:main
+            git stash pop -q || true
+          fi
+          echo "firmata=si" >> "$GITHUB_OUTPUT"
         id: cache
         uses: actions/cache/restore@v4
         with:
@@ -90,7 +122,13 @@ jobs:
         working-directory: mobile
         run: |
           set +e
-          yes | buildozer -v android debug > buildozer.log 2>&1
+          if [ "${{ steps.firma.outputs.firmata }}" = "si" ]; then
+            export P4A_RELEASE_KEYSTORE="$RUNNER_TEMP/pm.keystore" P4A_RELEASE_KEYALIAS=pensieromagico
+            export P4A_RELEASE_KEYSTORE_PASSWD="$FIRMA_PW" P4A_RELEASE_KEYALIAS_PASSWD="$FIRMA_PW"
+            yes | buildozer -v android release > buildozer.log 2>&1
+          else
+            yes | buildozer -v android debug > buildozer.log 2>&1
+          fi
           esito=$?
           tail -n 300 buildozer.log
           exit $esito
@@ -105,7 +143,11 @@ jobs:
       - name: Rinomina l'APK
         run: |
           ls -la mobile/bin
-          cp mobile/bin/*.apk PensieroMagico.apk
+          cp "$(ls -t mobile/bin/*.apk | head -1)" PensieroMagico.apk
+          if [ "${{ steps.firma.outputs.firmata }}" = "si" ]; then
+            BT=$(ls -d $ANDROID_HOME/build-tools/* ~/.buildozer/android/platform/android-sdk/build-tools/* 2>/dev/null | sort -V | tail -1)
+            "$BT/apksigner" verify --print-certs PensieroMagico.apk | head -5
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: PensieroMagico-apk
@@ -130,6 +172,18 @@ jobs:
           for u in https://www.superenalotto.com/archivio/estrazioni-2026 https://www.euro-jackpot.net/it/risultati-archivio-2012; do
             curl -sS -m 40 -o /dev/null -A "Mozilla/5.0" -w "$u -> %{http_code} in %{time_total}s\n" "$u" || echo "$u -> non raggiungibile"
           done
+      - name: Scarica l'APK firmato precedente (per provare l'aggiornamento senza perdere i dati)
+        if: needs.apk.outputs.firmata == 'si'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh api "repos/${{ github.repository }}/releases?per_page=40" --jq '[.[] | select(.name | contains("firmata"))][0].tag_name // empty')
+          if [ -n "$tag" ]; then
+            gh release download "$tag" -R "${{ github.repository }}" -p PensieroMagico.apk -O Precedente.apk && echo "Precedente: $tag"
+          else
+            echo "Nessuna release firmata precedente: è la prima."
+          fi
       - name: Prova l'APK su un emulatore Android (archivi veri da Internet)
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -154,10 +208,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ github.run_number }}
-          name: Pensiero Magico per Android (build ${{ github.run_number }})
+          name: Pensiero Magico per Android (build ${{ github.run_number }})${{ needs.apk.outputs.firmata == 'si' && ' – firmata' || '' }}
           body: |
             App Android (versione ridotta): archivio con aggiornamento da Internet, Magico Pensiero,
-            verifica storica e intelligenza artificiale, per SuperEnalotto ed Eurojackpot (separati).
+            verifica storica, intelligenza artificiale, laboratorio e concorsi con il 6, per SuperEnalotto ed
+            Eurojackpot (separati).
+            ${{ needs.apk.outputs.firmata == 'si' && 'Firma fissa: si installa sopra la versione precedente e archivio, allenamenti e impostazioni restano.' || 'ATTENZIONE: firma temporanea, per installarla va prima disinstallata la versione precedente.' }}
             Scarica PensieroMagico.apk dal telefono e installalo (consenti l'installazione da fonti sconosciute).
             Commit ${{ github.sha }}.
           files: PensieroMagico.apk

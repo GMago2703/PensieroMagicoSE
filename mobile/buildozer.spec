@@ -5,7 +5,7 @@ package.domain = it.gmago2703
 source.dir = .
 source.include_exts = py,png,json
 source.exclude_patterns = prova_grafica.py
-source.exclude_dirs = bin, .buildozer, foto_android, __pycache__
+source.exclude_dirs = bin, .buildozer, foto_android, __pycache__, firma
 version.regex = __version__ = "(.*)"
 version.filename = %(source.dir)s/pmse/__init__.py
 requirements = python3,kivy==2.3.1,numpy,sqlite3,openssl,certifi,charset_normalizer==3.3.2
