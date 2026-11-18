@@ -711,6 +711,12 @@ def test_scheda_gruppi_tra(app, tmp_path):
     d.s_min.setValue(0)
     d.s_max.setValue(1)
     d._aggiungi()
+    d.t.item(1, 3).setText("9")            # massimo oltre il possibile: diventa 3
+    app.processEvents()
+    assert d.gruppi[1]["massimo"] == 3
+    d.t.item(1, 3).setText("1")
+    app.processEvents()
+    assert d.gruppi[1]["massimo"] == 1
     d.t.selectRow(0)
     d._analisi()
     assert d.t_an.rowCount() >= 3 and "comune" in d.l_an.text()

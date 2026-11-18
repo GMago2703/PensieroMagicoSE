@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QThread, Signal
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFileDialog,
                                QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit,
@@ -399,7 +399,9 @@ class SchedaGruppiTra(QDialog):
         self.t.setHorizontalHeaderLabels(["Gruppo", "Numeri", "Minimo", "Massimo", "Archivio: consigliato"])
         self.t.verticalHeader().setVisible(False)
         self.t.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.t.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed)
         self.t.itemSelectionChanged.connect(self._analisi)
+        self.t.itemChanged.connect(self._cambia)
         dx.addWidget(self.t, 2)
         h = QHBoxLayout()
         b = QPushButton("Applica il suggerimento")
@@ -414,7 +416,7 @@ class SchedaGruppiTra(QDialog):
         self.l_an.setWordWrap(True)
         dx.addWidget(self.l_an)
         self.t_an = QTableWidget(0, 4)
-        self.t_an.setHorizontalHeaderLabels(["Numeri del gruppo usciti", "Estrazioni", "% archivio", "% atteso dal caso"])
+        self.t_an.setHorizontalHeaderLabels(["Usciti del gruppo", "Estrazioni", "% archivio", "% atteso dal caso"])
         self.t_an.verticalHeader().setVisible(False)
         self.t_an.setEditTriggers(QAbstractItemView.NoEditTriggers)
         dx.addWidget(self.t_an, 2)
@@ -497,19 +499,23 @@ class SchedaGruppiTra(QDialog):
             it.setBackground(QColor(COLORI_GRUPPI[i % len(COLORI_GRUPPI)]))
             it.setForeground(QColor("white"))
             it.setTextAlignment(Qt.AlignCenter)
+            it.setFlags(it.flags() & ~Qt.ItemIsEditable)
             self.t.setItem(i, 0, it)
-            self.t.setItem(i, 1, QTableWidgetItem(" ".join(map(str, gr["numeri"]))))
+            it = QTableWidgetItem(" ".join(map(str, gr["numeri"])))
+            it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+            self.t.setItem(i, 1, it)
             for j, chiave in ((2, "minimo"), (3, "massimo")):
-                s = QSpinBox()
-                s.setRange(0, min(self.g.k, len(gr["numeri"])))
-                s.setValue(gr[chiave])
-                s.valueChanged.connect(lambda val, i=i, c=chiave: self._cambia(i, c, val))
-                self.t.setCellWidget(i, j, s)
+                it = QTableWidgetItem(str(gr[chiave]))
+                it.setTextAlignment(Qt.AlignCenter)
+                it.setBackground(QColor("#fffde7"))
+                self.t.setItem(i, j, it)
             sug = ""
             if self.ctx is not None and self.ctx.estrazioni:
                 a = cnd.analizza_gruppo(gr["numeri"], self.ctx)
                 sug = f"da {a.copertura[0]} a {a.copertura[1]} (più comune {a.piu_frequente})"
-            self.t.setItem(i, 4, QTableWidgetItem(sug))
+            it = QTableWidgetItem(sug)
+            it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+            self.t.setItem(i, 4, it)
         self.t.resizeColumnsToContents()
         self.t.horizontalHeader().setStretchLastSection(True)
         self.t.blockSignals(False)
@@ -518,15 +524,20 @@ class SchedaGruppiTra(QDialog):
             s.setRange(0, max(n, 0))
         self.l_tot.setText(f"su {n}")
 
-    def _cambia(self, i, chiave, val):
-        self.gruppi[i][chiave] = val
-        if self.gruppi[i]["minimo"] > self.gruppi[i]["massimo"]:
-            altro = "massimo" if chiave == "minimo" else "minimo"
-            self.gruppi[i][altro] = val
-            w = self.t.cellWidget(i, 3 if altro == "massimo" else 2)
-            w.blockSignals(True)
-            w.setValue(val)
-            w.blockSignals(False)
+    def _cambia(self, it: QTableWidgetItem):
+        i, j = it.row(), it.column()
+        if j not in (2, 3) or not 0 <= i < len(self.gruppi):
+            return
+        gr = self.gruppi[i]
+        chiave = "minimo" if j == 2 else "massimo"
+        try:
+            val = max(0, min(int(it.text()), self.g.k, len(gr["numeri"])))
+        except ValueError:
+            val = gr[chiave]
+        gr[chiave] = val
+        if gr["minimo"] > gr["massimo"]:
+            gr["massimo" if chiave == "minimo" else "minimo"] = val
+        QTimer.singleShot(0, lambda: (self._tabella(), self.t.selectRow(i)))
 
     def _analisi(self):
         i = self.t.currentRow()
@@ -546,6 +557,7 @@ class SchedaGruppiTra(QDialog):
                 if lo <= val <= hi:
                     it.setBackground(QColor(VERDE_OK))
                 self.t_an.setItem(r, c, it)
+        self.t_an.resizeColumnsToContents()
 
     def _applica_sugg(self):
         i = self.t.currentRow()
