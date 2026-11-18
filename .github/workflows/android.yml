@@ -110,6 +110,7 @@ jobs:
             git stash pop -q || true
           fi
           echo "firmata=si" >> "$GITHUB_OUTPUT"
+      - name: Recupera la cache di buildozer
         id: cache
         uses: actions/cache/restore@v4
         with:
