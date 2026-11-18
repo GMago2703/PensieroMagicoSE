@@ -176,10 +176,10 @@ def verifica_garanzia(colonne: np.ndarray, possibili: np.ndarray, campione: int 
 
 
 CATEGORIE_SE = ["6", "5+1", "5", "4", "3", "2"]
-CATEGORIE_EJ = ["5+2", "5+1", "5", "4+2", "4+1", "4", "3+2", "3+1", "3", "2+2", "2+1", "1+2"]
+CATEGORIE_EJ = ["5", "4", "3", "2"]          # punti sui 5 numeri (gli Euronumeri non fanno parte del sistema)
 
 
-def spoglio(colonne: np.ndarray, numeri, jolly=None, g: Gioco = SE, euro_giocati=()) -> dict[str, int]:
+def spoglio(colonne: np.ndarray, numeri, jolly=None, g: Gioco = SE) -> dict[str, int]:
     """Quante colonne del sistema vincono in ciascuna categoria per un'estrazione."""
     lo, hi = maschere(colonne)
     l1, h1 = maschere(np.array([sorted(numeri)]))
@@ -193,11 +193,9 @@ def spoglio(colonne: np.ndarray, numeri, jolly=None, g: Gioco = SE, euro_giocati
         for x in (4, 3, 2):
             out[str(x)] = int((p == x).sum())
         return out
-    e = len(set(euro_giocati) & set(jolly or ()))
-    for cat in CATEGORIE_EJ:
-        a, _, b = cat.partition("+")
-        b = int(b or 0)
-        out[cat] = int((p == int(a)).sum()) if b == e else 0
+    # Eurojackpot: i sistemi riguardano i 5 numeri; gli Euronumeri si aggiungono a parte in schedina
+    for x in (5, 4, 3, 2):
+        out[str(x)] = int((p == x).sum())
     return out
 
 

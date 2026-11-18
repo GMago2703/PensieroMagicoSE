@@ -821,13 +821,15 @@ class FinestraSviluppo(QDialog):
         e = sis.verifica_garanzia(self.C, P)
         self.risultati.setPlainText(self.s.descrizione() + "\n\nCALCOLO GARANZIE\n" + e.testo(self.g.k))
 
-    def _mostra_spoglio(self, titolo, numeri, jolly=None, euro=()):
-        r = sis.spoglio(self.C, numeri, jolly, self.g, euro)
+    def _mostra_spoglio(self, titolo, numeri, jolly=None):
+        r = sis.spoglio(self.C, numeri, None if self.g.is_ej else jolly, self.g)
         self.modello.evidenzia = set(numeri)
         self.modello.layoutChanged.emit()
         righe = [f"{titolo}: {' '.join(map(str, sorted(numeri)))}" + (f"  Jolly {jolly}" if jolly and not self.g.is_ej
                                                                       else "")]
         righe += [f"  {cat:>4} punti: {c} colonne" for cat, c in r.items() if c]
+        if self.g.is_ej:
+            righe.append("  (punti sui 5 numeri: gli Euronumeri non fanno parte del sistema)")
         if not any(r.values()):
             righe.append("  nessuna colonna vincente")
         self.risultati.setPlainText(self.s.descrizione() + "\n\nSPOGLIO\n" + "\n".join(righe))
@@ -837,8 +839,7 @@ class FinestraSviluppo(QDialog):
         if not e:
             QMessageBox.information(self, "Spoglio", "Archivio vuoto.")
             return
-        self._mostra_spoglio(f"Estrazione del {e.data:%d/%m/%Y}", e.numeri, e.jolly,
-                             (e.jolly, e.superstar) if self.g.is_ej else ())
+        self._mostra_spoglio(f"Estrazione del {e.data:%d/%m/%Y}", e.numeri, e.jolly)
 
     def spoglio_combinazione(self):
         t, ok = QInputDialog.getText(self, "Spoglio", f"Combinazione vincente ({self.g.k} numeri, Jolly facoltativo):")

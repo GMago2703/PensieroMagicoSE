@@ -125,8 +125,8 @@ def test_immediato_e_spoglio():
     assert st["estrazioni"] == 100 and len(st["migliori"]) == 100
     ej = sis.Sistema(tipo="immediato", gioco="EJ", numeri=list(range(10, 20)), garanzia=1)
     svj = sis.sviluppa(ej)
-    rj = sis.spoglio(svj.colonne, [10, 11, 12, 13, 14], (3, 7), EJ, (3, 7))
-    assert rj["5+2"] + rj["4+2"] >= 1
+    rj = sis.spoglio(svj.colonne, [10, 11, 12, 13, 14], None, EJ)
+    assert set(rj) == {"5", "4", "3", "2"} and rj["5"] + rj["4"] >= 1
 
 
 def test_limiti_e_validazione():
