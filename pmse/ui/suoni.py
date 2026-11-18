@@ -6,6 +6,7 @@ I file WAV vengono creati una volta nella cartella temporanea; se l'audio non è
 """
 from __future__ import annotations
 
+import atexit
 import os
 import tempfile
 import wave
@@ -155,8 +156,9 @@ class Suoni:
         self.volume = 0.8
         self.effetti: dict[str, list] = {}
         self.turno: dict[str, int] = {}
-        if QSoundEffect is None:
+        if QSoundEffect is None or os.environ.get("PMSE_SENZA_SUONI"):
             return
+        _APERTI.append(self)
         try:
             cartella = os.path.join(tempfile.gettempdir(), f"pensieromagico_suoni_{VERSIONE}")
             for nome, p in scrivi(cartella).items():
@@ -213,18 +215,33 @@ class Suoni:
         for nome in self.effetti:
             self.ferma(nome)
 
-
-_CONDIVISI: Suoni | None = None
-
-
-def condivisi() -> Suoni:
-    """Un solo insieme di suoni per tutto il programma, legato all'applicazione (si chiude con lei)."""
-    global _CONDIVISI
-    if _CONDIVISI is None:
+    def chiudi(self):
+        """Ferma e distrugge subito gli effetti sonori (prima che l'applicazione si chiuda)."""
         try:
-            from PySide6.QtWidgets import QApplication
-            app = QApplication.instance()
+            from shiboken6 import delete, isValid
         except Exception:
-            app = None
-        _CONDIVISI = Suoni(app)
-    return _CONDIVISI
+            delete = isValid = None
+        for lista in self.effetti.values():
+            for e in lista:
+                try:
+                    if isValid is None or isValid(e):
+                        e.stop()
+                        if delete:
+                            delete(e)
+                except Exception:
+                    pass
+        self.effetti = {}
+        if self in _APERTI:
+            _APERTI.remove(self)
+
+
+
+_APERTI: list = []
+
+
+def _chiudi_tutti():
+    for s in list(_APERTI):
+        s.chiudi()
+
+
+atexit.register(_chiudi_tutti)

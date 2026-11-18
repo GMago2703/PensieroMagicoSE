@@ -524,8 +524,8 @@ class Scena(QWidget):
         self.copione = None
         self.istantaneo = False
         self.alla_fine = None
-        from .suoni import condivisi
-        self.suoni = condivisi()
+        from .suoni import Suoni
+        self.suoni = Suoni(None)
         self.orologio = QElapsedTimer()
         self.timer = QTimer(self)
         self.timer.setInterval(16)
@@ -1132,10 +1132,15 @@ class FinestraMacchina(QDialog):
 
     def closeEvent(self, ev):
         self.scena.timer.stop()
-        self.scena.suoni.zitto()
+        self.scena.suoni.chiudi()
         super().closeEvent(ev)
 
     def reject(self):
         self.scena.timer.stop()
-        self.scena.suoni.zitto()
+        self.scena.suoni.chiudi()
         super().reject()
+
+    def accept(self):
+        self.scena.timer.stop()
+        self.scena.suoni.chiudi()
+        super().accept()
