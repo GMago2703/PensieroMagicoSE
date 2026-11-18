@@ -249,7 +249,14 @@ class FinestraPrincipale(QMainWindow):
         a = m.addAction("Editor di formazioni numeriche (in preparazione)")
         a.setEnabled(False)
 
-        m = mb.addMenu("C&ombinazioni")
+        m = mb.addMenu("C&ombinazioni casuali")
+        sest = "Sestine casuali" if not self.g.is_ej else "Cinquine ed Euronumeri casuali"
+        a = m.addAction(f"🎱 {sest} – la macchina dell'estrazione...", lambda: self.macchina("sestine"))
+        a.setShortcut(QKeySequence("Ctrl+E"))
+        m.addAction("🎱 Sistema casuale – i numeri dalla macchina...", lambda: self.macchina("sistema"))
+        m.addSeparator()
+        tutto = m
+        m = tutto.addMenu("Sistema sviluppato")
         m.addAction("Visualizzazione (ultimo sistema sviluppato)", lambda: self._ultimo(None))
         m.addSeparator()
         m.addAction("Spoglio sull'ultima estrazione", lambda: self._ultimo("spoglio_ultima"))
@@ -263,6 +270,10 @@ class FinestraPrincipale(QMainWindow):
                       "Editor basi e varianti"):
             a = m.addAction(testo + " (in preparazione)")
             a.setEnabled(False)
+
+    def macchina(self, modo):
+        from .macchina import FinestraMacchina
+        FinestraMacchina(self.arch, modo, self, self.nuovo_sistema).exec()
 
     def nuovo_sistema(self, tipo, sistema=None):
         from .sistemi import EditorSistema

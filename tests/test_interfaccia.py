@@ -391,10 +391,10 @@ def test_menu_disattivi(app, tmp_path):
         w = FinestraPrincipale(a, avvio_automatico=False)
         menu = {m.title().replace("&", ""): m for m in
                 (x.menu() for x in w.menuBar().actions()) if m is not None}
-        for nome in ("Sistemi", "Condizioni", "Sviluppo", "Combinazioni", "Statistiche"):
+        for nome in ("Sistemi", "Condizioni", "Sviluppo", "Combinazioni casuali", "Statistiche"):
             m = menu[nome]
             voci = [x for x in m.actions() if not x.isSeparator()]
-            assert len(voci) >= 4, nome
+            assert len(voci) >= (3 if nome == "Combinazioni casuali" else 4), nome
             for x in voci:
                 testo = x.text().split("\t")[0]
                 if nome == "Statistiche":
@@ -418,11 +418,11 @@ def test_menu_disattivi(app, tmp_path):
         w.show()
         app.processEvents()
         if g is SE:
-            for nome in ("Sistemi", "Condizioni", "Sviluppo", "Combinazioni", "Statistiche", "Stampe"):
+            for nome in ("Sistemi", "Condizioni", "Sviluppo", "Combinazioni casuali", "Statistiche", "Stampe"):
                 m = menu[nome]
                 m.popup(w.mapToGlobal(w.rect().topLeft()))
                 app.processEvents()
-                foto("menu_" + nome.lower(), m)
+                foto("menu_" + nome.lower().replace(" ", "_"), m)
                 m.close()
         w.close()
         a.chiudi()
@@ -621,4 +621,71 @@ def test_suggerimenti_ai(app, tmp_path):
             w.close()
         finally:
             ui_it.CONVERSA_FINTA = None
+        a.chiudi()
+
+
+def test_macchina_estrazione(app, tmp_path):
+    """Combinazioni casuali: la macchina dell'estrazione (animazione simulata, poi salto)."""
+    from pmse.core import sistemi as sis
+    from pmse.core.gioco import EJ, SE
+    from pmse.ui import macchina as mc
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"mc_{g.codice}.db", gioco=g)
+        f = mc.FinestraMacchina(a, "sestine")
+        f.resize(1280, 840)
+        f.show()
+        if g is SE:
+            f.cb_ss.setChecked(True)
+        f.sp_n.setValue(2)
+        f.avvia()
+        sc = f.scena
+        sc.simula(5.5)
+        if g is SE:
+            foto("macchina_mescolamento", f)
+        visti = set()
+        for _ in range(3000):
+            sc.simula(0.05)
+            viaggi = [v for m in sc.macchine for v in m.in_viaggio]
+            if "tubo" not in visti and any(v.stato == "tubo" for v in viaggi):
+                visti.add("tubo")
+                foto(f"macchina_tubo_{g.codice}", f)
+            if "scivolo" not in visti and any(v.stato == "scivolo" and v.t > 1.0 for v in viaggi):
+                visti.add("scivolo")
+                foto(f"macchina_scivolo_{g.codice}", f)
+            if "annuncio" not in visti and sc.annuncio and sc.t - sc.annuncio[3] > 0.8:
+                visti.add("annuncio")
+                foto(f"macchina_annuncio_{g.codice}", f)
+            if "volo" not in visti and sc.voli and any(v.t > 0.5 for v, _ in sc.voli):
+                visti.add("volo")
+                foto(f"macchina_volo_{g.codice}", f)
+            if len(visti) == 4:
+                break
+        assert visti == {"tubo", "scivolo", "annuncio", "volo"}, visti
+        f.salta()
+        assert sc.copione is None and len(f.risultati) == 2
+        for r in f.risultati:
+            assert len(set(r["numeri"])) == g.k and all(1 <= x <= g.n for x in r["numeri"])
+            assert len(r["extra"]) == (1 if g is SE else 2)
+        assert all(c.numero for c in sc.caselle)
+        app.processEvents()
+        foto(f"macchina_fine_{g.codice}", f)
+        assert f.b_avvia.isEnabled() and not f.b_salta.isEnabled()
+        f.close()
+        # sistema casuale
+        f = mc.FinestraMacchina(a, "sistema")
+        f.resize(1280, 840)
+        f.show()
+        f.sp_n.setValue(10)
+        f.avvia()
+        f.scena.simula(12)
+        f.salta()
+        r = f.risultati[0]
+        assert len(r["numeri"]) == 10 and len(r["extra"]) == (2 if g is EJ else 0)
+        assert f.c_tipo.count() >= 2
+        gar = f.c_tipo.itemData(1)
+        s = f._sistema("immediato", gar)
+        assert len(sis.sviluppa(s).colonne) > 0
+        app.processEvents()
+        foto(f"macchina_sistema_{g.codice}", f)
+        f.close()
         a.chiudi()
