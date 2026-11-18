@@ -18,4 +18,10 @@ def pytest_sessionfinish(session, exitstatus):
         pass
     sys.stdout.flush()
     sys.stderr.flush()
+    if sys.platform == "win32":          # termina senza le notifiche di chiusura delle DLL (Qt)
+        import ctypes
+        k = ctypes.windll.kernel32
+        k.GetCurrentProcess.restype = ctypes.c_void_p
+        k.TerminateProcess.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+        k.TerminateProcess(k.GetCurrentProcess(), int(exitstatus))
     os._exit(int(exitstatus))
