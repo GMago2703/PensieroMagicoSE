@@ -565,3 +565,60 @@ def test_statistiche_e_stampe(app, tmp_path):
         a.chiudi()
     padre.deleteLater()
     app.processEvents()
+
+
+def test_suggerimenti_ai(app, tmp_path):
+    """Suggerimenti AI con un'intelligenza artificiale finta: proposta, sviluppo, correzione del budget."""
+    import json
+    import random as _r
+    from datetime import date as _d, timedelta as _td
+    from pmse.core.gioco import EJ, SE
+    from pmse.core.modello import Estrazione
+    from pmse.ui import intuizione as ui_it
+    from pmse.ui.finestra import FinestraPrincipale
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"ai_{g.codice}.db", gioco=g)
+        rnd, ests, d = _r.Random(6), [], _d(2013, 1, 4)
+        while len(ests) < 400:
+            if d.weekday() in g.giorni_estrazione:
+                n = rnd.sample(range(1, g.n + 1), g.k)
+                if g.is_ej:
+                    e = rnd.sample(range(1, g.euro_max(d) + 1), 2)
+                    ests.append(Estrazione(d, n, e[0], e[1], gioco=EJ))
+                else:
+                    resto = [x for x in range(1, 91) if x not in n]
+                    ests.append(Estrazione(d, n, rnd.choice(resto), rnd.randint(1, 90)))
+            d += _td(days=1)
+        a.unisci(ests)
+        risposte = [{"titolo": "Troppo grande", "tipo": "ridotto", "numeri": list(range(1, 21)), "garanzia": 1},
+                    {"titolo": "Le tre sorelle", "tipo": "condizionato", "numeri": [3, 7, 12, 21, 33, 44, 47, 49],
+                     "fisse": [7], "condizioni": [{"codice": "pari", "valori": [1, 2, 3]},
+                                                  {"codice": "gruppo", "numeri": [33, 44], "minimo": 1, "massimo": 1}],
+                     "garanzia": 0, "intuizione": "Il 7 mi chiama da giorni.", "perche_numeri": "simmetrie",
+                     "affidabilita": "È un gioco: nessuna garanzia di vincita."}]
+        chiamate = []
+
+        def conversa(messaggi):
+            chiamate.append(messaggi)
+            return json.dumps(risposte[min(len(chiamate) - 1, 1)]), "finta", 10, 10
+        ui_it.CONVERSA_FINTA = conversa
+        try:
+            w = FinestraPrincipale(a, avvio_automatico=False)
+            f = ui_it.FinestraIntuizione(a, w, w.nuovo_sistema)
+            f.sp_budget.setValue(30)
+            f.cb_cand.setChecked(False)
+            f.chiedi()
+            f.thread.wait(120000)
+            app.processEvents()
+            assert f.esito is not None, f.testo.toPlainText()
+            s = f.esito.proposta.sistema
+            assert 0 < len(s.colonne) <= 30 and all(7 in c for c in s.colonne)
+            assert len(f.esito.correzioni) == 1 and "Le tre sorelle" in f.testo.toPlainText()
+            assert f.b_colonne.isEnabled()
+            if g is SE:
+                foto("suggerimenti_ai", f)
+            f.close()
+            w.close()
+        finally:
+            ui_it.CONVERSA_FINTA = None
+        a.chiudi()

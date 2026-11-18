@@ -459,6 +459,7 @@ class FinestraPrincipale(QMainWindow):
         self._azione(m, f"✨ Genera {cosa} Magico Pensiero", self.genera)
         self._azione(m, f"Come sono nate le {self.g.nome_comb_pl} (spiegazione)...", self.spiegazione)
         self._azione(m, "🤖 Magico Pensiero + intelligenza artificiale (Gemini o Claude)...", self.claude)
+        self._azione(m, "💡 Suggerimenti AI: un piccolo sistema per intuizione...", self.suggerimenti_ai)
         m.addSeparator()
         self._azione(m, "Impostazioni dell'algoritmo...", self.impostazioni_magico)
         self._azione(m, "Verifica storica (previsioni su quanto già avvenuto)...", self.verifica_magico)
@@ -716,6 +717,10 @@ class FinestraPrincipale(QMainWindow):
             self.mostra_magico(SimpleNamespace(sestine=[SimpleNamespace(numeri=s) for s in p["sestine"]],
                                                jolly=p["jolly"], superstar=p.get("superstar")),
                                "Proposta dell'algoritmo" if o == "Algoritmo" else f"Scelta di {o.split(' ')[0]}")
+
+    def suggerimenti_ai(self):
+        from .intuizione import FinestraIntuizione
+        FinestraIntuizione(self.arch, self, self.nuovo_sistema).exec()
 
     def claude(self):
         from .claude import FinestraClaude

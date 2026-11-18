@@ -309,11 +309,11 @@ def ritardo_posizione(d: Dati, posizione: int = 1) -> Tabella:
 FASCE = {"somme": 20, "distanza_globale": 10, "distanza_massima": 5, "posizione": 10}
 
 
-def classifica_condizioni(d: Dati, ultime_ritardo: int = 0) -> Tabella:
+def classifica_condizioni(d: Dati, ultime_ritardo: int = 0, ctx=None) -> Tabella:
     """Per ogni condizione e ogni suo valore: frequenza, ritardo attuale, massimo, medio, IC."""
     from . import condizioni as cnd
     g = d.gioco
-    ctx = d.archivio and _contesto(d)
+    ctx = ctx or (d.archivio and _contesto(d))
     if ctx is None:
         from .modello import Estrazione
         ctx = cnd.Contesto(g, [Estrazione(r[0], r[1], r[2], r[3], gioco=g) for r in d.righe])
