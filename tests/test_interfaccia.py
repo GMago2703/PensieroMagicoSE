@@ -378,7 +378,7 @@ def test_pensiero_magico_ej(app, tmp_path):
 
 
 def test_menu_disattivi(app, tmp_path):
-    """Menu in stile Enavision: Sistemi, Condizioni, Sviluppo, Combinazioni attivi; Statistiche ancora disattivato."""
+    """Menu in stile Enavision: Sistemi, Condizioni, Sviluppo, Combinazioni, Statistiche e Stampe attivi."""
     from pmse.core.gioco import EJ, SE
     from pmse.ui.finestra import FinestraPrincipale
 
@@ -398,7 +398,7 @@ def test_menu_disattivi(app, tmp_path):
             for x in voci:
                 testo = x.text().split("\t")[0]
                 if nome == "Statistiche":
-                    assert not x.isEnabled(), (nome, testo)          # ancora da fare
+                    assert x.isEnabled(), (nome, testo)
                 assert testo.lower() not in {e.lower() for e in escluse}, (nome, testo)
         # i menu dei sistemi sono attivi
         nuovo = next(x.menu() for x in menu["Sistemi"].actions() if x.menu())
@@ -408,15 +408,17 @@ def test_menu_disattivi(app, tmp_path):
         assert "Somme" in cond and "Pari e dispari" in cond and len(cond) >= 18
         assert ("Popolarità (quanto è giocata)" in cond) == (g is SE)
         stat = [x.text() for x in menu["Statistiche"].actions()]
-        assert ("Numeri SuperStar" in stat) == (g is SE)
-        assert ("Euronumeri" in stat) == (g is EJ)
+        assert ("Numeri SuperStar e Jolly..." in stat) == (g is SE)
+        assert ("Euronumeri..." in stat) == (g is EJ)
+        assert any("Tabulato" in x.text() and x.isEnabled() for x in menu["Stampe"].actions())
+        assert any("Verifica colonne casuali" in x.text() for x in menu["Sviluppo"].actions())
         assert "Elaborazione" not in menu
         # le funzioni attive restano attive
         assert any(x.isEnabled() for x in menu["Archivio"].actions())
         w.show()
         app.processEvents()
         if g is SE:
-            for nome in ("Sistemi", "Condizioni", "Sviluppo", "Combinazioni", "Statistiche"):
+            for nome in ("Sistemi", "Condizioni", "Sviluppo", "Combinazioni", "Statistiche", "Stampe"):
                 m = menu[nome]
                 m.popup(w.mapToGlobal(w.rect().topLeft()))
                 app.processEvents()
@@ -499,4 +501,64 @@ def test_sistemi(app, tmp_path):
         for f in (fsal, fac):
             f.close()
         w.close()
+        a.chiudi()
+
+
+def test_statistiche_e_stampe(app, tmp_path):
+    """Statistiche, verifica di colonne sull'archivio, tabulato del sistema in PDF e TXT."""
+    import random as _r
+    from datetime import date as _d, timedelta as _td
+    from pmse.core import sistemi as sis
+    from pmse.core import statistiche as st
+    from pmse.core.gioco import EJ, SE
+    from pmse.core.modello import Estrazione
+    from pmse.ui import stampa as sp
+    from pmse.ui import statistiche as ust
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"st_{g.codice}.db", gioco=g)
+        rnd, ests, d = _r.Random(4), [], _d(2012, 3, 30)
+        while len(ests) < 700:
+            if d.weekday() in g.giorni_estrazione:
+                n = rnd.sample(range(1, g.n + 1), g.k)
+                if g.is_ej:
+                    e = rnd.sample(range(1, g.euro_max(d) + 1), 2)
+                    ests.append(Estrazione(d, n, e[0], e[1], gioco=EJ))
+                else:
+                    resto = [x for x in range(1, 91) if x not in n]
+                    ests.append(Estrazione(d, n, rnd.choice(resto), rnd.randint(1, 90)))
+            d += _td(days=1)
+        a.unisci(ests)
+        for s in st.statistiche_del_gioco(g):
+            f = ust.FinestraStatistica(a, s.codice)
+            assert f.t.rowCount() > 0, s.codice
+            titolo, testo, _ = f._da_stampare()
+            assert testo.count("\n") > 3
+            if g is SE and s.codice in ("numeri", "tabellone", "condizioni", "caldi"):
+                foto(f"statistiche_{s.codice}", f)
+            f.close()
+        v = ust.FinestraVerificaColonne(a)
+        v.sp_n.setValue(3)
+        v.genera()
+        v.verifica()
+        assert v.esito and v.t.rowCount() == 5 and v.esito.estrazioni == 700
+        if g is SE:
+            foto("verifica_colonne", v)
+        v.close()
+        s = sis.Sistema(nome="tab", tipo="ridotto", gioco=g.codice, numeri=list(range(1, 11)), garanzia=1)
+        sv = sis.sviluppa(s)
+        s.colonne = sv.colonne.tolist()
+        sis.salva(a, s)
+        ft = ust.FinestraTabulato(a)
+        ft.cb_gar.setChecked(True)
+        testo = ft.anteprima.toPlainText()
+        assert "TABULATO DEL SISTEMA" in testo and "CALCOLO GARANZIE" in testo and "COLONNE" in testo
+        if g is SE:
+            foto("tabulato_sistema", ft)
+        pdf, txt = tmp_path / f"t_{g.codice}.pdf", tmp_path / f"t_{g.codice}.txt"
+        sp.salva_pdf(str(pdf), "Tabulato", testo)
+        sp.salva_txt(str(txt), "Tabulato", testo)
+        assert pdf.read_bytes()[:4] == b"%PDF" and pdf.stat().st_size > 1000
+        assert "COLONNE" in txt.read_text(encoding="utf-8")
+        ft.close()
+        assert "/" in ust.stampa_estrazioni(None, a, 5)
         a.chiudi()

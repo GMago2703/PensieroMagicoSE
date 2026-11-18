@@ -7,9 +7,9 @@ from datetime import date
 
 from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtGui import QAction, QFont, QKeySequence
-from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
-                               QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QPushButton, QSizePolicy, QToolButton,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
+                               QInputDialog, QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QPushButton,
+                               QSizePolicy, QToolButton, QVBoxLayout, QWidget)
 
 from .. import __version__
 from ..core import internet, magico, personalizzate
@@ -39,12 +39,8 @@ MENU_VUOTI = ["Metodi"]
 
 # Menu in stile Enavision, inseriti ma non ancora attivi ("-" = separatore,
 # (nome, [voci]) = sottomenu). La voce "SUPERSTAR" diventa il nome giusto per ogni gioco.
-MENU_DISATTIVI = [
-    ("Statistiche", ["Tutti i numeri", "SUPERSTAR", "-", "Tabellone dei ritardi",
-                     "Numeri caldi e freddi", "Ritardo di posizione", "Classifica delle condizioni",
-                     "-", ("Combinazioni", [])]),
-]
-MENU_VUOTI_DOPO = ["Stampe", "Ricevitoria", "Impostazioni"]
+MENU_DISATTIVI: list = []
+MENU_VUOTI_DOPO = ["Ricevitoria", "Impostazioni"]
 
 
 FINESTRE: list = []        # riferimenti alle finestre aperte (evita che vengano distrutte)
@@ -247,6 +243,9 @@ class FinestraPrincipale(QMainWindow):
         m.addAction("Analisi statistica condizionato...", self.analisi_condizioni)
         m.addAction("Rendimento delle condizioni", self._rendimento)
         m.addSeparator()
+        a = m.addAction("🎲 Verifica colonne casuali...", self.verifica_colonne)
+        a.setShortcut(QKeySequence("Ctrl+K"))
+        m.addSeparator()
         a = m.addAction("Editor di formazioni numeriche (in preparazione)")
         a.setEnabled(False)
 
@@ -324,6 +323,52 @@ class FinestraPrincipale(QMainWindow):
             return
         FinestraAnalisiCondizioni(self.arch, self, self.apri_condizione).exec()
 
+    # ------------------------------------------------------------- statistiche e stampe
+    def _menu_statistiche(self):
+        from ..core import statistiche as st
+        m = self.menuBar().addMenu("S&tatistiche")
+        voci = {s.codice: s for s in st.statistiche_del_gioco(self.g)}
+        for gruppo in (("numeri", "speciali"), ("tabellone", "caldi", "posizione", "condizioni", "anni")):
+            for c in gruppo:
+                self._azione(m, voci[c].nome + "...", lambda _=False, c=c: self.statistica(c))
+            m.addSeparator()
+        sotto = m.addMenu("Combinazioni")
+        for c in ("ambi_f", "ambi_r", "terni_f"):
+            self._azione(sotto, voci[c].nome + "...", lambda _=False, c=c: self.statistica(c))
+
+    def statistica(self, codice):
+        from .statistiche import FinestraStatistica
+        if self.arch.conta() < 10:
+            QMessageBox.information(self, "Statistiche", "Servono almeno 10 estrazioni in archivio.")
+            return
+        FinestraStatistica(self.arch, codice, self).exec()
+
+    def verifica_colonne(self):
+        from .statistiche import FinestraVerificaColonne
+        FinestraVerificaColonne(self.arch, self).exec()
+
+    def _menu_stampe(self):
+        m = self.menuBar().addMenu("Sta&mpe")
+        a = self._azione(m, "🖨 Tabulato di un sistema (stampante, PDF, TXT)...", self.tabulato)
+        a.setShortcut(QKeySequence("Ctrl+T"))
+        self._azione(m, "Estrazioni dell'archivio...", self.stampa_estrazioni)
+        m.addSeparator()
+        self._azione(m, "Le statistiche si stampano dalla loro finestra (pulsante Stampa)", abilitata=False)
+
+    def tabulato(self):
+        from .sistemi import ULTIMO
+        from .statistiche import FinestraTabulato
+        FinestraTabulato(self.arch, self, ultimo=ULTIMO.get(self.g.codice)).exec()
+
+    def stampa_estrazioni(self):
+        from .stampa import stampa
+        from .statistiche import stampa_estrazioni
+        n, ok = QInputDialog.getInt(self, "Stampa estrazioni", "Quante estrazioni recenti? (0 = tutto l'archivio)",
+                                    100, 0, 100000)
+        if ok:
+            stampa(self, f"Estrazioni {self.g.nome}" + (f" – ultime {n}" if n else ""),
+                   stampa_estrazioni(self, self.arch, n), f"estrazioni {self.g.codice}")
+
     def _ultimo(self, azione):
         from .sistemi import ULTIMO, FinestraSviluppo
         dato = ULTIMO.get(self.g.codice)
@@ -375,6 +420,7 @@ class FinestraPrincipale(QMainWindow):
         mb = self.menuBar()
         self._selettore()
         self._menu_sistemi()
+        self._menu_statistiche()
         for nome, voci in MENU_DISATTIVI:
             self._menu_disattivo(nome, voci)
         for nome in MENU_VUOTI:
@@ -421,6 +467,7 @@ class FinestraPrincipale(QMainWindow):
         m.addSeparator()
         self._azione(m, "🧪 Laboratorio: la casualità è davvero casuale?...", self.laboratorio)
 
+        self._menu_stampe()
         for nome in MENU_VUOTI_DOPO:
             self._menu_vuoto(nome)
         m = mb.addMenu("&Help")

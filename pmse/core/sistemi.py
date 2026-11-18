@@ -345,6 +345,18 @@ def sviluppa(s: Sistema, ctx: cnd.Contesto | None = None, avanzamento=None, inte
     return Sviluppo(C, tot, possibili, time.time() - t0, None)
 
 
+def possibili_del_sistema(s: Sistema, ctx: cnd.Contesto | None = None) -> np.ndarray:
+    """Le combinazioni vincenti 'possibili' del sistema (numeri, fisse e condizioni rispettate): servono
+    per il calcolo delle garanzie."""
+    s2 = Sistema.da_json(s.a_json())
+    if s2.tipo in ("condizionato", "condizionato_ridotto"):
+        s2.tipo, s2.garanzia = "condizionato", 0
+        return sviluppa(s2, ctx).colonne
+    if numero_integrale(len(s2.numeri), s2.G.k, len(s2.fisse)) > LIMITE_INTEGRALE:
+        raise ValueError("Integrale troppo grande per la verifica.")
+    return np.vstack(list(integrale(s2.numeri, s2.G.k, s2.fisse)))
+
+
 def costo(s_colonne: int, g: Gioco, prezzi: dict | None = None, superstar: bool = False) -> float:
     prezzi = prezzi or {}
     if g.is_ej:
@@ -390,3 +402,86 @@ def contesto_da_archivio(archivio) -> cnd.Contesto:
     except Exception:
         ctx.popolarita = None
     return ctx
+
+
+def _euro(x: float) -> str:
+    return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _migliaia(x: int) -> str:
+    return f"{x:,}".replace(",", ".")
+
+
+def tabulato(s: Sistema, colonne, prezzi: dict | None = None, superstar: bool = False,
+             garanzia: EsitoGaranzia | None = None, per_riga: int | None = None,
+             con_colonne: bool = True, con_presenze: bool = True) -> str:
+    """Tabulato completo del sistema (per la stampa e i file TXT/PDF): dati, condizioni, riduzione,
+    garanzie, costo, presenze dei numeri e tutte le colonne numerate."""
+    g = s.G
+    C = np.asarray(colonne, dtype=np.int64).reshape(-1, g.k)
+    n = len(C)
+    info = s.info or {}
+    sep = "=" * 78
+    r = [sep, f"TABULATO DEL SISTEMA – {g.nome_app}", sep]
+    r.append(f"Nome:            {s.nome or '(non memorizzato)'}")
+    r.append(f"Tipo:            {TIPI.get(s.tipo, s.tipo)}")
+    r.append(f"Gioco:           {g.nome}")
+    if s.creato:
+        r.append(f"Memorizzato il:  {s.creato.replace('T', ' ')}")
+    r.append(f"Numeri giocati:  {len(s.numeri)} → {' '.join(map(str, sorted(s.numeri)))}")
+    r.append(f"Fisse:           {len(s.fisse)}" + (f" → {' '.join(map(str, sorted(s.fisse)))}" if s.fisse else ""))
+    r.append("")
+    conds = [c for c in s.lista_condizioni() if c.attiva] if s.tipo in ("condizionato", "condizionato_ridotto") else []
+    r.append(f"CONDIZIONI ({len(conds)})")
+    if conds:
+        r.append(f"  Errori ammessi: da {s.errori_min} a {s.errori_max} (condizioni non rispettate accettate)")
+        for i, c in enumerate(conds, 1):
+            r.append(f"  {i:2d}. {c.descrivi()}")
+    else:
+        r.append("  nessuna")
+    r.append("")
+    r.append("RIDUZIONE E GARANZIA")
+    integ = info.get("integrale") or numero_integrale(len(s.numeri), g.k, len(s.fisse))
+    r.append(f"  Integrale:                      {_migliaia(int(integ))} colonne")
+    if conds:
+        r.append(f"  Con le condizioni rispettate:   {_migliaia(int(info.get('possibili', 0)))} colonne")
+    if s.garanzia:
+        r.append(f"  Garanzia n-{s.garanzia}: almeno {s.punti_garantiti} punti se la combinazione vincente è tra "
+                 "quelle possibili")
+        if s.tipo == "immediato":
+            r.append("  Riduzione: già pronta (Ridotti immediati)")
+        else:
+            r.append(f"  Riduzione: qualità {s.qualita}")
+    else:
+        r.append("  Nessuna riduzione")
+    r.append(f"  Colonne del sistema:            {_migliaia(n)}")
+    if garanzia is not None:
+        r.append("")
+        r.append("CALCOLO GARANZIE")
+        r += ["  " + x for x in garanzia.testo(g.k).splitlines()]
+    r.append("")
+    euro = costo(n, g, prezzi, superstar)
+    r.append("COSTO")
+    if g.is_ej:
+        r.append(f"  {_migliaia(n)} colonne × {_euro(float((prezzi or {}).get('EJ', 2.0)))} € = {_euro(euro)} €")
+    else:
+        r.append(f"  {_migliaia(n)} colonne" + (" con SuperStar" if superstar else "") + f" = {_euro(euro)} €")
+    if con_presenze and n:
+        r.append("")
+        r.append("PRESENZE DEI NUMERI NELLE COLONNE")
+        conte = np.bincount(C.ravel(), minlength=g.n + 1)
+        voci = [f"{x:2d}: {int(conte[x]):>6}" for x in sorted(s.numeri)]
+        for i in range(0, len(voci), 6):
+            r.append("  " + "    ".join(voci[i:i + 6]))
+    if s.note:
+        r += ["", "NOTE", "  " + s.note]
+    if con_colonne:
+        r.append("")
+        r.append(f"COLONNE ({_migliaia(n)})")
+        larg = len(str(n))
+        per_riga = per_riga or (4 if g.k == 6 else 5)
+        celle = [f"{i + 1:>{larg}}) " + " ".join(f"{int(x):2d}" for x in c) for i, c in enumerate(C)]
+        for i in range(0, len(celle), per_riga):
+            r.append("   ".join(celle[i:i + per_riga]))
+    r.append(sep)
+    return "\n".join(r)

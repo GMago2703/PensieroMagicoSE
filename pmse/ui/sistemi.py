@@ -762,7 +762,8 @@ class FinestraSviluppo(QDialog):
                            ("🎯 Spoglio sull'ultima estrazione", self.spoglio_ultima),
                            ("🎯 Spoglio su una combinazione...", self.spoglio_combinazione),
                            ("📜 Spoglio storico (archivio)...", self.spoglio_storico),
-                           ("📄 Esporta (TXT / CSV)...", self.esporta)):
+                           ("📄 Esporta (TXT / CSV)...", self.esporta),
+                           ("🖨 Stampa il tabulato (stampante / PDF / TXT)...", self.tabulato)):
             b = QPushButton(testo)
             b.clicked.connect(fun)
             dx.addWidget(b)
@@ -800,16 +801,8 @@ class FinestraSviluppo(QDialog):
 
     def _possibili(self) -> np.ndarray:
         """Le combinazioni vincenti 'possibili' del sistema (per verificare la garanzia)."""
-        if self.possibili is not None:
-            return self.possibili
-        s = sis.Sistema.da_json(self.s.a_json())
-        if s.tipo in ("condizionato", "condizionato_ridotto"):
-            s.tipo, s.garanzia = "condizionato", 0
-            self.possibili = sis.sviluppa(s, sis.contesto_da_archivio(self.arch)).colonne
-        else:
-            if sis.numero_integrale(len(s.numeri), self.g.k, len(s.fisse)) > sis.LIMITE_INTEGRALE:
-                raise ValueError("Integrale troppo grande per la verifica.")
-            self.possibili = np.vstack(list(sis.integrale(s.numeri, self.g.k, s.fisse)))
+        if self.possibili is None:
+            self.possibili = sis.possibili_del_sistema(self.s, sis.contesto_da_archivio(self.arch))
         return self.possibili
 
     def garanzie(self):
@@ -877,6 +870,11 @@ class FinestraSviluppo(QDialog):
         with open(nome, "w", encoding="utf-8") as f:
             f.write(testo)
         QMessageBox.information(self, "Esporta", f"Salvate {len(self.C)} colonne in {nome}")
+
+    def tabulato(self):
+        from .statistiche import FinestraTabulato
+        self.s.colonne = self.C.tolist()
+        FinestraTabulato(self.arch, self, self.s, self.possibili).exec()
 
     def memorizza(self):
         nome, ok = QInputDialog.getText(self, "Memorizza sistema", "Nome del sistema:", text=self.s.nome)
