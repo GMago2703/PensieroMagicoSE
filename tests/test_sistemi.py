@@ -195,3 +195,20 @@ def test_miscelatore():
     assert [v["nome"] for v in m.voci] == ["a"]          # il suono breve è finito, il ciclo continua
     m.aggiungi("a", np.ones(3000, dtype=np.float32), 0.1, loop=True)
     assert len(m.voci) == 1 and m.voci[0]["vol"] == 0.1
+
+
+def test_uscita_audio_windows():
+    """Su Windows apre davvero l'uscita audio (se il computer ne ha una), suona e chiude senza errori."""
+    import sys
+    import time
+    if sys.platform != "win32":
+        return
+    from pmse.ui import suoni
+    m = suoni.Miscelatore()
+    print("USCITA AUDIO DISPONIBILE:", m.ok)
+    if m.ok:
+        x = suoni.genera()["annuncio"].astype("float32")
+        m.aggiungi("annuncio", x, 0.1)
+        time.sleep(0.4)
+        assert m.thread.is_alive()
+        m.chiudi()
