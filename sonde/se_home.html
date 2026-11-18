@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="it-it">
+	<head>
+		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta name="content-language" content="it" />
+		<meta name="description" content="Scopri l'ultima estrazione del SuperEnalotto di oggi. Verifica i numeri vincenti, controlla le quote dei premi e scopri quanto vale il Jackpot attuale." />
+		<meta name="keywords" content="" />
+		<script src="/js/jquery-3.6.0.min.js"></script>
+		<title>SuperEnalotto Oggi: Ultima Estrazione, Quote, Jackpot [Superenalotto.com]</title>
+		<link href="/css/site.min.css?v7" type="text/css" rel="stylesheet" />
+		<link rel="shortcut icon" href="/favicon/favicon.ico" />
+		<link rel="apple-touch-icon" sizes="48x48" href="/favicon/48.png">
+		<link rel="icon" type="image/png" sizes="48x48" href="/favicon/48.png">
+		<script src="/js/common.min.js?1795030886"></script>
+		<script defer src="https://www.gstatic.com/firebasejs/9.2.0/firebase-app-compat.js"></script>
+		<script defer src="https://www.gstatic.com/firebasejs/9.2.0/firebase-messaging-compat.js"></script>
+		<script defer src="/js/notifications.min.js"></script>
+		<link rel="canonical" href="https://www.superenalotto.com/" />
+	</head>
+<body><script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@graph": [
+        {
+            "@type": "WebSite",
+            "@id": "https://www.superenalotto.com/#website",
+            "url": "https://www.superenalotto.com/",
+            "name": "Superenalotto.com",
+            "inLanguage": "it",
+            "publisher": {
+                "@id": "https://www.superenalotto.com/#organization"
+            }
+        },
+        {
+            "@type": "Organization",
+            "@id": "https://www.superenalotto.com/#organization",
+            "name": "Superenalotto.com",
+            "legalName": "Giochi24 S.r.l.",
+            "url": "https://www.superenalotto.com/",
+            "logo": {
+                "@type": "ImageObject",
+                "url": "https://www.superenalotto.com/img/logo_bottom.png"
+            }
+        },
+        {
+            "@type": "WebPage",
+            "@id": "https://www.superenalotto.com/",
+            "url": "https://www.superenalotto.com/",
+            "name": "SuperEnalotto Oggi: Ultima Estrazione, Quote, Jackpot [Superenalotto.com]",
+            "description": "Scopri l'ultima estrazione del SuperEnalotto di oggi. Verifica i numeri vincenti, controlla le quote dei premi e scopri quanto vale il Jackpot attuale.",
+            "inLanguage": "it",
+            "isPartOf": {
+                "@id": "https://www.superenalotto.com/#website"
+            }
+        },
+        {
+            "@type": "PublicationEvent",
+            "name": "Concorso SuperEnalotto N. 184",
+            "identifier": "184",
+            "startDate": "2026-11-17",
+            "description": "Numeri vincenti: 1, 2, 10, 79, 85, 90. Numero Jolly: 47. Numero SuperStar: 68. Jackpot: 55.900.000 EUR."
+        }
+    ]
+}</script>
+
+	<div class="mainContainer">
+		<div class="menuContainer">
+	<div class="menu">
+		<div class="menuItem">
+			<a href="/vincite/verifica-schedina">Verifica Vincite Superenalotto</a>
+		</div>
+		<div class="menuItem">
+			<a href="/sivincetutto/verifica-schedina">Verifica Vincite Sivincetutto</a>
+		</div>
+		<div class="menuItem">
+			<a href="/vincite/quote-vincitori">Vincite e Vincitori</a>
+		</div>
+		<div class="menuItem">
+			<a href="/vincite/probabilita">Probabilità di vincita</a>
+		</div>
+		<div class="menuItem">
+			<a href="/vincite/incasso">Come incassare</a>
+		</div>
+		<div class="menuItem">
+			<a href="/vincite/punti-pagamento-premi">Punti di pagamento premi</a>
+		</div>
+		<div class="menuItem">
+			<a href="/generatore-numeri-casuali">Genera numeri</a>
+		</div>
+		<div class="menuItem">
+			<a href="/guida/costo-giocate">Costo giocate</a>
+		</div>
+		<div class="menuItem">
+			<a href="/guida/come-funziona-l-estrazione">Come funziona l'estrazione</a>
+		</div>
+	</div>
+</div>		<div class="topHeader">
+	<div class="topHeaderRow">
+		<div class="topLeft">
+			<a href="/"><img src="/img/logo.png" alt="Logo dell’Header del sito Superenalotto.com" title="Logo header Superenalotto.com"/></a>
+		</div>
+		<div class="topRight">
+			<img onclick="toggleMenu()" src="/img/menu.png" alt="Apri il menu"/>
+		</div>
+	</div>
+	<div class="topHeaderRow2">
+		<div class="topLeft">
+			<a href='/archivio'>Archivio</a>
+		</div>
+		<div class="topRight">
+			<a href='/risultati-estrazione'>Ultimi Risultati</a>
+		</div>
+	</div>
+</div>		<div class="container">		
+			<script>
+	var nextDrawDate = new Date("2026-11-19 20:00:00");
+</script>
+<script src="/js/jackpot.min.js?1795030886"></script>
+<div class="topBarHome">
+	<div class="topBarHomeTimer">
+		<div class="topBarHomeTimerItem"><span id='nextDrawDays'>00</span><div class="topBarHomeTimerSubItem">giorni</div></div>
+		<div class="topBarHomeTimerSeparator"></div>
+		<div class="topBarHomeTimerItem"><span id='nextDrawHours'>23</span><div class="topBarHomeTimerSubItem">ore</div></div>
+		<div class="topBarHomeTimerSeparator"></div>
+		<div class="topBarHomeTimerItem"><span id='nextDrawMinutes'>18</span><div class="topBarHomeTimerSubItem">minuti</div></div>
+		<div class="topBarHomeTimerSeparator"></div>
+		<div class="topBarHomeTimerItem"><span id='nextDrawSeconds' class="bold">33</span><div class="topBarHomeTimerSubItem">secondi</div></div>
+	</div>
+	<div class="topBarJackpot">
+		<div class="topBarJackpotTitle">JACKPOT</div>
+		<div class="topBarJackpotValue">
+			<div class="topBarJackpotValueNumber">55.900.000</div>
+			<div class="topBarJackpotValueEuro">&euro;</div>
+		</div>	
+	</div>
+</div>			<ol class='breadcrumbs'><li><a href='/'>Home</a></li></ol><script type="application/ld+json">{
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+        {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://www.superenalotto.com/"
+        }
+    ]
+}</script>			<div class="boxHomeLastDraw">
+				<div class="boxHomeLastDrawTitle">
+					<div class="boxHomeLastDrawTitleLeft">
+						SuperEnalotto
+					</div>
+					<div class="boxHomeLastDrawTitleRight">
+						<a href='risultati-estrazione/17-11-2026'>Ultima estrazione</a>
+					</div>
+				</div>
+				<div class="boxHomeLastDrawSubTitle">
+					<div class="boxHomeLastDrawSubTitleLeft">
+						17 novembre 2026					</div>
+					<div class="boxHomeLastDrawSubTitleRight">
+						Concorso n.184					</div>
+				</div>
+				<div class="boxHomeLastDrawNumbers">
+					<div class="boxHomeLastDrawNumber">1</div><div class="boxHomeLastDrawNumber">2</div><div class="boxHomeLastDrawNumber">10</div><div class="boxHomeLastDrawNumber">79</div><div class="boxHomeLastDrawNumber">85</div><div class="boxHomeLastDrawNumber">90</div><div class="boxHomeLastDrawNumber boxHomeLastDrawNumberRed">47<div>Jolly</div></div><div class="boxHomeLastDrawNumber boxHomeLastDrawNumberstar">68<div>Superstar</div></div>
+				</div>
+				<div class="vseparator10"></div>
+				<div class="table">
+					<div class="row tableHeader1">
+						<div class="cell colspan3">Quote SuperEnalotto</div>
+					</div>
+					<div class="row tableHeader2">
+						<div class="cell">Premio</div>
+						<div class="cell">Valore</div>
+						<div class="cell bold">Vincitori</div>
+					</div>
+					<div class='row'><div class='cell'>6 punti</div><div class='cell'>-</div><div class='cell bold'>0</div></div>					<div class='row'><div class='cell'>5 punti + Jolly</div><div class='cell'>-</div><div class='cell bold'>0</div></div>					<div class='row'><div class='cell'>5 punti</div><div class='cell'>10.370,60 €</div><div class='cell bold'>16</div></div>					<div class='row'><div class='cell'>4 punti</div><div class='cell'>169,08 €</div><div class='cell bold'>1.499</div></div>					<div class='row'><div class='cell'>3 punti</div><div class='cell'>14,48 €</div><div class='cell bold'>40.963</div></div>					<div class='row'><div class='cell'>2 punti</div><div class='cell'>5,00 €</div><div class='cell bold'>448.041</div></div>					<div class="row tableFooter">
+						<div class="cell colspan3"></div>
+					</div>
+				</div>
+				<a href="/risultati-estrazione/17-11-2026"><div class="greenButtonInside">
+					Guarda tutte le quote e i vincitori
+				</div></a>
+			</div>
+			<a href='https://www.giochi24.it/gioco-online/tracking/affiliation.html?id=SECOM&product=msite_se'>
+				<div class="orangeButton">
+					Gioca la schedina
+				</div>
+			</a>
+			<a href='vincite/verifica-schedina'><div class="homeButton">
+				Verifica la schedina
+			</div></a>
+			<a href='/superstar'><div class="homeButton">
+				Superstar
+			</div></a>
+			<div class="homeButton homeAccordion" onclick="toggleAccordion('siVinceTutto')">
+				<div class="homeAccordionLeft">Si Vince Tutto</div>
+				<div class="homeAccordionRight">Ultima estrazione <img id="siVinceTuttoAccordionButton" src="/img/accordion-down.png" alt="Apri/chiudi sezione"/></div>
+			</div>
+
+			<div class="boxHomeLastDrawSiVinceTutto" id="siVinceTuttoAccordion">
+				<div class="boxHomeLastDrawSubTitle">
+					<div class="boxHomeLastDrawSubTitleLeft">
+						11 novembre 2026					</div>
+					<div class="boxHomeLastDrawSubTitleRight">
+						Concorso n.45					</div>
+				</div>
+				<div class="boxHomeLastDrawNumbers">
+					<div class="boxHomeLastDrawNumber">29</div><div class="boxHomeLastDrawNumber">39</div><div class="boxHomeLastDrawNumber">40</div><div class="boxHomeLastDrawNumber">61</div><div class="boxHomeLastDrawNumber">62</div><div class="boxHomeLastDrawNumber">89</div>
+				</div>
+				<a href="/sivincetutto/risultati-estrazione/11-11-2026"><div class="greenButtonInside">
+					Guarda tutte le quote e i vincitori
+				</div></a>
+			</div>
+
+			<a href="download-app.php"><div class="greenButton">
+				Scarica l'App Risultati
+			</div></a>
+			<div class="homeButton homeAccordion" onclick="toggleAccordion('info')">
+				<div class="homeAccordionLeft">Informazioni</div>
+				<div class="homeAccordionRight"><img id="infoAccordionButton" src="/img/accordion-up.png" alt="Apri/chiudi sezione"/></div>
+			</div>
+			<div id="infoAccordion">
+				<div class="infoBox">
+					<div class="infoBoxImage" style='background-image:url(news/1.jpg);'></div>
+					<div class="infoBoxText">
+						<a href='estrazione-oggi-diretta'>
+						GUARDA L’ESTRAZIONE DI OGGI IN DIRETTA
+						</a>
+					</div>
+				</div>
+				<div class="infoBox">
+					<div class="infoBoxImage" style='background-image:url(news/2.jpg);'></div>
+					<div class="infoBoxText">
+						<a href='prossima-estrazione'>
+						GUARDA LA DATA DELLA PROSSIMA ESTRAZIONE
+						</a>
+					</div>
+				</div>				
+				<div class="infoBox">
+					<div class="infoBoxImage" style='background-image:url(news/3.jpg);'></div>
+					<div class="infoBoxText">
+						<a href='/notizie'>
+						LEGGI LE ULTIME NOTIZIE
+						</a>
+					</div>
+				</div>
+			</div>
+
+
+			<div class="homeButton homeAccordion" onclick="toggleAccordion('utility')">
+				<div class="homeAccordionLeft">Utilità</div>
+				<div class="homeAccordionRight"><img id="utilityAccordionButton" src="/img/accordion-up.png" alt="Apri/chiudi sezione"/></div>
+			</div>
+			<div id="utilityAccordion">
+				<a href='/statistiche'><div class="greenButton">
+					Statistiche
+				</div></a>
+				<a href='/guida/come-si-gioca'><div class="greenButton">
+					Come si gioca
+				</div></a>
+				<a href='/guida'><div class="greenButton">
+					Guida
+				</div></a>
+				<a href="/faq"><div class="greenButton">
+					FAQ
+				</div></a>
+			</div>
+			<div class="seoContent">
+					<h1>Estrazione SuperEnalotto di Oggi: Numeri Vincenti, Quote e Jackpot del Concorso – verifica vincite</h1>
+					<p>Superenalotto.com è il tuo punto di riferimento per scoprire la combinazione vincente del concorso di oggi e di ieri sera. In questa pagina trovi i risultati in tempo reale dell'ultimo sorteggio, il valore del Jackpot attuale e il dettaglio completo dei premi distribuiti, inclusi i dati sulle opzioni Superstar e SiVinceTutto. Se vuoi controllare la tua schedina, puoi consultare lo storico dei concorsi degli ultimi 90 giorni oppure accedere al nostro archivio aggiornato da oggi a ritroso. Inoltre, scopri le statistiche sui numeri frequenti e ritardatari, le probabilità di vincita e i siti autorizzati da Sisal come Giochi24 per tentare la fortuna online in totale sicurezza.</p>
+					<h2>Ultima estrazione Superenalotto: concorso di oggi e di ieri sera</h2>
+					<p>Su superenalotto.com puoi vedere il <a href='https://www.superenalotto.com/estrazione-oggi-diretta'>video in diretta</a> dell'estrazione di oggi. Inoltre puoi vedere tutti i risultati dell'<a href='https://www.superenalotto.com/risultati-estrazione'>ultimo concorso</a>: i 6 numeri estratti, il numero Jolly, il numero Superstar, le quote per ogni categoria di premi, quanti sono i vincitori. Puoi controllare i numeri dell'ultima estrazione per verificare se la tua schedina è vincente.</p>
+					<p>Trovi anche la data della <a href='https://www.superenalotto.com/prossima-estrazione'>prossima estrazione</a> e il valore del Jackpot. Le estrazioni del Lotto e Superenalotto avvengono di solito martedi, giovedi, venerdì e sabato anche se a volte vengono spostate per le feste nazionali in Italia. Sono riportate da tutti i principali giornali come <a href='https://www.leggo.it/t/superenalotto'>Leggo</a> e sul sito dell'<a href='https://www.adm.gov.it/portale/home'>Agenzia delle Dogane e Monopoli</a>.</p>
+					<h2>Archivio SuperEnalotto aggiornato: 2026, 2025 e anni precedenti</h2>
+					<p>L'archivio storico aggiornato ad oggi con tutte le estrazioni è visibile su questo sito in una sezione dedicata all’<a href='https://www.superenalotto.com/archivio'>archivio</a>. Li trovi subito tutte le estrazioni degli ultimi 90 giorni che è il tempo massimo in cui puoi chiedere il pagamento della vincita. Puoi anche cercare tutte le estrazioni filtrando per ogni anno e quindi avere subito l'archivio 2026, 2025, 2024 via via per gli anni precedenti. Trovi le date dei concorsi e tutti i 6 numeri estratti, inclusi il numero jolly ed il numero Superstar.</p>
+					<h2>Verifica le vincite e scopri come riscuotere</h2>
+					<p>Puoi sapere tutto quello che serve sulle <a href='https://www.superenalotto.com/vincite'>vincite al Superenalotto</a>. Puoi fare la <a href='https://www.superenalotto.com/vincite/verifica-schedina'>verifica delle vincite</a>, come <a href='https://www.superenalotto.com/vincite/incasso'>incassare le vincite</a>, quali sono i punti di pagamento premi.</p>
+					<h2>Statistiche, ritardatari e siti migliori per giocare la schedina</h2>
+					<p>In questa sezione trovi le guide pratiche al gioco, il calcolo del costo delle schedine e le risposte alle domande più frequenti. Puoi consultare i dati sempre aggiornati sulle <a href='https://www.superenalotto.com/vincite/probabilita'>probabilità di vincita</a> e le statistiche storiche del gioco, inclusi i numeri frequenti e i massimi ritardatari. Resta informato sulle date dei prossimi concorsi e scopri come compilare la tua schedina online in totale sicurezza sul sito del concessionario ufficiale Sisal o tramite rivenditori autorizzati come Giochi24, la piattaforma in Italia con le migliori recensioni secondo Trustpilot e Google.</p>
+					<h2>SiVinceTutto Superenalotto e Superstar</h2>
+					<p><strong>SiVinceTutto</strong> è il celebre concorso speciale di casa <a href='https://www.sisal.com/offerta/giochi/lotterie/sivincetutto'>Sisal</a>, caratterizzato da un'<strong>estrazione settimanale ogni mercoledì sera</strong>. A differenza della formula tradizionale, la sua particolarità principale risiede nella dinamica del montepremi: <strong>l'intero jackpot viene interamente distribuito ai vincitori in un'unica sera</strong>. Nel caso in cui non venga centrato il fatidico "6", le risorse in palio non si accumulano per i concorsi successivi, ma vengono spartite per arricchire i premi delle categorie inferiori (punti 5, 4, 3 e 2).</p>
+					<p>Anche le regole di compilazione della schedina cambiano: per giocare a <a href='https://www.superenalotto.com/sivincetutto'>SiVinceTutto</a> si scelgono ben <strong>12 numeri compresi tra 1 e 90</strong>, raddoppiando le probabilità di successo, ma ne occorre <strong>indovinare solo 6</strong> per conquistare il premio massimo. Il costo di una giocata singola è di 5€. Sul nostro portale puoi consultare in tempo reale tutti i risultati dell'ultimo concorso del mercoledì.</p>
+					<p>Il <a href='https://www.superenalotto.com/superstar'><strong>Superstar</strong></a> è invece un'opzione di gioco facoltativa e indipendente, legata a un numero compreso tra 1 e 90. Sceglierlo ti offre l'opportunità di moltiplicare le vincite classiche del gioco principale o di accedere a premi aggiuntivi dedicati, attivi persino in assenza dei 6 numeri base sulla schedina.</p>
+				</div>
+				<div class="goBack" onclick="scrollUp()">
+		Torna su <img class="pointer" src="/img/goup.png" alt="Torna su"/>
+	</div>
+	<div class="bottomLink">
+		<a href='/risultati-estrazione'>Ultima Estrazione SuperEnalotto</a>
+	</div>
+	<div class="bottomLink">
+		<a href='/sivincetutto'>Tutto sul SiVinceTutto</a>
+	</div>
+	<div class="bottomLogo">
+		<img src="/img/logo_bottom.png" alt="Logo ufficiale e completo di Superenalotto.com su fondo bianco" title="Logo Superenalotto.com ufficiale"/>
+	</div>
+	<div class="bottomLanguages">
+		<img src="/img/lang_ita.png" alt="Superenalotto.com, versione del sito in italiano" title="Superenalotto.com in Italiano"/>
+		<a href='/en/'><img class='langOff' src="/img/lang_eng.png" alt="Superenalotto.com, versione del sito in inglese" title="Superenalotto.com in Inglese"/></a>
+		<a href='/de/'><img class='langOff' src="/img/lang_ger.png" alt="Superenalotto.com, versione del sito in tedesco" title="Superenalotto.com in Tedesco"/></a>
+	</div>
+	<div class="bottomMenu">
+		<a href='/disclaimer'>Disclaimer</a>
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+		<a href='https://www.iubenda.com/privacy-policy/83178508'>Privacy</a>
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+		<a href='https://www.iubenda.com/privacy-policy/83178508/cookie-policy'>Cookie Policy</a><br />
+		<a href='/contattaci'>Contatti SuperEnalotto.com</a>
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+		<a href='/pdf/accessibilita-superenalotto-com.pdf' target='_blank'>Accessibilità</a>
+	</div>
+	<div class="bottomCopyright">
+		Copyright &copy; 2026 SuperEnalotto.com. Questo sito è gestito da Giochi24 S.r.l. Unipersonale Società soggetta alla direzione e coordinamento di Lotto.com Holdings LTD.
+	</div>
+
+	<div class="footer">
+	I giochi online sono disponibili su siti autorizzati. Le probabilità di vincita sono disponibili sul sito degli operatori o su www.adm.gov.it. Il gioco può causare dipendenza patologica.<br />
+	Gioco vietato ai minori di 18 anni. <a class="underline" href=' https://www.adm.gov.it/portale/en/-/superenalotto_note-note-informative-sulle-probabilita-di-vincita'>Controlla qui le probabilità di vincita.</a>
+	</div>
+	<script type="text/javascript">
+var _iub = _iub || [];
+_iub.csConfiguration = {"askConsentAtCookiePolicyUpdate":true,"cookiePolicyInOtherWindow":true,"enableTcf":true,"floatingPreferencesButtonDisplay":"bottom-right","googleAdditionalConsentMode":true,"perPurposeConsent":true,"siteId":2967914,"tcfPurposes":{"2":"consent_only","7":"consent_only","8":"consent_only","9":"consent_only","10":"consent_only","11":"consent_only"},"whitelabel":false,"cookiePolicyId":83178508,"banner":{"acceptButtonColor":"#016239","acceptButtonDisplay":true,"backgroundColor":"#FFFFFF","closeButtonDisplay":false,"customizeButtonDisplay":true,"explicitWithdrawal":true,"fontSizeBody":"12px","linksColor":"#000000","listPurposes":true,"logo":null,"rejectButtonCaptionColor":"#000000","rejectButtonColor":"#FFFFFF","rejectButtonDisplay":true,"textColor":"#000000"}};
+_iub.csLangConfiguration = {"it":{"cookiePolicyId":83178508},"de":{"cookiePolicyId":57852331},"en-GB":{"cookiePolicyId":18779720}};
+</script>
+<script type="text/javascript" src="https://cs.iubenda.com/autoblocking/2967914.js"></script>
+<script type="text/javascript" src="//cdn.iubenda.com/cs/tcf/stub-v2.js"></script>
+<script type="text/javascript" src="//cdn.iubenda.com/cs/tcf/safe-tcf-v2.js"></script>
+<script type="text/javascript" src="//cdn.iubenda.com/cs/iubenda_cs.js" charset="UTF-8" async></script>
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5166608547474961"
+     crossorigin="anonymous"></script>
+<!-- Superenalotto-display-orizzontale -->
+
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="ca-pub-5166608547474961"
+     data-ad-slot="7446262639"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+<!-- Google tag (gtag.js) --> <script async src="https://www.googletagmanager.com/gtag/js?id=G-HJZ7EQTJYK"></script> <script> window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-HJZ7EQTJYK'); </script>
+ 		</div>
+	</div>
+</body>
+</html>
