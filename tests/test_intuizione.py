@@ -65,3 +65,25 @@ def test_rifiuto_dopo_correzioni():
     righe, ctx = _ctx(EJ)
     with pytest.raises(ErroreClaude):
         it.proponi(finta({"tipo": "ridotto", "numeri": [1, 2, 3], "garanzia": 1}), "q", EJ, ctx, 10.0)
+
+
+def test_sovraccarico_cambia_modello(monkeypatch):
+    from pmse.core import claude_ai as ca
+    provati = []
+
+    def finto(chiave, modello, corpo, timeout):
+        provati.append(modello)
+        if len(provati) < 3:
+            raise ca.ErroreSovraccarico("Errore 503 (servizio momentaneamente sovraccarico)")
+        return {"modelVersion": modello}
+    monkeypatch.setattr(ca, "_invia_gemini", finto)
+    avvisi = []
+    d = ca.invia_gemini_robusto("k", "gemini-3.5-flash-lite", {}, 10, avvisi.append, attese=(0,))
+    assert provati[:2] == ["gemini-3.5-flash-lite"] * 2 and d["modelVersion"] != "gemini-3.5-flash-lite"
+    assert any("provo con" in a for a in avvisi)
+
+    def sempre(*a):
+        raise ca.ErroreSovraccarico("503")
+    monkeypatch.setattr(ca, "_invia_gemini", sempre)
+    with pytest.raises(ca.ErroreSovraccarico, match="riprova tra qualche minuto"):
+        ca.invia_gemini_robusto("k", "gemini-3.8-flash", {}, 10, attese=(0,))

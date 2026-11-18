@@ -102,6 +102,33 @@ class ErroreClaude(Exception):
     pass
 
 
+class ErroreSovraccarico(ErroreClaude):
+    """Il servizio è momentaneamente sovraccarico (errori 500/502/503/504/529): conviene riprovare."""
+
+
+class ErroreLimite(ErroreClaude):
+    """Limite di richieste raggiunto (errore 429), per esempio il limite giornaliero gratuito di un modello."""
+
+
+SOVRACCARICO = (500, 502, 503, 504, 529)
+ATTESE = (3, 8, 15)          # secondi di attesa tra un tentativo e l'altro
+
+
+def _con_tentativi(fun, attese=ATTESE, avviso=None):
+    """Esegue fun(); se il servizio è sovraccarico riprova dopo qualche secondo."""
+    import time
+    for i, att in enumerate((0,) + tuple(attese)):
+        if att:
+            if avviso:
+                avviso(f"Servizio sovraccarico: nuovo tentativo tra {att} secondi ({i}/{len(attese)})...")
+            time.sleep(att)
+        try:
+            return fun()
+        except ErroreSovraccarico as ex:
+            ultimo = ex
+    raise ultimo
+
+
 @dataclass
 class RispostaClaude:
     sestine: list[list[int]]
@@ -352,7 +379,8 @@ def _invia(chiave: str, corpo: dict, timeout: int, workspace: str = "") -> dict:
                             "workspace)", 401: "chiave API non valida", 402: "credito API esaurito",
                        403: "chiave senza permessi", 404: "modello non disponibile per questa chiave",
                        429: "troppe richieste o limite di spesa raggiunto", 529: "servizio momentaneamente sovraccarico"}
-        raise ErroreClaude(f"Errore {ex.code} ({spiegazioni.get(ex.code, 'errore del servizio')}): {dettaglio}")
+        tipo = ErroreSovraccarico if ex.code in SOVRACCARICO else ErroreClaude
+        raise tipo(f"Errore {ex.code} ({spiegazioni.get(ex.code, 'errore del servizio')}): {dettaglio}")
     except (urllib.error.URLError, TimeoutError) as ex:
         raise ErroreClaude(f"Impossibile contattare Claude: {ex}")
 
@@ -415,8 +443,8 @@ def chiedi_a_claude(chiave: str, modello: str, dossier: str, gia_uscite: set[tup
     sistema = istruzioni(g)
 
     def conversa(messaggi):
-        dati = _invia(chiave, {"model": modello, "max_tokens": 6000, "system": sistema, "messages": messaggi},
-                      timeout, workspace)
+        dati = invia_claude_robusto(chiave, {"model": modello, "max_tokens": 6000, "system": sistema,
+                                             "messages": messaggi}, timeout, workspace)
         uso = dati.get("usage", {})
         return (_testo(dati), dati.get("model", modello), int(uso.get("input_tokens", 0)),
                 int(uso.get("output_tokens", 0)))
@@ -427,9 +455,10 @@ def chiedi_a_claude(chiave: str, modello: str, dossier: str, gia_uscite: set[tup
 # ------------------------------------------------------------------ Gemini
 URL_GEMINI = "https://generativelanguage.googleapis.com/v1beta/models/{modello}:generateContent"
 MODELLI_GEMINI = [
-    ("gemini-3.8-flash", "Gemini 3.8 Flash – consigliato (funziona anche con la chiave gratuita)"),
+    ("gemini-3.8-flash", "Gemini 3.8 Flash – il migliore gratuito (circa 20 richieste al giorno)"),
     ("gemini-4-argon", "Gemini 4 Argon – il più potente (richiede il piano a pagamento)"),
-    ("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite – il più veloce ed economico"),
+    ("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite – veloce, gratuito fino a circa 500 richieste al giorno"),
+    ("gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite – di riserva, gratuito fino a circa 500 richieste al giorno"),
 ]
 CHIAVE_GEMINI = "gemini_api_key"
 CHIAVE_MODELLO_GEMINI = "gemini_modello"
@@ -458,9 +487,45 @@ def _invia_gemini(chiave: str, modello: str, corpo: dict, timeout: int) -> dict:
                        404: "modello non disponibile per questa chiave",
                        429: "limite di richieste raggiunto (quota gratuita esaurita: riprova più tardi)",
                        500: "errore interno di Google", 503: "servizio momentaneamente sovraccarico"}
-        raise ErroreClaude(f"Errore {ex.code} ({spiegazioni.get(ex.code, 'errore del servizio')}): {dettaglio}")
+        tipo = (ErroreSovraccarico if ex.code in SOVRACCARICO else ErroreLimite if ex.code == 429
+                else ErroreClaude)
+        raise tipo(f"Errore {ex.code} ({spiegazioni.get(ex.code, 'errore del servizio')}): {dettaglio}")
     except (urllib.error.URLError, TimeoutError) as ex:
         raise ErroreClaude(f"Impossibile contattare Gemini: {ex}")
+
+
+def invia_gemini_robusto(chiave: str, modello: str, corpo: dict, timeout: int, avviso=None,
+                         attese=ATTESE) -> dict:
+    """Come _invia_gemini, ma se il modello è sovraccarico (503) riprova; se resta sovraccarico o se il suo
+    limite di richieste è esaurito (429) passa agli altri modelli Gemini gratuiti, prima i Flash-Lite che
+    hanno i limiti più alti. Il modello usato davvero è in dati["modelVersion"]."""
+    altri = [m for m, _ in MODELLI_GEMINI if m != modello and "argon" not in m and "pro" not in m]
+    altri.sort(key=lambda m: 0 if "lite" in m else 1)
+    ultimo = None
+    for i, mod in enumerate([modello] + altri):
+        if i and avviso:
+            motivo = "ha esaurito il limite di richieste" if isinstance(ultimo, ErroreLimite) else "è sovraccarico"
+            avviso(f"Il modello {modello} {motivo}: provo con {mod}...")
+        try:
+            return _con_tentativi(lambda m=mod: _invia_gemini(chiave, m, corpo, timeout),
+                                  attese if i == 0 else attese[:1], avviso)
+        except (ErroreSovraccarico, ErroreLimite) as ex:
+            ultimo = ex
+    if isinstance(ultimo, ErroreLimite):
+        raise ErroreLimite(f"{ultimo}\n\nHai esaurito le richieste gratuite di tutti i modelli Gemini provati "
+                           "(il modello 3.8 Flash ne concede poche al giorno, i Flash-Lite molte di più): riprova "
+                           "più tardi o domani, oppure scegli Claude.")
+    raise ErroreSovraccarico(f"{ultimo}\n\nTutti i modelli Gemini provati sono sovraccarichi in questo momento: "
+                             "riprova tra qualche minuto, oppure scegli Claude con «Cambia intelligenza artificiale "
+                             "o chiave».")
+
+
+def invia_claude_robusto(chiave: str, corpo: dict, timeout: int, workspace: str = "", avviso=None,
+                         attese=ATTESE) -> dict:
+    try:
+        return _con_tentativi(lambda: _invia(chiave, corpo, timeout, workspace), attese, avviso)
+    except ErroreSovraccarico as ex:
+        raise ErroreSovraccarico(f"{ex}\n\nClaude è sovraccarico in questo momento: riprova tra qualche minuto.")
 
 
 def _testo_gemini(dati: dict) -> str:
@@ -497,7 +562,7 @@ def chiedi_a_gemini(chiave: str, modello: str, dossier: str, gia_uscite: set[tup
                      for x in messaggi]
         corpo = {"systemInstruction": {"parts": [{"text": sistema}]}, "contents": contenuti,
                  "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": 16000}}
-        dati = _invia_gemini(chiave, modello, corpo, timeout)
+        dati = invia_gemini_robusto(chiave, modello, corpo, timeout)
         uso = dati.get("usageMetadata", {})
         return (_testo_gemini(dati), dati.get("modelVersion", modello), int(uso.get("promptTokenCount", 0)),
                 int(uso.get("candidatesTokenCount", 0)) + int(uso.get("thoughtsTokenCount", 0)))

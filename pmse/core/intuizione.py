@@ -18,7 +18,8 @@ from . import condizioni as cnd
 from . import ridotti_pronti
 from . import sistemi as sis
 from . import statistiche as st
-from .claude_ai import (ErroreClaude, _estrai_json, _invia, _invia_gemini, _testo, _testo_gemini)
+from .claude_ai import (ErroreClaude, _estrai_json, _testo, _testo_gemini, invia_claude_robusto,
+                        invia_gemini_robusto)
 from .gioco import Gioco, SE
 
 CHIAVE_BUDGET = "intuizione_budget"
@@ -232,7 +233,7 @@ class Esito:
 
 
 def conversatore(fornitore: str, chiave: str, modello: str, sistema: str, workspace: str = "",
-                 timeout: int = 300):
+                 timeout: int = 300, avviso=None):
     """Funzione conversa(messaggi) -> (testo, modello, token_in, token_out) per Claude o Gemini."""
     if not chiave:
         raise ErroreClaude("Manca la chiave API: impostala in Magico Pensiero → intelligenza artificiale.")
@@ -243,15 +244,15 @@ def conversatore(fornitore: str, chiave: str, modello: str, sistema: str, worksp
             corpo = {"systemInstruction": {"parts": [{"text": sistema}]}, "contents": contenuti,
                      "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": 16000,
                                           "temperature": 1.0}}
-            dati = _invia_gemini(chiave, modello, corpo, timeout)
+            dati = invia_gemini_robusto(chiave, modello, corpo, timeout, avviso)
             uso = dati.get("usageMetadata", {})
             return (_testo_gemini(dati), dati.get("modelVersion", modello), int(uso.get("promptTokenCount", 0)),
                     int(uso.get("candidatesTokenCount", 0)) + int(uso.get("thoughtsTokenCount", 0)))
         return conversa
 
     def conversa(messaggi):
-        dati = _invia(chiave, {"model": modello, "max_tokens": 6000, "system": sistema, "messages": messaggi},
-                      timeout, workspace)
+        dati = invia_claude_robusto(chiave, {"model": modello, "max_tokens": 6000, "system": sistema,
+                                             "messages": messaggi}, timeout, workspace, avviso)
         uso = dati.get("usage", {})
         return (_testo(dati), dati.get("model", modello), int(uso.get("input_tokens", 0)),
                 int(uso.get("output_tokens", 0)))

@@ -73,7 +73,7 @@ class Pensatore(QThread):
                 conversa = CONVERSA_FINTA
             else:
                 forn, chiave, modello, ws = impostazioni_ai(self.arch)
-                conversa = it.conversatore(forn, chiave, modello, it.istruzioni(g), ws)
+                conversa = it.conversatore(forn, chiave, modello, it.istruzioni(g), ws, avviso=self.stato.emit)
             self.finito.emit(it.proponi(conversa, self.quadro, g, self.ctx, self.budget, leggi_prezzi(self.arch),
                                         avanzamento=self.stato.emit))
         except claude_ai.ErroreClaude as ex:
