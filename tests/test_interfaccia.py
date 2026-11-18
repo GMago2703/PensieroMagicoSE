@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -377,7 +378,7 @@ def test_pensiero_magico_ej(app, tmp_path):
 
 
 def test_menu_disattivi(app, tmp_path):
-    """Sistemi, Condizioni, Sviluppo, Combinazioni, Statistiche: voci inserite ma tutte disattivate."""
+    """Menu in stile Enavision: Sistemi, Condizioni, Sviluppo, Combinazioni attivi; Statistiche ancora disattivato."""
     from pmse.core.gioco import EJ, SE
     from pmse.ui.finestra import FinestraPrincipale
 
@@ -396,8 +397,16 @@ def test_menu_disattivi(app, tmp_path):
             assert len(voci) >= 4, nome
             for x in voci:
                 testo = x.text().split("\t")[0]
-                assert not x.isEnabled(), (nome, testo)
+                if nome == "Statistiche":
+                    assert not x.isEnabled(), (nome, testo)          # ancora da fare
                 assert testo.lower() not in {e.lower() for e in escluse}, (nome, testo)
+        # i menu dei sistemi sono attivi
+        nuovo = next(x.menu() for x in menu["Sistemi"].actions() if x.menu())
+        assert [x.text() for x in nuovo.actions()] == ["Condizionati...", "Condizionati ridotti...",
+                                                      "Ridotti (integrali a garanzia)...", "Ridotti immediati..."]
+        cond = [x.text() for x in menu["Condizioni"].actions() if x.isEnabled() and not x.isSeparator()]
+        assert "Somme" in cond and "Pari e dispari" in cond and len(cond) >= 18
+        assert ("Popolarità (quanto è giocata)" in cond) == (g is SE)
         stat = [x.text() for x in menu["Statistiche"].actions()]
         assert ("Numeri SuperStar" in stat) == (g is SE)
         assert ("Euronumeri" in stat) == (g is EJ)
@@ -413,5 +422,81 @@ def test_menu_disattivi(app, tmp_path):
                 app.processEvents()
                 foto("menu_" + nome.lower(), m)
                 m.close()
+        w.close()
+        a.chiudi()
+
+
+
+def test_sistemi(app, tmp_path):
+    """Editor dei sistemi, scheda di una condizione, sviluppo, memorizzazione, sistemi salvati."""
+    import random as _r
+    from datetime import date as _d, timedelta as _td
+    from pmse.core import condizioni as cnd, sistemi as sis
+    from pmse.core.gioco import EJ, SE
+    from pmse.core.modello import Estrazione
+    from pmse.ui import sistemi as us
+    from pmse.ui.finestra import FinestraPrincipale
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"s_{g.codice}.db", gioco=g)
+        rnd, ests, d = _r.Random(2), [], _d(2015, 1, 6)
+        while len(ests) < 600:
+            if d.weekday() in g.giorni_estrazione:
+                n = rnd.sample(range(1, g.n + 1), g.k)
+                if g.is_ej:
+                    e = rnd.sample(range(1, g.euro_max(d) + 1), 2)
+                    ests.append(Estrazione(d, n, e[0], e[1], gioco=EJ))
+                else:
+                    resto = [x for x in range(1, 91) if x not in n]
+                    ests.append(Estrazione(d, n, rnd.choice(resto), rnd.randint(1, 90)))
+            d += _td(days=1)
+        a.unisci(ests)
+        w = FinestraPrincipale(a, avvio_automatico=False)
+        # condizionato con la scheda della condizione Pari e dispari (suggerimento applicato)
+        ed = w.nuovo_sistema("condizionato")
+        ed.griglia.imposta(list(range(1, 21)), [3])
+        sc = us.SchedaCondizione(ed.ctx, "pari", None, ed)
+        assert sc.analisi.righe and "più comune" in sc.l_sugg.text()
+        sc._ok()
+        conds = ed._conds() + [sc.risultato]
+        ed._salva_conds(conds)
+        assert ed.lista.count() == 1
+        if g is SE:
+            foto("sistemi_scheda_condizione", sc)
+            foto("sistemi_editor_condizionato", ed)
+        s = ed._raccogli()
+        sv = sis.sviluppa(s, ed.ctx)
+        assert 0 < len(sv.colonne) < sis.numero_integrale(20, g.k, 1)
+        assert all(3 in c for c in sv.colonne.tolist())
+        s.colonne = sv.colonne.tolist()
+        fs = us.FinestraSviluppo(a, s, None, ed)
+        fs.garanzie()
+        assert "CALCOLO GARANZIE" in fs.risultati.toPlainText()
+        fs.spoglio_ultima()
+        if g is SE:
+            foto("sistemi_sviluppo", fs)
+        s.nome = "prova"
+        sis.salva(a, s)
+        fs.close()
+        ed.close()
+        # ridotto immediato: 10 numeri, garanzia n-1 già pronta
+        ed = w.nuovo_sistema("immediato")
+        ed.griglia.imposta(list(range(5, 15)), [])
+        ed.c_gar.setCurrentIndex(ed.c_gar.findData(1))
+        assert ed.t_pronti.rowCount() >= 3 and "pronto" in ed.l_info.text()
+        s2 = ed._raccogli()
+        sv2 = sis.sviluppa(s2)
+        ver = sis.verifica_garanzia(sv2.colonne, np.vstack(list(sis.integrale(s2.numeri, g.k))))
+        assert ver.garantiti >= g.k - 1
+        if g is SE:
+            foto("sistemi_ridotto_immediato", ed)
+        ed.close()
+        fsal = us.FinestraSalvati(a, w)
+        assert fsal.t.rowCount() == 1
+        fac = us.FinestraAnalisiCondizioni(a, w)
+        assert fac.t.rowCount() >= 15
+        if g is SE:
+            foto("sistemi_analisi_condizioni", fac)
+        for f in (fsal, fac):
+            f.close()
         w.close()
         a.chiudi()

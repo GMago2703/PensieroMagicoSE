@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import date
 
 from PySide6.QtCore import QSettings, Qt, QTimer
-from PySide6.QtGui import QAction, QFont
+from PySide6.QtGui import QAction, QFont, QKeySequence
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
                                QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QPushButton, QSizePolicy, QToolButton,
                                QVBoxLayout, QWidget)
@@ -40,20 +40,6 @@ MENU_VUOTI = ["Metodi"]
 # Menu in stile Enavision, inseriti ma non ancora attivi ("-" = separatore,
 # (nome, [voci]) = sottomenu). La voce "SUPERSTAR" diventa il nome giusto per ogni gioco.
 MENU_DISATTIVI = [
-    ("Sistemi", ["Nuovo", "-", "Carica\tF3", "Salva\tF2", "Salva come", "Cancella", "-", "Uscita"]),
-    ("Condizioni", ["Fisse", "Somme\tCtrl+S", "Consecutività numerica", "Numero di sequenze",
-                    "Pari e dispari\tCtrl+P", "Numero di cifre", "Consecutività differenziata",
-                    "Presenza delle distanze", "Distanze globali", "Distanze specifiche", "Posizioni",
-                    "Interruzioni", "Simmetrie", "Ripetizioni", "Ritardi e IC",
-                    "Combinazioni speciali", "Combinazioni filtro\tCtrl+F", "Sequele",
-                    "Personalizzata", "-", "Quadri\tCtrl+Q"]),
-    ("Sviluppo", ["Impostazioni", "Sviluppo\tF5", "-", "Calcolo garanzie",
-                  "Analisi statistica condizionato", "Rendimento delle condizioni", "-",
-                  "Editor di formazioni numeriche"]),
-    ("Combinazioni", [("Visualizzazione", []), "-", ("Spoglio", []), ("Spoglio storico", []),
-                      "Spoglio multiplo", "Combinazione test", "-", "Salva", "-",
-                      "Conversione formati", "Operazioni", "-", "Editor di combinazioni",
-                      "Editor basi e varianti"]),
     ("Statistiche", ["Tutti i numeri", "SUPERSTAR", "-", "Tabellone dei ritardi",
                      "Numeri caldi e freddi", "Ritardo di posizione", "Classifica delle condizioni",
                      "-", ("Combinazioni", [])]),
@@ -206,6 +192,150 @@ class FinestraPrincipale(QMainWindow):
                 a.setToolTip("In preparazione")
                 menu.addAction(a)
 
+    # ------------------------------------------------------------- sistemi
+    CONDIZIONI_MENU = [("Fisse", "gruppo", ""), ("Somme", "somme", "Ctrl+S"),
+                       ("Consecutività numerica", "consecutivi", ""), ("Numero di sequenze", "sequenze", ""),
+                       ("Pari e dispari", "pari", "Ctrl+P"), ("Numero di cifre", "cifre", ""),
+                       ("Consecutività differenziata", "differenziata", ""),
+                       ("Presenza delle distanze", "presenza_distanze", ""), ("Distanze globali", "distanza_globale", ""),
+                       ("Distanze specifiche", "distanza_massima", ""), ("Posizioni", "posizione", ""),
+                       ("Interruzioni (decine occupate)", "decine", ""), ("Simmetrie", "simmetrie", ""),
+                       ("Ripetizioni (in comune con l'archivio)", "ripetizioni", ""),
+                       ("Ripetizioni dall'ultima estrazione", "ultima", ""), ("Ritardi e IC", "ritardatari", ""),
+                       ("Combinazioni speciali: numeri alti", "alti", ""),
+                       ("Combinazioni speciali: numeri primi", "primi", ""),
+                       ("Combinazioni filtro", "filtro", "Ctrl+F"), ("Sequele", "gruppo", ""),
+                       ("Popolarità (quanto è giocata)", "popolarita", "")]
+
+    def _menu_sistemi(self):
+        mb = self.menuBar()
+        m = mb.addMenu("&Sistemi")
+        nuovo = m.addMenu("Nuovo")
+        for testo, tipo in (("Condizionati...", "condizionato"), ("Condizionati ridotti...", "condizionato_ridotto"),
+                            ("Ridotti (integrali a garanzia)...", "ridotto"), ("Ridotti immediati...", "immediato")):
+            nuovo.addAction(testo, lambda t=tipo: self.nuovo_sistema(t))
+        m.addSeparator()
+        a = m.addAction("Carica...", self.sistemi_salvati)
+        a.setShortcut(QKeySequence("F3"))
+        a = m.addAction("Salva", self._salva_sistema)
+        a.setShortcut(QKeySequence("F2"))
+        m.addAction("Salva come...", self._salva_sistema)
+        m.addAction("Cancella...", self.sistemi_salvati)
+        m.addSeparator()
+        m.addAction("Uscita", self.close)
+
+        m = mb.addMenu("&Condizioni")
+        m.addAction("📊 Analisi di tutte le condizioni sull'archivio...", self.analisi_condizioni)
+        m.addSeparator()
+        for testo, codice, tasto in self.CONDIZIONI_MENU:
+            if codice == "popolarita" and self.g.is_ej:
+                continue
+            a = m.addAction(testo, lambda c=codice: self.apri_condizione(c))
+            if tasto:
+                a.setShortcut(QKeySequence(tasto))
+        m.addSeparator()
+        for testo in ("Personalizzata", "Quadri"):
+            a = m.addAction(testo + " (in preparazione)")
+            a.setEnabled(False)
+
+        m = mb.addMenu("S&viluppo")
+        m.addAction("Impostazioni (prezzi)...", self._prezzi)
+        a = m.addAction("Sviluppo", self._sviluppa)
+        a.setShortcut(QKeySequence("F5"))
+        m.addSeparator()
+        m.addAction("Calcolo garanzie (ultimo sistema sviluppato)", lambda: self._ultimo("garanzie"))
+        m.addAction("Analisi statistica condizionato...", self.analisi_condizioni)
+        m.addAction("Rendimento delle condizioni", self._rendimento)
+        m.addSeparator()
+        a = m.addAction("Editor di formazioni numeriche (in preparazione)")
+        a.setEnabled(False)
+
+        m = mb.addMenu("C&ombinazioni")
+        m.addAction("Visualizzazione (ultimo sistema sviluppato)", lambda: self._ultimo(None))
+        m.addSeparator()
+        m.addAction("Spoglio sull'ultima estrazione", lambda: self._ultimo("spoglio_ultima"))
+        m.addAction("Spoglio su una combinazione...", lambda: self._ultimo("spoglio_combinazione"))
+        m.addAction("Spoglio storico...", lambda: self._ultimo("spoglio_storico"))
+        m.addSeparator()
+        m.addAction("Salva / Conversione formati (TXT, CSV)...", lambda: self._ultimo("esporta"))
+        m.addAction("Sistemi memorizzati...", self.sistemi_salvati)
+        m.addSeparator()
+        for testo in ("Spoglio multiplo", "Combinazione test", "Operazioni", "Editor di combinazioni",
+                      "Editor basi e varianti"):
+            a = m.addAction(testo + " (in preparazione)")
+            a.setEnabled(False)
+
+    def nuovo_sistema(self, tipo, sistema=None):
+        from .sistemi import EditorSistema
+        if len(self.arch.tutte()) < 30 and tipo in ("condizionato", "condizionato_ridotto"):
+            QMessageBox.information(self, "Sistemi", "Per i condizionati serve l'archivio: aggiornalo prima "
+                                                     "(le condizioni si analizzano sulle estrazioni reali).")
+        self.editor_sistema = EditorSistema(self.arch, tipo, sistema, self)
+        self.editor_sistema.setAttribute(Qt.WA_DeleteOnClose, False)
+        self.editor_sistema.show()
+        return self.editor_sistema
+
+    def _editor_aperto(self):
+        e = getattr(self, "editor_sistema", None)
+        return e if e is not None and e.isVisible() else None
+
+    def apri_condizione(self, codice):
+        e = self._editor_aperto()
+        if e is None or e.s.tipo not in ("condizionato", "condizionato_ridotto"):
+            e = self.nuovo_sistema("condizionato")
+        if codice in ("gruppo", "filtro"):
+            e._gruppo(codice)
+        else:
+            e.apri_condizione(codice)
+
+    def sistemi_salvati(self):
+        from .sistemi import FinestraSalvati
+        FinestraSalvati(self.arch, self, lambda tipo, s: self.nuovo_sistema(tipo, s)).exec()
+
+    def _salva_sistema(self):
+        e = self._editor_aperto()
+        if e is None:
+            QMessageBox.information(self, "Sistemi", "Apri o crea un sistema (Sistemi → Nuovo) per salvarlo.")
+            return
+        e._memorizza_impostazioni()
+
+    def _sviluppa(self):
+        e = self._editor_aperto()
+        if e is None:
+            QMessageBox.information(self, "Sviluppo", "Apri o crea un sistema (Sistemi → Nuovo) da sviluppare.")
+            return
+        e.sviluppa()
+
+    def _rendimento(self):
+        e = self._editor_aperto()
+        if e is None or e.s.tipo not in ("condizionato", "condizionato_ridotto"):
+            QMessageBox.information(self, "Rendimento", "Apri un sistema condizionato con delle condizioni.")
+            return
+        e.rendimento()
+
+    def _prezzi(self):
+        from .sistemi import FinestraPrezzi
+        FinestraPrezzi(self.arch, self).exec()
+
+    def analisi_condizioni(self):
+        from .sistemi import FinestraAnalisiCondizioni
+        if len(self.arch.tutte()) < 30:
+            QMessageBox.information(self, "Condizioni", "Archivio troppo piccolo: aggiornalo prima.")
+            return
+        FinestraAnalisiCondizioni(self.arch, self, self.apri_condizione).exec()
+
+    def _ultimo(self, azione):
+        from .sistemi import ULTIMO, FinestraSviluppo
+        dato = ULTIMO.get(self.g.codice)
+        if not dato:
+            QMessageBox.information(self, "Combinazioni", "Nessun sistema sviluppato in questa sessione: sviluppane "
+                                                          "uno (Sistemi → Nuovo) o aprine uno memorizzato (F3).")
+            return
+        f = FinestraSviluppo(self.arch, dato[0], dato[1], self)
+        if azione:
+            getattr(f, azione)()
+        f.exec()
+
     def _menu_disattivo(self, nome, voci):
         m = self.menuBar().addMenu(nome)
         m.setToolTipsVisible(True)
@@ -244,6 +374,7 @@ class FinestraPrincipale(QMainWindow):
     def _menu(self):
         mb = self.menuBar()
         self._selettore()
+        self._menu_sistemi()
         for nome, voci in MENU_DISATTIVI:
             self._menu_disattivo(nome, voci)
         for nome in MENU_VUOTI:
