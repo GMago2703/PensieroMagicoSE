@@ -152,3 +152,20 @@ def test_laboratorio_servizio(tmp_path, finto_internet, monkeypatch):
     assert "Laboratorio sulla casualità" in visti["dossier"]
     assert s.arch.leggi_impostazione(laboratorio.CHIAVE_LAB) in visti["dossier"]
     s.chiudi()
+
+
+def test_sistemi_ridotti_servizio():
+    import servizi
+    from pmse.core.gioco import EJ, SE
+    assert servizi.ridotti_disponibili(SE, 10, 0)[0] == (5, 15)
+    s = servizi.sviluppa_ridotto(SE, [3, 7, 12, 18, 21, 33, 45, 56, 67, 78], [7], 1, True)
+    assert s.colonne and all(7 in c for c in s.colonne)
+    s2 = servizi.sviluppa_ridotto(EJ, range(1, 10), [], 2, False)
+    assert s2.colonne and len(s2.colonne[0]) == 5
+    nome, dati = servizi.documento(s, "pdf")
+    assert nome.endswith(".pdf") and dati.startswith(b"%PDF-1.4") and dati.rstrip().endswith(b"%%EOF")
+    nome, dati = servizi.documento(s2, "txt")
+    assert nome.endswith(".txt") and "TABULATO DEL SISTEMA" in dati.decode("utf-8")
+    import pytest
+    with pytest.raises(ValueError):
+        servizi.sviluppa_ridotto(SE, range(1, 31), [], 1, False)

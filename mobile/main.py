@@ -1,7 +1,8 @@
 """Pensiero Magico – app Android (versione ridotta).
 
 Funzioni: archivio con aggiornamento da Internet, Magico Pensiero, verifica storica (con
-apprendimento) e scelta con l'intelligenza artificiale (Gemini o Claude).
+apprendimento), scelta con l'intelligenza artificiale (Gemini o Claude) e sistemi ridotti (ridotti
+immediati e integrali ridotti a garanzia) con salvataggio del tabulato in PDF o TXT.
 SuperEnalotto ed Eurojackpot sono rigidamente separati: si sceglie il gioco in alto e ognuno
 ha il suo archivio, le sue previsioni, il suo apprendimento e le sue chiavi.
 """
@@ -19,6 +20,7 @@ from kivy.metrics import Metrics, dp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.checkbox import CheckBox
+from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.progressbar import ProgressBar
@@ -300,6 +302,7 @@ class Home(Pagina):
         c.add_widget(bottone("Magico Pensiero", lambda: self.app.vai("magico"), ARANCIO))
         c.add_widget(bottone("Verifica storica", lambda: self.app.vai("verifica"), ARANCIO))
         c.add_widget(bottone("Intelligenza artificiale", lambda: self.app.vai("ai"), ARANCIO))
+        c.add_widget(bottone("Sistemi ridotti", lambda: self.app.vai("sistemi"), ARANCIO))
         c.add_widget(bottone("Laboratorio: è davvero casuale?", lambda: self.app.vai("laboratorio"), ARANCIO))
         c.add_widget(bottone("Archivio estrazioni", lambda: self.app.vai("archivio"), VERDE))
         piede = Testo(f"versione {__version__} – i numeri del lotto sono casuali: gioca con moderazione",
@@ -366,6 +369,239 @@ class PaginaArchivio(Pagina):
         if resto > 0:
             self.b_altre.text = f"Mostra altre {min(resto, self.BLOCCO)} (restano {resto})"
             c.add_widget(self.b_altre)
+
+
+# ------------------------------------------------------------------ salvataggio dei file
+def salva_documento(nome: str, dati: bytes, mime: str, condividi: bool = False) -> str:
+    """Salva un file nella cartella Download/PensieroMagico del telefono (o, sul PC, in una cartella
+    dell'app) e, se richiesto, apre la scelta dell'app con cui condividerlo. Restituisce dove è finito."""
+    from kivy.utils import platform
+    if platform != "android":
+        cartella = os.path.join(App.get_running_app().cartella, "esportati")
+        os.makedirs(cartella, exist_ok=True)
+        percorso = os.path.join(cartella, nome)
+        with open(percorso, "wb") as f:
+            f.write(dati)
+        return percorso
+    from jnius import autoclass, cast
+    attivita = autoclass("org.kivy.android.PythonActivity").mActivity
+    versione = autoclass("android.os.Build$VERSION").SDK_INT
+    uri = None
+    if versione >= 29:
+        ContentValues = autoclass("android.content.ContentValues")
+        Colonne = autoclass("android.provider.MediaStore$MediaColumns")
+        Downloads = autoclass("android.provider.MediaStore$Downloads")
+        cv = ContentValues()
+        cv.put(Colonne.DISPLAY_NAME, nome)
+        cv.put(Colonne.MIME_TYPE, mime)
+        cv.put(Colonne.RELATIVE_PATH, "Download/PensieroMagico")
+        resolver = attivita.getContentResolver()
+        uri = resolver.insert(Downloads.EXTERNAL_CONTENT_URI, cv)
+        flusso = resolver.openOutputStream(uri)
+        flusso.write(bytearray(dati), 0, len(dati))
+        flusso.close()
+        dove = f"Download/PensieroMagico/{nome}"
+    else:
+        cartella = attivita.getExternalFilesDir(None).getAbsolutePath()
+        percorso = os.path.join(cartella, nome)
+        with open(percorso, "wb") as f:
+            f.write(dati)
+        dove = percorso
+    if condividi and uri is not None:
+        Intent = autoclass("android.content.Intent")
+        intento = Intent(Intent.ACTION_SEND)
+        intento.setType(mime)
+        intento.putExtra(Intent.EXTRA_STREAM, cast("android.os.Parcelable", uri))
+        intento.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        attivita.startActivity(Intent.createChooser(intento, autoclass("java.lang.String")("Condividi")))
+    return dove
+
+
+class PaginaSistemi(Pagina):
+    """Sistemi ridotti: ridotti immediati (riduzioni già pronte) e integrali ridotti a garanzia."""
+    titolo = "Sistemi ridotti"
+
+    def __init__(self, app, **kw):
+        super().__init__(app, name="sistemi", **kw)
+        self.numeri: set[int] = set()
+        self.fisse: set[int] = set()
+        self.immediato = True
+        self.punti = None                 # punti garantiti scelti
+        self.sistema = None
+        self.gioco_attuale = None
+
+    def mostra(self):
+        if self.gioco_attuale is not self.g:          # giochi separati: si riparte da zero
+            self.numeri, self.fisse, self.sistema, self.punti = set(), set(), None, None
+            self.gioco_attuale = self.g
+        c = self.corpo
+        c.clear_widgets()
+        scelta = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(6))
+        for testo, imm in (("Ridotto immediato", True), ("Ridotto a garanzia", False)):
+            b = ToggleButton(text=testo, group="tipo_sistema", state="down" if imm == self.immediato else "normal",
+                             bold=True, font_size=sp(15), background_normal="", background_down="",
+                             background_color=hexc(LIME if imm == self.immediato else "#ffffff30"),
+                             color=(0, 0, 0, 1) if imm == self.immediato else (1, 1, 1, 1),
+                             allow_no_selection=False)
+            b.bind(on_release=lambda _b, v=imm: self._tipo(v))
+            scelta.add_widget(adatta_testo(b))
+        c.add_widget(scelta)
+        spieg = ("[b]Ridotto immediato[/b]: riduzioni già pronte e verificate (da 7 a 20 numeri, 0-4 fisse): scegli i "
+                 "numeri e la garanzia." if self.immediato else
+                 "[b]Ridotto a garanzia[/b]: l'integrale dei tuoi numeri ridotto dal programma in modo da "
+                 f"garantire i punti scelti (fino a {servizi.MAX_NUMERI_RIDOTTO} numeri).")
+        if self.g.is_ej:
+            spieg += " Eurojackpot: il sistema riguarda i 5 numeri; gli Euronumeri si scelgono a parte."
+        c.add_widget(Testo(spieg, (1, 1, 1, 0.9), font_size=sp(13)))
+        sch = Scheda()
+        sch.add_widget(Testo("Tocca un numero: 1 volta = giocato (verde), 2 volte = [b][color=c62828]fisso[/color][/b], "
+                             "3 volte = tolto.", font_size=sp(13)))
+        griglia = GridLayout(cols=10, spacing=dp(3), size_hint_y=None)
+        griglia.bind(minimum_height=griglia.setter("height"))
+        self.tasti = {}
+        for n in range(1, self.g.n + 1):
+            b = Button(text=str(n), bold=True, font_size=sp(14), size_hint_y=None, height=dp(36),
+                       background_normal="", background_down="")
+            b.bind(on_release=lambda _b, n=n: self._tocca(n))
+            self.tasti[n] = b
+            griglia.add_widget(b)
+        sch.add_widget(griglia)
+        r = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(6))
+        self.l_conta = adatta_testo(Label(color=(0.1, 0.1, 0.1, 1), bold=True, font_size=sp(14)))
+        r.add_widget(self.l_conta)
+        r.add_widget(bottone("Azzera", self._azzera, ARDESIA, alto=dp(40), size_hint_x=0.4))
+        sch.add_widget(r)
+        c.add_widget(sch)
+        self.box_gar = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6))
+        self.box_gar.bind(minimum_height=self.box_gar.setter("height"))
+        c.add_widget(self.box_gar)
+        c.add_widget(bottone("Sviluppa il sistema", self._sviluppa, ARANCIO))
+        self.box_ris = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8))
+        self.box_ris.bind(minimum_height=self.box_ris.setter("height"))
+        c.add_widget(self.box_ris)
+        self._colori()
+        self._garanzie()
+        if self.sistema is not None:
+            self._mostra_sistema()
+
+    # ---------------------------------------------------------------- scelta dei numeri
+    def _tipo(self, immediato):
+        if immediato != self.immediato:
+            self.immediato, self.punti, self.sistema = immediato, None, None
+        self.mostra()
+
+    def _tocca(self, n):
+        if n in self.fisse:
+            self.fisse.discard(n)
+            self.numeri.discard(n)
+        elif n in self.numeri:
+            self.fisse.add(n)
+        else:
+            self.numeri.add(n)
+        self.sistema = None
+        self.box_ris.clear_widgets()
+        self._colori()
+        self._garanzie()
+
+    def _azzera(self):
+        self.numeri, self.fisse, self.sistema = set(), set(), None
+        self.box_ris.clear_widgets()
+        self._colori()
+        self._garanzie()
+
+    def _colori(self):
+        for n, b in self.tasti.items():
+            if n in self.fisse:
+                b.background_color, b.color = hexc("#c62828"), (1, 1, 1, 1)
+            elif n in self.numeri:
+                b.background_color, b.color = hexc(VERDE), (1, 1, 1, 1)
+            else:
+                b.background_color, b.color = hexc("#7ff0f6"), hexc("#0b2a6b")
+        self.l_conta.text = f"Numeri: {len(self.numeri)}" + (f"  (fisse {len(self.fisse)})" if self.fisse else "")
+
+    def _garanzie(self):
+        box = self.box_gar
+        box.clear_widgets()
+        g, n, f = self.g, len(self.numeri), len(self.fisse)
+        sch = Scheda()
+        sch.add_widget(Testo("[b]Garanzia[/b] (se i numeri vincenti sono tra i tuoi):", font_size=sp(14)))
+        if self.immediato:
+            scelte = servizi.ridotti_disponibili(g, n, f)
+            if not scelte:
+                sch.add_widget(Testo(f"Scegli da 7 a 20 numeri ({'6' if g.is_ej else '7'} per l'Eurojackpot) e "
+                                     "da 0 a 4 fisse: qui compariranno le riduzioni pronte." if n < g.k + 1 else
+                                     f"Nessuna riduzione pronta per {n} numeri e {f} fisse.", font_size=sp(13)))
+            voci = [(p, f"Garanzia n-{g.k - p}: almeno il {p} – {c} colonne") for p, c in scelte]
+        else:
+            voci = [(g.k - j, f"Garanzia n-{j}: almeno il {g.k - j}") for j in range(1, g.k - 1)]
+            if n and n <= g.k:
+                sch.add_widget(Testo(f"Servono almeno {g.k + 1} numeri.", font_size=sp(13)))
+        if voci and self.punti not in [p for p, _ in voci]:
+            self.punti = voci[0][0]
+        for p, testo in voci:
+            sel = p == self.punti
+            b = bottone(testo, lambda p=p: self._scegli(p), VERDE if sel else "#90a4ae", alto=dp(44))
+            sch.add_widget(b)
+        box.add_widget(sch)
+
+    def _scegli(self, punti):
+        self.punti = punti
+        self.sistema = None
+        self.box_ris.clear_widgets()
+        self._garanzie()
+
+    # ---------------------------------------------------------------- sviluppo e risultato
+    def _sviluppa(self):
+        g = self.g
+        if len(self.numeri) <= g.k:
+            avviso("Sistemi", f"Scegli almeno {g.k + 1} numeri.")
+            return
+        if not self.punti:
+            avviso("Sistemi", "Scegli la garanzia.")
+            return
+        numeri, fisse, gar, imm = sorted(self.numeri), sorted(self.fisse), g.k - self.punti, self.immediato
+
+        def fatto(s):
+            self.sistema = s
+            self._mostra_sistema()
+        self.app.in_background("Sviluppo del sistema...",
+                               lambda: servizi.sviluppa_ridotto(g, numeri, fisse, gar, imm), fatto)
+
+    def _mostra_sistema(self):
+        s, g = self.sistema, self.g
+        box = self.box_ris
+        box.clear_widgets()
+        n = len(s.colonne)
+        prezzo = 2.0 if g.is_ej else 1.0
+        sch = Scheda()
+        sch.add_widget(Testo(f"[b]{'Ridotto immediato' if s.tipo == 'immediato' else 'Ridotto a garanzia'}[/b] – "
+                             f"{len(s.numeri)} numeri" + (f", fisse {' '.join(map(str, s.fisse))}" if s.fisse else "")
+                             + f"\nGaranzia n-{s.garanzia}: almeno il {g.k - s.garanzia}\n"
+                             f"Integrale {s.info.get('integrale', 0):,} colonne -> ridotto a [b]{n:,} colonne[/b]\n"
+                             f"Costo: [b]{n * prezzo:,.2f} €[/b]".replace(",", "X").replace(".", ",").replace("X", ".")))
+        r = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(6))
+        r.add_widget(bottone("Salva PDF", lambda: self._salva("pdf"), VERDE, alto=dp(48)))
+        r.add_widget(bottone("Salva TXT", lambda: self._salva("txt"), VERDE, alto=dp(48)))
+        r.add_widget(bottone("Condividi", lambda: self._salva("pdf", True), ARANCIO, alto=dp(48)))
+        sch.add_widget(r)
+        box.add_widget(sch)
+        sch2 = Scheda()
+        mostra = s.colonne[:400]
+        righe = [f"{i + 1:>4})  " + "  ".join(f"{x:2d}" for x in c) for i, c in enumerate(mostra)]
+        if n > len(mostra):
+            righe.append(f"... e altre {n - len(mostra)} colonne nel PDF / TXT")
+        paragrafi(sch2, "\n".join(righe), font_name="RobotoMono-Regular", font_size=sp(14))
+        box.add_widget(sch2)
+
+    def _salva(self, formato, condividi=False):
+        try:
+            nome, dati = servizi.documento(self.sistema, formato)
+            dove = salva_documento(nome, dati, "application/pdf" if formato == "pdf" else "text/plain", condividi)
+        except Exception as ex:          # noqa: BLE001 – mostrato all'utente
+            avviso("Errore", f"Non riesco a salvare il file: {ex}")
+            return
+        if not condividi:
+            avviso("Salvato", f"Il tabulato è stato salvato in:\n{dove}")
 
 
 class PaginaMagico(Pagina):
@@ -733,7 +969,7 @@ class PensieroMagicoApp(App):
         self.serv = servizi.Servizio(self.cartella, servizi.ultimo_gioco(self.cartella))
         self.sm = ScreenManager(transition=SlideTransition(duration=0.18))
         self.pagine = {}
-        for cls in (Home, PaginaArchivio, PaginaMagico, PaginaVerifica, PaginaAI, PaginaLaboratorio):
+        for cls in (Home, PaginaArchivio, PaginaMagico, PaginaVerifica, PaginaAI, PaginaLaboratorio, PaginaSistemi):
             p = cls(self)
             self.pagine[p.name] = p
             self.sm.add_widget(p)
@@ -782,6 +1018,13 @@ class PensieroMagicoApp(App):
                 print(f"AUTOTEST {g.codice} laboratorio: {len(lab.prove)} prove, {len(lab.anomalie)} anomalie, "
                       f"{time.time() - t1:.0f}s")
                 s.chiudi()
+            # sistemi ridotti e salvataggio del tabulato nella cartella Download del telefono
+            sr = servizi.sviluppa_ridotto(SE, range(1, 11), [], 1, True)
+            nome, dati = servizi.documento(sr, "pdf")
+            print(f"AUTOTEST sistemi: {len(sr.colonne)} colonne, PDF {len(dati)} byte salvato in "
+                  f"{salva_documento(nome, dati, 'application/pdf')}")
+            nome, dati = servizi.documento(sr, "txt")
+            print(f"AUTOTEST sistemi: TXT salvato in {salva_documento(nome, dati, 'text/plain')}")
             if "SE" in senza_rete and "EJ" in senza_rete:
                 raise RuntimeError("nessun sito raggiungibile")
             if senza_rete:

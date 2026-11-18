@@ -261,3 +261,48 @@ def descrivi_risposta(rc, base, g: Gioco) -> str:
 
 __all__ = ["Servizio", "EsitoAggiornamento", "FORNITORI", "SE", "EJ", "GIOCHI", "prepara_certificati",
            "ultimo_gioco", "ricorda_gioco", "descrivi_risposta"]
+
+
+# ------------------------------------------------------------------ sistemi ridotti (versione Android)
+MAX_NUMERI_RIDOTTO = 25          # sul telefono: integrali ridotti fino a 25 numeri (177.100 colonne per il SE)
+
+
+def ridotti_disponibili(g: Gioco, numeri: int, fisse: int) -> list[tuple[int, int]]:
+    """Riduzioni già pronte per quanti numeri e fisse: [(punti garantiti, colonne)], la garanzia più alta prima."""
+    from pmse.core import ridotti_pronti
+    out = [(p, c) for n, f, p, c in ridotti_pronti.disponibili(g.k) if n == numeri and f == fisse]
+    return sorted(out, reverse=True)
+
+
+def sviluppa_ridotto(g: Gioco, numeri, fisse, garanzia: int, immediato: bool, avanzamento=None):
+    """Sviluppa un ridotto immediato (riduzione pronta) o un integrale ridotto a garanzia (n-garanzia).
+    Restituisce il Sistema con le colonne."""
+    from pmse.core import sistemi as sis
+    numeri, fisse = sorted(set(numeri)), sorted(set(fisse))
+    if not immediato and len(numeri) > MAX_NUMERI_RIDOTTO:
+        raise ValueError(f"Sul telefono il ridotto a garanzia arriva a {MAX_NUMERI_RIDOTTO} numeri.")
+    s = sis.Sistema(nome="", tipo="immediato" if immediato else "ridotto", gioco=g.codice, numeri=numeri,
+                    fisse=fisse, garanzia=garanzia, qualita=10)
+    sv = sis.sviluppa(s, avanzamento=avanzamento)
+    s.colonne = sv.colonne.tolist()
+    s.info = {"integrale": sv.integrale, "possibili": sv.possibili}
+    return s
+
+
+def tabulato(s) -> str:
+    from pmse.core import sistemi as sis
+    return sis.tabulato(s, s.colonne, per_riga=2)
+
+
+def documento(s, formato: str) -> tuple[str, bytes]:
+    """(nome del file, contenuto) del tabulato in PDF o TXT."""
+    from datetime import datetime
+
+    from pmse.core import pdf
+    g = s.G
+    from pmse.core import sistemi as sis
+    testo = sis.tabulato(s, s.colonne)
+    nome = f"PensieroMagico{g.codice}_sistema_{len(s.numeri)}numeri_{datetime.now():%Y%m%d_%H%M%S}"
+    if formato == "pdf":
+        return nome + ".pdf", pdf.crea(f"Sistema {len(s.numeri)} numeri – {g.nome}", testo)
+    return nome + ".txt", testo.encode("utf-8")

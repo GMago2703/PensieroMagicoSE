@@ -193,6 +193,47 @@ class Prova(main.PensieroMagicoApp):
         yield
         yield
         self.foto("a09_magico_con_ai_se")
+        # ---- sistemi ridotti (immediato con una fissa, poi a garanzia) e salvataggio PDF / TXT
+        self.vai("sistemi")
+        yield
+        yield
+        si = self.pagine["sistemi"]
+        for n in (3, 7, 12, 18, 21, 33, 45, 56, 67, 78):
+            si._tocca(n)
+        si._tocca(7)                               # seconda volta: fisso
+        yield
+        assert si.fisse == {7} and len(si.numeri) == 10
+        self.foto("a10_sistemi_scelta_se")
+        si._sviluppa()
+        yield
+        yield
+        assert si.sistema and all(7 in c for c in si.sistema.colonne)
+        si.sv.scroll_y = 0.25
+        yield
+        self.foto("a11_sistemi_immediato_se")
+        si._salva("pdf")
+        yield
+        self.chiudi_popup()
+        si._salva("txt")
+        yield
+        self.chiudi_popup()
+        cartella = os.path.join(self.cartella, "esportati")
+        file = sorted(os.listdir(cartella))
+        assert any(f.endswith(".pdf") for f in file) and any(f.endswith(".txt") for f in file), file
+        pdf = next(f for f in file if f.endswith(".pdf"))
+        assert open(os.path.join(cartella, pdf), "rb").read(5) == b"%PDF-"
+        si._tipo(False)
+        yield
+        si._tocca(7)                               # terza volta: tolto
+        si._tocca(9)
+        si._scegli(4)
+        si._sviluppa()
+        yield
+        yield
+        assert si.sistema and si.sistema.tipo == "ridotto"
+        si.sv.scroll_y = 0.3
+        yield
+        self.foto("a12_sistemi_garanzia_se")
         self.vai("home")
         yield
         yield
@@ -230,12 +271,26 @@ class Prova(main.PensieroMagicoApp):
         yield
         yield
         self.foto("b05_archivio_ej")
+        self.vai("sistemi")
+        yield
+        yield
+        si = self.pagine["sistemi"]
+        assert not si.numeri                       # i numeri del SuperEnalotto non passano all'EJ
+        for n in (4, 9, 15, 22, 28, 33, 41, 47, 50):
+            si._tocca(n)
+        si._sviluppa()
+        yield
+        yield
+        assert si.sistema and len(si.sistema.colonne[0]) == 5
+        si.sv.scroll_y = 0.3
+        yield
+        self.foto("b06_sistemi_ej")
         self.vai("home")
         yield
         self.cambia_gioco(SE)
         yield
         assert self.serv.conta() == 400
-        self.foto("b06_ritorno_se")
+        self.foto("b07_ritorno_se")
         # telefono stretto (320 dp): le palline devono restare dentro i riquadri
         Window.size = (int(320 * DENSITA), int(640 * DENSITA))
         yield
