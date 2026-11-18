@@ -47,7 +47,12 @@ def testo_previsione(g, p: dict, titolo: str) -> str:
     r = [titolo, f"Gioco: {g.nome}"]
     if p.get("dopo"):
         r.append(f"Per il concorso dopo quello del {date.fromisoformat(p['dopo']):%d/%m/%Y}")
-    r.append(f"Origine: {p.get('origine', 'Algoritmo')} – generata il {p.get('generata', '')}")
+    gen = p.get("generata", "")
+    try:
+        gen = date.fromisoformat(gen).strftime("%d/%m/%Y")
+    except ValueError:
+        pass
+    r.append(f"Origine: {p.get('origine', 'Algoritmo')} – generata il {gen}")
     r.append("")
     if g.is_ej:
         r.append(f"Cinquina:    {_fmt(p['sestine'][0])}")
@@ -112,8 +117,9 @@ def raccogli(f) -> list[Sezione]:
                       (f"   SuperStar {x['extra'][0]}" if x["extra"] else ""))
                 r.append(f"{'Sistema' if cas['modo'] == 'sistema' else f'{i:2d})'} {_fmt(x['numeri'])}{ex}")
             return "\n".join(r)
-        modo = "numeri per un sistema" if cas["modo"] == "sistema" else f"{len(rr)} combinazioni"
-        out.append(Sezione("casuali", "Combinazioni casuali (macchina)", f"{modo} estratte in questa sessione",
+        modo = "numeri per un sistema" if cas["modo"] == "sistema" else (
+            "1 combinazione estratta" if len(rr) == 1 else f"{len(rr)} combinazioni estratte")
+        out.append(Sezione("casuali", "Combinazioni casuali (macchina)", f"{modo} in questa sessione",
                            testo=testo_cas,
                            colonne=(lambda rr=rr: ([x["numeri"] for x in rr], [x["extra"] for x in rr],
                                                    "Macchina dell'estrazione")) if cas["modo"] != "sistema" else None,
@@ -232,6 +238,7 @@ class FinestraRiepilogo(QDialog):
         for i, s in enumerate(self.sezioni):
             a = QTableWidgetItem(("🟢 " if s.attiva else "⚪ ") + s.nome)
             b = QTableWidgetItem(s.stato)
+            b.setToolTip(s.stato)
             if not s.attiva:
                 a.setForeground(QColor("#777"))
                 b.setForeground(QColor("#777"))
