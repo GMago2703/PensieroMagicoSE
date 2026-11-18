@@ -821,3 +821,48 @@ def test_ricevitoria_e_copie(app, tmp_path, monkeypatch):
     # le combinazioni casuali si dimenticano cambiando programma
     mc.dimentica()
     assert not mc.combinazioni_casuali(SE)
+
+
+def test_riepilogo_sezioni(app, tmp_path):
+    """Riepilogo delle sezioni attive: stampa delle combinazioni di Magico Pensiero, chiusura delle sezioni."""
+    from pmse.core import sistemi as sis
+    from pmse.core.gioco import EJ, SE
+    from pmse.ui import macchina as mc
+    from pmse.ui import sistemi as us
+    from pmse.ui.finestra import FinestraPrincipale
+    from pmse.ui.riepilogo import FinestraRiepilogo
+    from tests.test_sistemi import archivio_finto
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"rp_{g.codice}.db", gioco=g)
+        a.unisci(archivio_finto(g, 300))
+        w = FinestraPrincipale(a, avvio_automatico=False)
+        w.genera()
+        mc.CASUALI[g.codice] = {"modo": "sestine", "risultati": [{"numeri": list(range(1, g.k + 1)),
+                                                                   "extra": [] if g is SE else [1, 2]}]}
+        s = sis.Sistema(tipo="immediato", gioco=g.codice, numeri=list(range(1, 11)), garanzia=1)
+        s.colonne = sis.sviluppa(s).colonne.tolist()
+        us.ULTIMO[g.codice] = (s, None)
+        r = FinestraRiepilogo(w, "magico")
+        nomi = {x.codice: x for x in r.sezioni}
+        assert nomi["magico"].attiva and nomi["casuali"].attiva and nomi["sistema"].attiva
+        assert ("Sestina 1" if g is SE else "Cinquina") in r.anteprima.toPlainText()
+        cols, extra, _ = nomi["magico"].colonne()
+        assert len(cols) == (3 if g is SE else 1) and all(extra)
+        if g is SE:
+            r.show()
+            app.processEvents()
+            foto("riepilogo_sezioni", r)
+        # chiusura: la home si svuota e la previsione non ricompare riaprendo il programma
+        nomi["magico"].chiudi()
+        nomi["casuali"].chiudi()
+        nomi["sistema"].chiudi()
+        r.ricarica()
+        nomi = {x.codice: x for x in r.sezioni}
+        assert not nomi["magico"].attiva and not nomi["casuali"].attiva and not nomi["sistema"].attiva
+        assert "compariranno" in w.l_sestine.text()
+        r.close()
+        w.close()
+        w2 = FinestraPrincipale(a, avvio_automatico=False)
+        assert "compariranno" in w2.l_sestine.text()
+        w2.close()
+        a.chiudi()

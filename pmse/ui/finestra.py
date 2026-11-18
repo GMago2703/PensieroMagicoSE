@@ -388,11 +388,42 @@ class FinestraPrincipale(QMainWindow):
         a = self._azione(m, "🖨 Tabulato di un sistema (stampante, PDF, TXT)...", self.tabulato)
         a.setShortcut(QKeySequence("Ctrl+T"))
         self._azione(m, "Estrazioni dell'archivio...", self.stampa_estrazioni)
+        self._azione(m, "Combinazioni di Magico Pensiero...", lambda: self.riepilogo("magico"))
+        m.addSeparator()
+        a = self._azione(m, "📋 Scegli cosa stampare (tutte le sezioni attive)...", self.riepilogo)
+        a.setShortcut(QKeySequence("Ctrl+Shift+P"))
         m.addSeparator()
         self._azione(m, "Le statistiche si stampano dalla loro finestra (pulsante Stampa)", abilitata=False)
 
+    def riepilogo(self, evidenzia=None):
+        from .riepilogo import FinestraRiepilogo
+        FinestraRiepilogo(self, evidenzia if isinstance(evidenzia, str) else None).exec()
+
+    def mostra_previsione(self, p: dict):
+        from types import SimpleNamespace
+
+        from .riepilogo import CHIAVE_NASCOSTA
+        self.arch.scrivi_impostazione(CHIAVE_NASCOSTA, "")
+        o = p.get("origine", "Algoritmo")
+        self.mostra_magico(SimpleNamespace(sestine=[SimpleNamespace(numeri=s) for s in p["sestine"]],
+                                           jolly=p["jolly"], superstar=p.get("superstar")),
+                           "Proposta dell'algoritmo" if o == "Algoritmo" else f"Scelta di {o.split(' ')[0]}")
+
+    def chiudi_previsione(self, chiave: str):
+        """Toglie dalla home le combinazioni mostrate (restano nello storico delle previsioni)."""
+        from .riepilogo import CHIAVE_NASCOSTA
+        self.arch.scrivi_impostazione(CHIAVE_NASCOSTA, chiave)
+        self.ultimo_magico = None
+        self.p_dx.griglia.mostra_sestine([], None, None)
+        if self.griglia_euro is not None:
+            self.griglia_euro.mostra_euronumeri([])
+        self.l_sestine.setText("La cinquina e gli Euronumeri compariranno qui dopo l'elaborazione." if self.g.is_ej
+                               else "Le 3 sestine compariranno qui dopo l'elaborazione.")
+
     def _menu_impostazioni(self):
         m = self.menuBar().addMenu("Imposta&zioni")
+        self._azione(m, "📋 Riepilogo delle sezioni attive...", self.riepilogo)
+        m.addSeparator()
         self._azione(m, "💾 Salva una copia dei dati (backup)...", self.salva_copia)
         self._azione(m, "♻ Ripristina i dati da una copia...", self.ripristina_copia)
         self._azione(m, "🗂 Copie automatiche...", self.copie_automatiche)
@@ -530,6 +561,7 @@ class FinestraPrincipale(QMainWindow):
         self._azione(m, f"Come sono nate le {self.g.nome_comb_pl} (spiegazione)...", self.spiegazione)
         self._azione(m, "🤖 Magico Pensiero + intelligenza artificiale (Gemini o Claude)...", self.claude)
         self._azione(m, "💡 Suggerimenti AI: un piccolo sistema per intuizione...", self.suggerimenti_ai)
+        self._azione(m, "🖨 Stampa o registra le combinazioni di Magico Pensiero...", lambda: self.riepilogo("magico"))
         m.addSeparator()
         self._azione(m, "Impostazioni dell'algoritmo...", self.impostazioni_magico)
         self._azione(m, "Verifica storica (previsioni su quanto già avvenuto)...", self.verifica_magico)
@@ -846,6 +878,8 @@ class FinestraPrincipale(QMainWindow):
             return
         self.ultimo_magico = r
         magico.salva_previsione(self.arch, r)
+        from .riepilogo import CHIAVE_NASCOSTA
+        self.arch.scrivi_impostazione(CHIAVE_NASCOSTA, "")
         self.mostra_magico(r)
 
     def mostra_magico(self, r, origine: str = "Proposta dell'algoritmo"):
@@ -873,6 +907,9 @@ class FinestraPrincipale(QMainWindow):
         if ultima and prev and prev[-1].get("dopo") == ultima.data.isoformat():
             p = prev[-1]
             o = p.get("origine", "Algoritmo")
+            from .riepilogo import CHIAVE_NASCOSTA
+            if self.arch.leggi_impostazione(CHIAVE_NASCOSTA) == f"{p.get('dopo')}|{o}":
+                return
             self.mostra_magico(SimpleNamespace(sestine=[SimpleNamespace(numeri=s) for s in p["sestine"]],
                                                jolly=p["jolly"], superstar=p.get("superstar")),
                                "Proposta dell'algoritmo" if o == "Algoritmo" else f"Scelta di {o.split(' ')[0]}")
@@ -886,6 +923,8 @@ class FinestraPrincipale(QMainWindow):
         dlg = FinestraClaude(self.arch, self)
         dlg.exec()
         if dlg.applicato:
+            from .riepilogo import CHIAVE_NASCOSTA
+            self.arch.scrivi_impostazione(CHIAVE_NASCOSTA, "")
             self.mostra_magico(dlg.applicato, f"Scelta di {getattr(dlg, 'origine_applicata', 'AI')}")
 
     def spiegazione(self):
