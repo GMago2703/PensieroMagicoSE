@@ -27,6 +27,7 @@ jobs:
         env:
           QT_QPA_PLATFORM: windows
           FOTO_DIR: foto
+          PMSE_SENZA_SUONI: "1"
         run: |
           python -X faulthandler -m pytest -v
           $codice = $LASTEXITCODE
