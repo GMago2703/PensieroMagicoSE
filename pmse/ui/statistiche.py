@@ -290,7 +290,7 @@ class FinestraVerificaColonne(QDialog):
         self.t.clear()
         self.t.setColumnCount(len(cats) + 2)
         self.t.setHorizontalHeaderLabels(["Colonna"] + [f"{c} punti" if "+" not in c else c for c in cats]
-                                         + ["Vincite"])
+                                         + ["Totale"])
         self.t.setRowCount(len(self.colonne) + 2)
         tot = e.totale()
         for i, c in enumerate(self.colonne):
