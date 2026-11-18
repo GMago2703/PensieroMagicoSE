@@ -605,7 +605,7 @@ def test_suggerimenti_ai(app, tmp_path):
         try:
             w = FinestraPrincipale(a, avvio_automatico=False)
             f = ui_it.FinestraIntuizione(a, w, w.nuovo_sistema)
-            f.sp_budget.setValue(30)
+            f.sp_budget.setValue(30 if g is SE else 60)
             f.cb_cand.setChecked(False)
             f.chiedi()
             f.thread.wait(120000)
