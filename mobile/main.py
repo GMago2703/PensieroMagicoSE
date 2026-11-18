@@ -446,8 +446,8 @@ class PaginaSistemi(Pagina):
             b.bind(on_release=lambda _b, v=imm: self._tipo(v))
             scelta.add_widget(adatta_testo(b))
         c.add_widget(scelta)
-        spieg = ("[b]Ridotto immediato[/b]: riduzioni già pronte e verificate (da 7 a 20 numeri, 0-4 fisse): scegli i "
-                 "numeri e la garanzia." if self.immediato else
+        spieg = (f"[b]Ridotto immediato[/b]: riduzioni già pronte e verificate (da {self.g.k + 1} a 20 numeri, 0-4 "
+                 "fisse): scegli i numeri e la garanzia." if self.immediato else
                  "[b]Ridotto a garanzia[/b]: l'integrale dei tuoi numeri ridotto dal programma in modo da "
                  f"garantire i punti scelti (fino a {servizi.MAX_NUMERI_RIDOTTO} numeri).")
         if self.g.is_ej:
@@ -528,8 +528,8 @@ class PaginaSistemi(Pagina):
         if self.immediato:
             scelte = servizi.ridotti_disponibili(g, n, f)
             if not scelte:
-                sch.add_widget(Testo(f"Scegli da 7 a 20 numeri ({'6' if g.is_ej else '7'} per l'Eurojackpot) e "
-                                     "da 0 a 4 fisse: qui compariranno le riduzioni pronte." if n < g.k + 1 else
+                sch.add_widget(Testo(f"Scegli da {g.k + 1} a 20 numeri e da 0 a 4 fisse: qui compariranno le "
+                                     "riduzioni pronte." if n < g.k + 1 else
                                      f"Nessuna riduzione pronta per {n} numeri e {f} fisse.", font_size=sp(13)))
             voci = [(p, f"Garanzia n-{g.k - p}: almeno il {p} – {c} colonne") for p, c in scelte]
         else:
