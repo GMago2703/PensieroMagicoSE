@@ -86,6 +86,13 @@ def analizza_pagina(html: str, d: date) -> Vincite | None:
             if m.group(1) not in ss and q is not None:
                 ss[m.group(1)] = q
         v.qs = ss or None
+    # prima del 2002 il sito riporta a volte le lire (fino a fine 2000) e a volte già gli euro: un "3 punti"
+    # oltre 500 è sicuramente in lire
+    if d.year < 2002 and v.q3 and v.q3 > 500:
+        for campo in ("q6", "q51", "q5", "q4", "q3", "q2"):
+            x = getattr(v, campo)
+            if x is not None:
+                setattr(v, campo, round(x / LIRE_PER_EURO, 2))
     return v if "6 punti" in visti else None
 
 
@@ -97,7 +104,7 @@ def _importo(s: str, d: date) -> float | None:
         x = float(s.replace(".", "").replace(",", "."))
     except ValueError:
         return None
-    return round(x / LIRE_PER_EURO, 2) if d.year < 2002 else x
+    return x
 
 
 def jackpot_da_pagina(html: str) -> float | None:
