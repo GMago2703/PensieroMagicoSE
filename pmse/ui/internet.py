@@ -18,9 +18,10 @@ class ScaricaVincitori(QThread):
     avanzamento = Signal(str, int, int)
     finito = Signal(dict)
 
-    def __init__(self, date_concorsi):
+    def __init__(self, date_concorsi, modulo=None):
         super().__init__()
         self.date_concorsi = date_concorsi
+        self.modulo = modulo or vincite          # vincite (SuperEnalotto) o vincite_ej (Eurojackpot)
         self._stop = False
 
     def ferma(self):
@@ -28,7 +29,7 @@ class ScaricaVincitori(QThread):
 
     def run(self):
         try:
-            dati = vincite.scarica(self.date_concorsi, lambda m, i, n: self.avanzamento.emit(m, i, n),
+            dati = self.modulo.scarica(self.date_concorsi, lambda m, i, n: self.avanzamento.emit(m, i, n),
                                    lambda: self._stop)
         except Exception:
             dati = {}
@@ -137,10 +138,12 @@ class FinestraInternet(QDialog):
             self._scrivi(f"  conflitto {vecchia.data:%d/%m/%Y}: archivio {vecchia.sestina} / web {nuova.sestina}")
         self.barra.setValue(self.barra.maximum())
         self._conflitti = bool(esito.conflitti)
-        da_fare = vincite.mancanti(self.arch)
+        from ..core import vincite_ej
+        self._mod_v = vincite_ej if self.arch.gioco.is_ej else vincite
+        da_fare = self._mod_v.mancanti(self.arch)
         if da_fare and len(da_fare) <= 300:
-            self._scrivi(f"Scarico i vincitori di {len(da_fare)} concorsi (per evidenziare i 6)...")
-            self.thread_v = ScaricaVincitori(da_fare)
+            self._scrivi(f"Scarico vincitori e quote di {len(da_fare)} concorsi...")
+            self.thread_v = ScaricaVincitori(da_fare, self._mod_v)
             self.thread_v.avanzamento.connect(self._avanza)
             self.thread_v.finito.connect(self._vincitori_finiti)
             for b in (self.b_agg, self.b_tutto, self.b_chiudi):
@@ -153,10 +156,14 @@ class FinestraInternet(QDialog):
         self._chiudi_se_automatico()
 
     def _vincitori_finiti(self, dati):
-        vincite.salva(self.arch, dati)
-        sei = [k for k, v in dati.items() if v.vinto_6]
-        self._scrivi(f"Vincitori letti per {len(dati)} concorsi" +
-                     (f"; 6 vinti il {', '.join(sei)}." if sei else "; nessun 6 tra questi."))
+        mod = getattr(self, "_mod_v", vincite)
+        mod.salva(self.arch, dati)
+        if mod is vincite:
+            sei = [k for k, v in dati.items() if v.vinto_6]
+            self._scrivi(f"Vincitori letti per {len(dati)} concorsi" +
+                         (f"; 6 vinti il {', '.join(sei)}." if sei else "; nessun 6 tra questi."))
+        else:
+            self._scrivi(f"Quote lette per {len(dati)} concorsi.")
         if dati:
             self.modificato = True
         self._fine_lavoro()

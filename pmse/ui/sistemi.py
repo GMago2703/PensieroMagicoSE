@@ -33,11 +33,8 @@ NOMI_TIPO = {"condizionato": "Sistema condizionato", "condizionato_ridotto": "Si
 
 
 def _numeri_da_testo(t: str) -> list[int]:
-    out = []
-    for p in t.replace(",", " ").replace(";", " ").replace("-", " ").split():
-        if p.isdigit():
-            out.append(int(p))
-    return out
+    from ..core.testo import numeri_da_testo
+    return numeri_da_testo(t)
 
 
 # ------------------------------------------------------------------ griglia numeri / fisse
@@ -617,6 +614,14 @@ class EditorSistema(QDialog):
         b = QPushButton("Azzera")
         b.clicked.connect(self.griglia.azzera)
         hn.addWidget(b)
+        from .macchina import numeri_casuali
+        b = QPushButton("🎱")
+        b.setToolTip("Inserisci i numeri estratti con la macchina (Combinazioni casuali), finché il programma "
+                     "resta aperto")
+        b.setEnabled(bool(numeri_casuali(self.g)))
+        b.clicked.connect(lambda: self.griglia.imposta(sorted(set(self.griglia.selezionati) |
+                                                               set(numeri_casuali(self.g))), self.griglia.fisse))
+        hn.addWidget(b)
         sx.addLayout(hn)
         corpo.addLayout(sx, 0)
         # destra: condizioni e riduzione
@@ -1019,7 +1024,9 @@ class FinestraSviluppo(QDialog):
                            ("🎯 Spoglio su una combinazione...", self.spoglio_combinazione),
                            ("📜 Spoglio storico (archivio)...", self.spoglio_storico),
                            ("📄 Esporta (TXT / CSV)...", self.esporta),
-                           ("🖨 Stampa il tabulato (stampante / PDF / TXT)...", self.tabulato)):
+                           ("🖨 Stampa il tabulato (stampante / PDF / TXT)...", self.tabulato),
+                           ("📝 Registra come giocata...", self.registra_giocata),
+                           ("📈 E se l'avessi giocato…", self.simula)):
             b = QPushButton(testo)
             b.clicked.connect(fun)
             dx.addWidget(b)
@@ -1126,6 +1133,18 @@ class FinestraSviluppo(QDialog):
         with open(nome, "w", encoding="utf-8") as f:
             f.write(testo)
         QMessageBox.information(self, "Esporta", f"Salvate {len(self.C)} colonne in {nome}")
+
+    def registra_giocata(self):
+        from .giocate import registra
+        registra(self.arch, self, self.C.tolist(), None, f"Sistema «{self.s.nome}»" if self.s.nome else "Sistema")
+
+    def simula(self):
+        from .giocate import FinestraSimulatore, chiedi_euronumeri
+        cols = self.C.tolist()
+        extra = chiedi_euronumeri(self, len(cols)) if self.g.is_ej else None
+        if self.g.is_ej and extra is None:
+            return
+        FinestraSimulatore(self.arch, self, cols, extra).exec()
 
     def tabulato(self):
         from .statistiche import FinestraTabulato

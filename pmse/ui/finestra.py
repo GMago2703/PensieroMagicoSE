@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from PySide6.QtCore import QSettings, Qt, QTimer
+from PySide6.QtCore import QSettings, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QFont, QKeySequence
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
                                QInputDialog, QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QPushButton,
@@ -40,7 +40,7 @@ MENU_VUOTI = ["Metodi"]
 # Menu in stile Enavision, inseriti ma non ancora attivi ("-" = separatore,
 # (nome, [voci]) = sottomenu). La voce "SUPERSTAR" diventa il nome giusto per ogni gioco.
 MENU_DISATTIVI: list = []
-MENU_VUOTI_DOPO = ["Ricevitoria", "Impostazioni"]
+MENU_VUOTI_DOPO: list = []
 
 
 FINESTRE: list = []        # riferimenti alle finestre aperte (evita che vengano distrutte)
@@ -140,6 +140,27 @@ class Pannello(QFrame):
         return b
 
 
+class LettoreJackpot(QThread):
+    """Legge il jackpot da Internet con una connessione all'archivio tutta sua (thread separato)."""
+    finito = Signal(object)
+
+    def __init__(self, percorso, gioco):
+        super().__init__()
+        self.percorso, self.gioco = percorso, gioco
+
+    def run(self):
+        try:
+            from ..core import jackpot
+            a = Archivio(self.percorso, gioco=self.gioco)
+            try:
+                j = jackpot.aggiorna(a)
+            finally:
+                a.chiudi()
+            self.finito.emit(j)
+        except Exception:
+            pass
+
+
 class FinestraPrincipale(QMainWindow):
     def __init__(self, archivio: Archivio | None = None, avvio_automatico: bool = True):
         super().__init__()
@@ -154,8 +175,11 @@ class FinestraPrincipale(QMainWindow):
         self._centro()
         self.aggiorna_stato()
         self._mostra_ultima_previsione()
+        from ..core import jackpot
+        self.mostra_jackpot(jackpot.carica(self.arch))
         if avvio_automatico:
             QTimer.singleShot(200, self._valuta_nuove)
+            QTimer.singleShot(1500, self._aggiorna_jackpot)
         if avvio_automatico:
             QTimer.singleShot(400, self._all_avvio)
 
@@ -367,6 +391,38 @@ class FinestraPrincipale(QMainWindow):
         m.addSeparator()
         self._azione(m, "Le statistiche si stampano dalla loro finestra (pulsante Stampa)", abilitata=False)
 
+    def _menu_impostazioni(self):
+        m = self.menuBar().addMenu("Imposta&zioni")
+        self._azione(m, "💾 Salva una copia dei dati (backup)...", self.salva_copia)
+        self._azione(m, "♻ Ripristina i dati da una copia...", self.ripristina_copia)
+        self._azione(m, "🗂 Copie automatiche...", self.copie_automatiche)
+
+    def salva_copia(self):
+        from .copie import salva_copia
+        salva_copia(self)
+
+    def ripristina_copia(self):
+        from .copie import scegli_e_ripristina
+        scegli_e_ripristina(self)
+
+    def copie_automatiche(self):
+        from .copie import FinestraCopieAutomatiche
+        FinestraCopieAutomatiche(self).exec()
+
+    def _menu_ricevitoria(self):
+        m = self.menuBar().addMenu("&Ricevitoria")
+        a = self._azione(m, "📝 Registro delle giocate...", self.registro_giocate)
+        a.setShortcut(QKeySequence("Ctrl+R"))
+        self._azione(m, "📈 E se avessi giocato… (simulatore)...", self.simulatore)
+
+    def registro_giocate(self):
+        from .giocate import FinestraGiocate
+        FinestraGiocate(self.arch, self).exec()
+
+    def simulatore(self):
+        from .giocate import FinestraSimulatore
+        FinestraSimulatore(self.arch, self).exec()
+
     def tabulato(self):
         from .sistemi import ULTIMO
         from .statistiche import FinestraTabulato
@@ -425,6 +481,8 @@ class FinestraPrincipale(QMainWindow):
         if self.scaricatore and self.scaricatore.isRunning():
             QMessageBox.information(self, "Attendi", "È in corso un aggiornamento da Internet: riprova tra poco.")
             return
+        from .macchina import dimentica
+        dimentica()                    # le combinazioni casuali non passano da un programma all'altro
         apri_programma(codice)
         self.close()
 
@@ -481,6 +539,8 @@ class FinestraPrincipale(QMainWindow):
         self._azione(m, "🧪 Laboratorio: la casualità è davvero casuale?...", self.laboratorio)
 
         self._menu_stampe()
+        self._menu_ricevitoria()
+        self._menu_impostazioni()
         for nome in MENU_VUOTI_DOPO:
             self._menu_vuoto(nome)
         m = mb.addMenu("&Help")
@@ -491,6 +551,19 @@ class FinestraPrincipale(QMainWindow):
         w = SfondoHome(self.g)
         esterno = QVBoxLayout(w)
         esterno.addStretch()
+        hj = QHBoxLayout()
+        hj.addStretch()
+        self.l_jackpot = QLabel()
+        self.l_jackpot.setObjectName("jackpot")
+        self.l_jackpot.setStyleSheet(
+            "QLabel#jackpot { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fff8d6, stop:1 #ffd54f);"
+            " border: 3px solid #1e5bb8; border-radius: 10px; padding: 6px 18px; color: #3e2723; }")
+        self.l_jackpot.setAlignment(Qt.AlignCenter)
+        self.l_jackpot.setVisible(False)
+        hj.addWidget(self.l_jackpot)
+        hj.addStretch()
+        esterno.addLayout(hj)
+        esterno.addSpacing(10)
         h = QHBoxLayout()
         esterno.addLayout(h)
         esterno.addStretch()
@@ -549,6 +622,25 @@ class FinestraPrincipale(QMainWindow):
         sb.addWidget(self.l_arch, 1)
         sb.addWidget(self.l_ultima, 2)
 
+    # ------------------------------------------------------------- jackpot
+    def mostra_jackpot(self, j):
+        from ..core import jackpot
+        riga, det = jackpot.testo(j)
+        if not riga:
+            self.l_jackpot.setVisible(False)
+            return
+        self.l_jackpot.setText(f"<span style='font-size:17px; font-weight:bold'>{riga}</span>"
+                               + (f"<br><span style='font-size:11px'>{det}</span>" if det else ""))
+        self.l_jackpot.setToolTip("Letto da Internet il " + (j.letto.replace("T", " alle ") if j.letto else "") +
+                                  ". Il valore medio è una stima: ogni estrazione è indipendente e la lotteria "
+                                  "restituisce in media meno di quanto si spende.")
+        self.l_jackpot.setVisible(True)
+
+    def _aggiorna_jackpot(self):
+        self._thread_jackpot = LettoreJackpot(self.arch.percorso, self.g)
+        self._thread_jackpot.finito.connect(self.mostra_jackpot)
+        self._thread_jackpot.start()
+
     def aggiorna_stato(self):
         n = self.arch.conta()
         u = self.arch.ultima()
@@ -586,6 +678,63 @@ class FinestraPrincipale(QMainWindow):
         if nuove:
             from .magico import FinestraApprendimento
             FinestraApprendimento(self.arch, nuove, self).exec()
+        self._controlla_giocate()
+
+    def _controlla_giocate(self):
+        """Dopo ogni nuova estrazione: spoglio automatico delle giocate registrate."""
+        from ..core import giocate as gc
+        try:
+            tutte = gc.carica(self.arch)
+            if not tutte:
+                return
+            righe = list(self.arch.sestine())
+            nuove = gc.nuove_vincite(self.g, tutte, righe, gc.Quote(self.arch))
+            if not nuove:
+                return
+            gc.salva_tutte(self.arch, tutte)
+        except Exception as ex:
+            self.statusBar().showMessage(f"Controllo delle giocate non riuscito: {ex}", 10000)
+            return
+        self._giocate_nuove = nuove
+        senza = sorted({v.data for _, vv, _ in nuove for v in vv if v.importo is None})
+        if senza:
+            from .giocate import ScaricaQuote
+            self._thread_quote = ScaricaQuote(self.g, senza)
+            self._thread_quote.finito.connect(self._quote_giocate)
+            self._thread_quote.start()
+        else:
+            self._avviso_giocate()
+
+    def _quote_giocate(self, dati):
+        from ..core import giocate as gc
+        from .giocate import salva_quote
+        salva_quote(self.arch, dati)
+        q = gc.Quote(self.arch)
+        for _, vv, _ in self._giocate_nuove:
+            for v in vv:
+                if v.importo is None:
+                    v.importo = q(v.data, v.categoria)
+        self._avviso_giocate()
+
+    def _avviso_giocate(self):
+        from ..core import giocate as gc
+        from .giocate import euro
+        nuove = self._giocate_nuove
+        vinte = [(gi, vv) for gi, vv, _ in nuove if vv]
+        if not vinte:
+            date_ = sorted({d for _, _, dd in nuove for d in dd})
+            self.statusBar().showMessage(f"Giocate controllate ({', '.join(f'{d:%d/%m}' for d in date_)}): "
+                                         "nessuna vincita questa volta.", 15000)
+            return
+        righe = []
+        for gi, vv in vinte:
+            righe.append(f"<b>{gi.nome}</b>:")
+            for v in vv:
+                imp = euro(v.importo) if v.importo is not None else "quota da verificare"
+                righe.append(f"&nbsp;&nbsp;{v.data:%d/%m/%Y} – colonna {v.colonna + 1}: "
+                             f"<b>{gc.nome_categoria(v.categoria)}</b> – {imp}")
+        QMessageBox.information(self, "🎉 Hai vinto!", "<br>".join(righe) +
+                                "<br><br>Dettagli in Ricevitoria → Registro delle giocate.")
 
     def apri_archivio(self):
         dlg = FinestraArchivio(self.arch, self)
@@ -816,6 +965,10 @@ class FinestraPrincipale(QMainWindow):
         if self.scaricatore and self.scaricatore.isRunning():
             self.scaricatore.ferma()
             self.scaricatore.wait(3000)
+        for nome in ("_thread_jackpot", "_thread_quote"):
+            th = getattr(self, nome, None)
+            if th is not None and th.isRunning():
+                th.wait(5000)
         super().closeEvent(ev)
         if self in FINESTRE:
             FINESTRE.remove(self)

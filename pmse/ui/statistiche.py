@@ -206,6 +206,13 @@ class FinestraVerificaColonne(QDialog):
         b = QPushButton("🎲 Genera casuali")
         b.clicked.connect(self.genera)
         h.addWidget(b)
+        from .macchina import combinazioni_casuali
+        self.b_casuali = QPushButton("🎱 Usa le combinazioni della macchina")
+        self.b_casuali.setToolTip("Le ultime combinazioni estratte con la macchina (Combinazioni casuali), "
+                                  "finché il programma resta aperto")
+        self.b_casuali.setEnabled(bool(combinazioni_casuali(self.g)))
+        self.b_casuali.clicked.connect(self.usa_casuali)
+        h.addWidget(self.b_casuali)
         h.addSpacing(20)
         h.addWidget(QLabel("Estrazioni: ultime"))
         self.sp_ult = QSpinBox()
@@ -250,14 +257,24 @@ class FinestraVerificaColonne(QDialog):
         cols = st.colonne_casuali(self.g, self.sp_n.value(), con_euro=self.cb_euro.isChecked())
         self.ed.setPlainText("\n".join(st._colonna_txt(c, self.g) for c in cols))
 
+    def usa_casuali(self):
+        from .macchina import combinazioni_casuali
+        cols = combinazioni_casuali(self.g)[:10]
+        if cols:
+            self.ed.setPlainText("\n".join(st._colonna_txt(c, self.g) for c in cols))
+
     def _leggi(self) -> list[list[int]]:
         g = self.g
         out = []
         for i, riga in enumerate(self.ed.toPlainText().splitlines(), 1):
             if not riga.strip():
                 continue
-            nums = _numeri(riga)
-            princ, euro = nums[:g.k], nums[g.k:]
+            from ..core.testo import leggi_riga
+            letta = leggi_riga(riga, g.k)
+            if letta is None:
+                continue
+            nums, speciali = letta
+            princ, euro = nums[:g.k], nums[g.k:] or (speciali.get("euro", []) if g.is_ej else [])
             if len(princ) != g.k or len(set(princ)) != g.k or not all(1 <= x <= g.n for x in princ):
                 raise ValueError(f"Riga {i}: servono {g.k} numeri diversi da 1 a {g.n}.")
             if g.is_ej and euro:

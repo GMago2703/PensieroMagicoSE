@@ -29,6 +29,10 @@ def main():
     # si riapre l'ultimo programma usato (Pensiero Magico SE o Pensiero Magico EJ)
     ultimo = QSettings("PensieroMagico", "Avvio").value("ultimo_programma", "SE")
     apri_programma(ultimo if ultimo in ("SE", "EJ") else "SE")
+    from PySide6.QtCore import QTimer
+
+    from pmse.ui.copie import copia_automatica
+    QTimer.singleShot(5000, copia_automatica)      # copia automatica dei dati, se è il momento
     sys.exit(app.exec())
 
 

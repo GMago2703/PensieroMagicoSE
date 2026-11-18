@@ -28,6 +28,36 @@ from ..core.db import Archivio
 from ..core.gioco import Gioco
 from .schermo import adatta_schermo
 
+# Ultime combinazioni estratte con la macchina, per gioco: restano SOLO in memoria finché il programma è
+# aperto (si cancellano cambiando programma SE/EJ o chiudendo), così si usano altrove senza copia-incolla.
+CASUALI: dict[str, dict] = {}
+
+
+def combinazioni_casuali(g) -> list[list[int]]:
+    """Colonne dell'ultima estrazione con la macchina (Eurojackpot: 5 numeri + 2 Euronumeri)."""
+    d = CASUALI.get(g.codice)
+    if not d:
+        return []
+    return [r["numeri"] + (r["extra"] if g.is_ej else []) for r in d["risultati"]]
+
+
+def numeri_casuali(g) -> list[int]:
+    """Tutti i numeri principali dell'ultima estrazione con la macchina (per un sistema)."""
+    d = CASUALI.get(g.codice)
+    return sorted({x for r in d["risultati"] for x in r["numeri"]}) if d else []
+
+
+def superstar_casuali(g) -> list[int | None]:
+    d = CASUALI.get(g.codice)
+    if not d or g.is_ej:
+        return []
+    return [(r["extra"][0] if r["extra"] else None) for r in d["risultati"]]
+
+
+def dimentica():
+    CASUALI.clear()
+
+
 W, H = 1280, 760                       # coordinate della scena (poi scalate alla finestra)
 CASO = random.SystemRandom()
 VELOCITA = [("Tranquilla (con suspense)", 1.0), ("Normale", 0.65), ("Veloce", 0.35)]
@@ -851,6 +881,7 @@ class FinestraMacchina(QDialog):
             self.sp_n.valueChanged.connect(self._ridisegna)
             self.cb_ss.toggled.connect(self._ridisegna)
             self._aggiungi(h2, "🔍 Verifica sull'archivio", self.verifica)
+            self._aggiungi(h2, "📝 Registra come giocata", self.registra)
         self._aggiungi(h2, "📋 Copia", self.copia)
         self._aggiungi(h2, "🖨 Stampa / PDF / TXT", self.stampa)
         h2.addStretch()
@@ -1069,6 +1100,8 @@ class FinestraMacchina(QDialog):
         self._finito()
 
     def _finito(self):
+        if self.risultati:
+            CASUALI[self.g.codice] = {"modo": self.modo, "risultati": [dict(r) for r in self.risultati]}
         self.b_salta.setEnabled(False)
         for w in (self.b_avvia, self.sp_n, self.cb_ss, *self.dopo):
             w.setEnabled(True)
@@ -1101,6 +1134,12 @@ class FinestraMacchina(QDialog):
         from .statistiche import FinestraVerificaColonne
         cols = [r["numeri"] + (r["extra"] if self.g.is_ej else []) for r in self.risultati]
         FinestraVerificaColonne(self.arch, self, cols).exec()
+
+    def registra(self):
+        from .giocate import registra
+        if self.risultati:
+            registra(self.arch, self, [r["numeri"] for r in self.risultati], [r["extra"] for r in self.risultati],
+                     "Macchina dell'estrazione")
 
     def _sistema(self, tipo: str, garanzia: int) -> sis.Sistema:
         r = self.risultati[0]

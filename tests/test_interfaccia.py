@@ -737,3 +737,87 @@ def test_scheda_gruppi_tra(app, tmp_path):
     assert any("Gruppi tra" in e.lista.item(i).text() for i in range(e.lista.count()))
     e.close()
     a.chiudi()
+
+
+def test_ricevitoria_e_copie(app, tmp_path, monkeypatch):
+    """Registro delle giocate, simulatore, combinazioni della macchina senza copia-incolla, jackpot in home,
+    copie dei dati."""
+    import json
+    from datetime import date as _d
+    from pmse.core import giocate as gc
+    from pmse.core import jackpot as jk
+    from pmse.core import vincite
+    from pmse.core.gioco import EJ, SE
+    from pmse.ui import giocate as ug
+    from pmse.ui import macchina as mc
+    from pmse.ui.finestra import FinestraPrincipale
+    from pmse.ui.statistiche import FinestraVerificaColonne
+    from tests.test_sistemi import archivio_finto
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"r_{g.codice}.db", gioco=g)
+        a.unisci(archivio_finto(g, 400))
+        righe = list(a.sestine())
+        # quote finte per gli ultimi concorsi
+        if g is SE:
+            vincite.salva(a, {r[0].isoformat(): vincite.Vincite(r[0].isoformat(), q6=3e7, q51=4e5, q5=3e4, q4=300,
+                                                               q3=25, q2=5, qs={"0": 5.0, "1": 10.0, "2": 100.0})
+                              for r in righe[-60:]})
+        # combinazioni casuali in memoria
+        mc.CASUALI[g.codice] = {"modo": "sestine", "risultati": [
+            {"numeri": sorted(righe[-5][1]), "extra": ([righe[-5][3]] if g is SE else [righe[-5][2], righe[-5][3]])},
+            {"numeri": list(range(1, g.k + 1)), "extra": ([] if g is SE else [1, 2])}]}
+        v = FinestraVerificaColonne(a)
+        assert v.b_casuali.isEnabled()
+        v.usa_casuali()
+        assert len(v._leggi()) == 2
+        v.close()
+        # registro
+        d = ug.DialogoGiocata(a)
+        d.colonne.da_macchina()
+        d.d_dal.setDate(ug._qd(righe[-6][0]))
+        d.sp_conc.setValue(3)
+        d._ok()
+        assert d.giocata and d.giocata.costo > 0
+        f = ug.FinestraGiocate(a)
+        assert f.t.rowCount() == 1 and f.esiti[0].vincite
+        f.t.selectRow(0)
+        f._dettaglio()
+        if g is SE:
+            assert "6 punti" in f.dett.toPlainText()
+            f.show()
+            app.processEvents()
+            foto("registro_giocate", f)
+            f.tabs.setCurrentIndex(2)
+            app.processEvents()
+            foto("registro_bilancio", f)
+        f.close()
+        # avvisi dopo l'aggiornamento: tutte già controllate nel registro? la prima volta sì
+        tutte = gc.carica(a)
+        assert gc.nuove_vincite(g, tutte, righe, gc.Quote(a))
+        # simulatore
+        s = ug.FinestraSimulatore(a, None, [sorted(righe[-5][1])],
+                                  [[righe[-5][3]]] if g is SE else [[righe[-5][2], righe[-5][3]]])
+        s.d_dal.setDate(ug._qd(righe[0][0]))
+        s.simula()
+        assert s.sim and s.sim.estrazioni == len(righe) and s.sim.vincite
+        if g is SE:
+            s.show()
+            app.processEvents()
+            foto("simulatore", s)
+        s.close()
+        # jackpot in home
+        a.scrivi_impostazione(jk.CHIAVE, json.dumps({"gioco": g.codice, "importo": 55_900_000.0,
+                                                     "preciso": g is SE, "nota": "", "letto": "2026-11-18T10:00:00",
+                                                     "valore_colonna": 0.43, "costo_colonna": 1.0}))
+        w = FinestraPrincipale(a, avvio_automatico=False)
+        assert w.l_jackpot.isVisibleTo(w) and "55.900.000" in w.l_jackpot.text()
+        if g is SE:
+            w.show()
+            app.processEvents()
+            foto("home_jackpot", w)
+        w.close()
+        a.chiudi()
+    # le combinazioni casuali si dimenticano cambiando programma
+    mc.dimentica()
+    assert not mc.combinazioni_casuali(SE)
