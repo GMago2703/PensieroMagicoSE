@@ -840,7 +840,7 @@ class FinestraMacchina(QDialog):
         k = self.g.k
         self.c_tipo.clear()
         self.c_tipo.addItem(f"Integrale ({sis.numero_integrale(n, k, 0):,} colonne)".replace(",", "."), 0)
-        for nn, f, punti, colonne in ridotti_pronti.disponibili(k):
+        for nn, f, punti, colonne in sorted(ridotti_pronti.disponibili(k), key=lambda x: -x[2]):
             if nn == n and f == 0:
                 self.c_tipo.addItem(f"Ridotto immediato – garanzia n-{k - punti}: almeno {punti} punti se {k} "
                                     f"({colonne} colonne)", k - punti)
