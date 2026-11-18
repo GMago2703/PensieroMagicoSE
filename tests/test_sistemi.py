@@ -150,3 +150,34 @@ def test_memorizzazione(tmp_path):
     sis.elimina(a, "Prova 1")
     assert sis.salvati(a) == {}
     a.chiudi()
+
+
+def test_gruppi_tra():
+    from pmse.core.gioco import SE
+    est = archivio_finto(SE, 400)
+    ctx = cnd.Contesto(SE, est)
+    c = cnd.gruppi_tra([([1, 2, 3, 4, 5], 1, 2), ([10, 11, 12, 13, 14], 1, 1), ([20, 21, 22], 0, 1)])
+    s = sis.Sistema(tipo="condizionato", gioco="SE", numeri=list(range(1, 23)), condizioni=cnd.a_json([c]))
+    C = sis.sviluppa(s, ctx).colonne.tolist()
+    assert C and all(1 <= len(set(r) & {1, 2, 3, 4, 5}) <= 2 and len(set(r) & {10, 11, 12, 13, 14}) == 1
+                     and len(set(r) & {20, 21, 22}) <= 1 for r in C)
+    # almeno 2 gruppi su 3: più colonne
+    c2 = cnd.gruppi_tra([([1, 2, 3, 4, 5], 1, 2), ([10, 11, 12, 13, 14], 1, 1), ([20, 21, 22], 0, 1)], 2, 3)
+    s.condizioni = cnd.a_json([c2])
+    assert len(sis.sviluppa(s, ctx).colonne) > len(C)
+    assert "Gruppi tra" in c.descrivi() and cnd.da_json(cnd.a_json([c]))[0].gruppi == c.gruppi
+    a = cnd.analizza_gruppo(list(range(1, 11)), ctx)
+    assert abs(sum(r[3] for r in a.righe) - 100) < 1e-6 and sum(r[1] for r in a.righe) == 400
+    # le condizioni salvate prima (senza "gruppi") si leggono ancora
+    vecchia = {"codice": "pari", "attiva": True, "valori": [3], "minimo": 0, "massimo": 0, "param": 0,
+               "numeri": [], "combinazioni": []}
+    assert cnd.da_json([vecchia])[0].gruppi == []
+
+
+def test_suoni_generati(tmp_path):
+    import wave
+    from pmse.ui import suoni
+    p = suoni.scrivi(str(tmp_path / "s"))
+    assert set(p) >= {"rotola", "aria", "palline", "annuncio", "toc"}
+    with wave.open(p["rotola"]) as w:
+        assert w.getframerate() == 44100 and w.getnframes() > 44100

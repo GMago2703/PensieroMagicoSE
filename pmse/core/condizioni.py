@@ -270,12 +270,22 @@ class Condizione:
     # gruppi (Fisse, Sequele) e filtro combinazioni hanno dati propri
     numeri: list[int] = field(default_factory=list)
     combinazioni: list[list[int]] = field(default_factory=list)
+    # "Gruppi tra": più gruppi, ognuno {"numeri": [...], "minimo": a, "massimo": b};
+    # minimo/massimo della condizione = quanti gruppi devono essere rispettati
+    gruppi: list[dict] = field(default_factory=list)
 
     @property
     def tipo(self):
         return TIPI_PER_CODICE.get(self.codice)
 
     def descrivi(self) -> str:
+        if self.codice == "gruppi_tra":
+            parti = [f"{LETTERE[i]}: {' '.join(map(str, sorted(gr['numeri'])))} da {gr['minimo']} a {gr['massimo']}"
+                     for i, gr in enumerate(self.gruppi)]
+            n = len(self.gruppi)
+            quanti = ("tutti rispettati" if self.minimo >= n else
+                      f"rispettati da {self.minimo} a {self.massimo} gruppi su {n}")
+            return f"Gruppi tra ({n}, {quanti}) – " + "; ".join(parti)
         if self.codice == "gruppo":
             return f"Gruppo {sorted(self.numeri)}: da {self.minimo} a {self.massimo} presenti"
         if self.codice == "filtro":
@@ -288,6 +298,14 @@ class Condizione:
         return f"{t.nome if t else self.codice}{par}: {', '.join(map(str, sorted(self.valori)))}"
 
     def rispetta(self, C: np.ndarray, ctx: Contesto) -> np.ndarray:
+        if self.codice == "gruppi_tra":
+            if not self.gruppi:
+                return np.ones(len(C), dtype=bool)
+            ok = np.zeros(len(C), dtype=np.int16)
+            for gr in self.gruppi:
+                v = np.isin(C, gr["numeri"]).sum(axis=1)
+                ok += (v >= gr["minimo"]) & (v <= gr["massimo"])
+            return (ok >= self.minimo) & (ok <= self.massimo)
         if self.codice == "gruppo":
             v = np.isin(C, self.numeri).sum(axis=1)
             return (v >= self.minimo) & (v <= self.massimo)
@@ -307,6 +325,51 @@ class Condizione:
         if self.tipo.modo == "intervallo":
             return (v >= self.minimo) & (v <= self.massimo)
         return np.isin(v, self.valori)
+
+
+LETTERE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def gruppi_tra(gruppi: list[tuple[list[int], int, int]], minimo: int | None = None,
+               massimo: int | None = None) -> Condizione:
+    """Gruppi tra: ogni gruppo (numeri, minimo, massimo) di presenze; minimo/massimo = gruppi da rispettare
+    (predefinito: tutti)."""
+    gr = [{"numeri": sorted(set(int(x) for x in n)), "minimo": int(a), "massimo": int(b)} for n, a, b in gruppi]
+    n = len(gr)
+    return Condizione("gruppi_tra", gruppi=gr, minimo=n if minimo is None else minimo,
+                      massimo=n if massimo is None else massimo)
+
+
+def analizza_gruppo(numeri, ctx: Contesto, ultime: int = 0, copertura: float = 0.8) -> AnalisiCondizione:
+    """Quanti numeri di un gruppo sono usciti in ogni estrazione dell'archivio, con l'atteso dal caso
+    (ipergeometrica) e il suggerimento."""
+    from math import comb
+    g = ctx.gioco
+    numeri = sorted(set(numeri))
+    m = len(numeri)
+    estr = ctx.estrazioni[-ultime:] if ultime else ctx.estrazioni
+    C = np.array([sorted(e.numeri) for e in estr], dtype=np.int64).reshape(-1, g.k)
+    v = np.isin(C, numeri).sum(axis=1) if len(C) else np.zeros(0, dtype=int)
+    n = len(v)
+    tot = comb(g.n, g.k)
+    righe = []
+    for x in range(0, min(m, g.k) + 1):
+        caso = comb(m, x) * comb(g.n - m, g.k - x) / tot * 100
+        usc = int((v == x).sum())
+        righe.append((x, usc, usc / n * 100 if n else 0.0, caso))
+    ordine = sorted(righe, key=lambda r: -r[1])
+    piu = ordine[0][0] if n else 0
+    scelti, cum = [], 0.0
+    for r in ordine:
+        scelti.append(r[0])
+        cum += r[2]
+        if cum >= copertura * 100:
+            break
+    lo, hi = min(scelti), max(scelti)
+    sug = (f"Il valore più comune è {piu} ({ordine[0][2]:.1f}% delle estrazioni). Con da {lo} a {hi} numeri del "
+           f"gruppo si copre il {sum(r[2] for r in righe if lo <= r[0] <= hi):.0f}% delle estrazioni: è "
+           "l'intervallo consigliato.") if n else "Archivio vuoto: nessuna analisi."
+    return AnalisiCondizione("gruppo", f"Gruppo di {m} numeri", n, righe, piu, (lo, hi), sorted(scelti), sug)
 
 
 def gruppo(numeri, minimo, massimo) -> Condizione:

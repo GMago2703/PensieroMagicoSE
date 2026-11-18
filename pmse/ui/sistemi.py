@@ -325,6 +325,247 @@ class SchedaGruppo(QDialog):
         self.accept()
 
 
+COLORI_GRUPPI = ["#ef5350", "#42a5f5", "#66bb6a", "#ffa726", "#ab47bc", "#26c6da", "#d4e157", "#8d6e63",
+                 "#ec407a", "#78909c"]
+
+
+class SchedaGruppiTra(QDialog):
+    """Gruppi tra: più gruppi scelti tra i numeri del sistema, ognuno con le sue presenze minime e massime;
+    per ogni gruppo l'analisi sull'archivio suggerisce l'intervallo più comune."""
+
+    def __init__(self, g, ctx: cnd.Contesto | None, numeri: list[int], attuale: cnd.Condizione | None = None,
+                 parent=None):
+        super().__init__(parent)
+        self.g = g
+        self.ctx = ctx
+        self.risultato: cnd.Condizione | None = None
+        self.numeri = sorted(set(numeri)) or list(range(1, g.n + 1))
+        self.gruppi: list[dict] = [dict(x) for x in (attuale.gruppi if attuale else [])]
+        self.scelti: set[int] = set()
+        self.setWindowTitle("Condizione: Gruppi tra")
+        adatta_schermo(self, 1060, 720)
+        v = QVBoxLayout(self)
+        spieg = QLabel("<b>Gruppi tra</b> – scegli tra i numeri del sistema uno o più gruppi e, per ognuno, "
+                       "quanti dei suoi numeri devono essere presenti in ogni colonna sviluppata (da un minimo a un "
+                       "massimo). Clicca i numeri per formare il gruppo, poi «Aggiungi gruppo». Per ogni gruppo "
+                       "l'analisi sull'archivio mostra quante volte ne sono usciti 0, 1, 2… e suggerisce l'intervallo "
+                       "più comune.")
+        spieg.setWordWrap(True)
+        v.addWidget(spieg)
+        corpo = QHBoxLayout()
+        sx = QVBoxLayout()
+        sx.addWidget(QLabel(f"Numeri del sistema ({len(self.numeri)})" if numeri else
+                            "Nessun numero nel sistema: si sceglie tra tutti"))
+        from PySide6.QtWidgets import QGridLayout
+        gl = QGridLayout()
+        gl.setSpacing(3)
+        self.bottoni = {}
+        col = 10 if len(self.numeri) > 40 else 8
+        for i, n in enumerate(self.numeri):
+            b = QPushButton(str(n))
+            b.setFixedSize(38, 30)
+            b.clicked.connect(lambda _=False, n=n: self._clic(n))
+            gl.addWidget(b, i // col, i % col)
+            self.bottoni[n] = b
+        box = QWidget()
+        box.setLayout(gl)
+        sx.addWidget(box)
+        h = QHBoxLayout()
+        h.addWidget(QLabel("presenti da"))
+        self.s_min, self.s_max = QSpinBox(), QSpinBox()
+        for s in (self.s_min, self.s_max):
+            s.setRange(0, g.k)
+        self.s_min.setValue(1)
+        self.s_max.setValue(2)
+        h.addWidget(self.s_min)
+        h.addWidget(QLabel("a"))
+        h.addWidget(self.s_max)
+        b = QPushButton("➕ Aggiungi gruppo")
+        b.clicked.connect(self._aggiungi)
+        h.addWidget(b)
+        b = QPushButton("Pulisci")
+        b.clicked.connect(self._pulisci)
+        h.addWidget(b)
+        h.addStretch()
+        sx.addLayout(h)
+        self.l_sel = QLabel()
+        self.l_sel.setWordWrap(True)
+        sx.addWidget(self.l_sel)
+        sx.addStretch()
+        corpo.addLayout(sx, 1)
+        dx = QVBoxLayout()
+        dx.addWidget(QLabel("<b>Gruppi</b> (doppio clic su minimo/massimo per cambiarli)"))
+        self.t = QTableWidget(0, 5)
+        self.t.setHorizontalHeaderLabels(["Gruppo", "Numeri", "Minimo", "Massimo", "Archivio: consigliato"])
+        self.t.verticalHeader().setVisible(False)
+        self.t.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.t.itemSelectionChanged.connect(self._analisi)
+        dx.addWidget(self.t, 2)
+        h = QHBoxLayout()
+        b = QPushButton("Applica il suggerimento")
+        b.clicked.connect(self._applica_sugg)
+        h.addWidget(b)
+        b = QPushButton("Elimina gruppo")
+        b.clicked.connect(self._elimina)
+        h.addWidget(b)
+        h.addStretch()
+        dx.addLayout(h)
+        self.l_an = QLabel("Seleziona un gruppo per vedere l'analisi sull'archivio.")
+        self.l_an.setWordWrap(True)
+        dx.addWidget(self.l_an)
+        self.t_an = QTableWidget(0, 4)
+        self.t_an.setHorizontalHeaderLabels(["Numeri del gruppo usciti", "Estrazioni", "% archivio", "% atteso dal caso"])
+        self.t_an.verticalHeader().setVisible(False)
+        self.t_an.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        dx.addWidget(self.t_an, 2)
+        corpo.addLayout(dx, 2)
+        v.addLayout(corpo, 1)
+        h = QHBoxLayout()
+        h.addWidget(QLabel("Gruppi che devono essere rispettati: da"))
+        self.s_gmin, self.s_gmax = QSpinBox(), QSpinBox()
+        h.addWidget(self.s_gmin)
+        h.addWidget(QLabel("a"))
+        h.addWidget(self.s_gmax)
+        self.l_tot = QLabel()
+        h.addWidget(self.l_tot)
+        h.addStretch()
+        b = QPushButton("✔ Usa")
+        b.clicked.connect(self._ok)
+        h.addWidget(b)
+        b = QPushButton("Annulla")
+        b.clicked.connect(self.reject)
+        h.addWidget(b)
+        v.addLayout(h)
+        self._tabella()
+        if attuale:
+            self.s_gmin.setValue(attuale.minimo)
+            self.s_gmax.setValue(attuale.massimo)
+        self._colori()
+
+    # ---------------------------------------------------------------- scelta dei numeri
+    def _clic(self, n):
+        self.scelti ^= {n}
+        self._colori()
+
+    def _pulisci(self):
+        self.scelti.clear()
+        self._colori()
+
+    def _colori(self):
+        for n, b in self.bottoni.items():
+            gr = [i for i, x in enumerate(self.gruppi) if n in x["numeri"]]
+            if n in self.scelti:
+                b.setStyleSheet("background:#263238; color:white; font-weight:bold; border:2px solid #ffca28;")
+            elif gr:
+                c = COLORI_GRUPPI[gr[0] % len(COLORI_GRUPPI)]
+                b.setStyleSheet(f"background:{c}; color:white; font-weight:bold;")
+            else:
+                b.setStyleSheet("")
+        self.l_sel.setText(f"Gruppo in preparazione: {' '.join(map(str, sorted(self.scelti)))}" if self.scelti
+                           else "Clicca i numeri che formano il nuovo gruppo.")
+
+    def _aggiungi(self):
+        if not self.scelti:
+            QMessageBox.information(self, "Gruppi tra", "Clicca prima i numeri del gruppo.")
+            return
+        lo, hi = sorted((self.s_min.value(), self.s_max.value()))
+        hi = min(hi, len(self.scelti))
+        lo = min(lo, hi)
+        if len(self.gruppi) >= 26:
+            return
+        self.gruppi.append({"numeri": sorted(self.scelti), "minimo": lo, "massimo": hi})
+        self.scelti.clear()
+        self._tabella()
+        self.t.selectRow(len(self.gruppi) - 1)
+        self.s_gmin.setValue(len(self.gruppi))
+        self.s_gmax.setValue(len(self.gruppi))
+        self._colori()
+
+    def _elimina(self):
+        i = self.t.currentRow()
+        if 0 <= i < len(self.gruppi):
+            del self.gruppi[i]
+            self._tabella()
+            self._colori()
+
+    # ---------------------------------------------------------------- tabella dei gruppi
+    def _tabella(self):
+        self.t.blockSignals(True)
+        self.t.setRowCount(len(self.gruppi))
+        for i, gr in enumerate(self.gruppi):
+            it = QTableWidgetItem(cnd.LETTERE[i])
+            it.setBackground(QColor(COLORI_GRUPPI[i % len(COLORI_GRUPPI)]))
+            it.setForeground(QColor("white"))
+            it.setTextAlignment(Qt.AlignCenter)
+            self.t.setItem(i, 0, it)
+            self.t.setItem(i, 1, QTableWidgetItem(" ".join(map(str, gr["numeri"]))))
+            for j, chiave in ((2, "minimo"), (3, "massimo")):
+                s = QSpinBox()
+                s.setRange(0, min(self.g.k, len(gr["numeri"])))
+                s.setValue(gr[chiave])
+                s.valueChanged.connect(lambda val, i=i, c=chiave: self._cambia(i, c, val))
+                self.t.setCellWidget(i, j, s)
+            sug = ""
+            if self.ctx is not None and self.ctx.estrazioni:
+                a = cnd.analizza_gruppo(gr["numeri"], self.ctx)
+                sug = f"da {a.copertura[0]} a {a.copertura[1]} (più comune {a.piu_frequente})"
+            self.t.setItem(i, 4, QTableWidgetItem(sug))
+        self.t.resizeColumnsToContents()
+        self.t.horizontalHeader().setStretchLastSection(True)
+        self.t.blockSignals(False)
+        n = len(self.gruppi)
+        for s in (self.s_gmin, self.s_gmax):
+            s.setRange(0, max(n, 0))
+        self.l_tot.setText(f"su {n}")
+
+    def _cambia(self, i, chiave, val):
+        self.gruppi[i][chiave] = val
+        if self.gruppi[i]["minimo"] > self.gruppi[i]["massimo"]:
+            altro = "massimo" if chiave == "minimo" else "minimo"
+            self.gruppi[i][altro] = val
+            w = self.t.cellWidget(i, 3 if altro == "massimo" else 2)
+            w.blockSignals(True)
+            w.setValue(val)
+            w.blockSignals(False)
+
+    def _analisi(self):
+        i = self.t.currentRow()
+        if not (0 <= i < len(self.gruppi)) or self.ctx is None or not self.ctx.estrazioni:
+            return
+        gr = self.gruppi[i]
+        a = cnd.analizza_gruppo(gr["numeri"], self.ctx)
+        self.l_an.setText(f"<b>Gruppo {cnd.LETTERE[i]}</b> ({len(gr['numeri'])} numeri) su {a.estrazioni} "
+                          f"estrazioni. {a.suggerimento}")
+        self.t_an.setRowCount(len(a.righe))
+        lo, hi = a.copertura
+        for r, (val, usc, pa, pc) in enumerate(a.righe):
+            celle = [str(val), str(usc), f"{pa:.1f}", f"{pc:.1f}"]
+            for c, x in enumerate(celle):
+                it = QTableWidgetItem(x)
+                it.setTextAlignment(Qt.AlignCenter)
+                if lo <= val <= hi:
+                    it.setBackground(QColor(VERDE_OK))
+                self.t_an.setItem(r, c, it)
+
+    def _applica_sugg(self):
+        i = self.t.currentRow()
+        if not (0 <= i < len(self.gruppi)) or self.ctx is None or not self.ctx.estrazioni:
+            return
+        a = cnd.analizza_gruppo(self.gruppi[i]["numeri"], self.ctx)
+        self.gruppi[i]["minimo"], self.gruppi[i]["massimo"] = a.copertura
+        self._tabella()
+        self.t.selectRow(i)
+
+    def _ok(self):
+        if not self.gruppi:
+            QMessageBox.warning(self, "Gruppi tra", "Aggiungi almeno un gruppo.")
+            return
+        lo, hi = sorted((self.s_gmin.value(), self.s_gmax.value()))
+        self.risultato = cnd.gruppi_tra([(g["numeri"], g["minimo"], g["massimo"]) for g in self.gruppi],
+                                        lo or len(self.gruppi), max(hi, lo or len(self.gruppi)))
+        self.accept()
+
+
 # ------------------------------------------------------------------ editor del sistema
 class EditorSistema(QDialog):
     def __init__(self, arch: Archivio, tipo: str, sistema: sis.Sistema | None = None, parent=None):
@@ -448,6 +689,7 @@ class EditorSistema(QDialog):
         menu.addSeparator()
         menu.addAction("Fisse / Sequele (gruppo di numeri)", lambda: self._gruppo("gruppo"))
         menu.addAction("Combinazioni filtro", lambda: self._gruppo("filtro"))
+        menu.addAction("Gruppi tra (più gruppi di numeri del sistema)", lambda: self.apri_condizione("gruppi_tra"))
         b.setMenu(menu)
         h.addWidget(b)
         b = QPushButton("Apri scheda")
@@ -504,6 +746,8 @@ class EditorSistema(QDialog):
         attuale = conds[indice] if indice is not None else None
         if codice in ("gruppo", "filtro"):
             d = SchedaGruppo(self.g, codice, attuale, self)
+        elif codice == "gruppi_tra":
+            d = SchedaGruppiTra(self.g, self.ctx, sorted(self.griglia.selezionati), attuale, self)
         else:
             d = SchedaCondizione(self.ctx, codice, attuale, self)
         if d.exec() and d.risultato:

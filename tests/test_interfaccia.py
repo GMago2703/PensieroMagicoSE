@@ -689,3 +689,42 @@ def test_macchina_estrazione(app, tmp_path):
         foto(f"macchina_sistema_{g.codice}", f)
         f.close()
         a.chiudi()
+
+
+def test_scheda_gruppi_tra(app, tmp_path):
+    """Condizione «Gruppi tra»: gruppi scelti tra i numeri del sistema, analisi e uso nell'editor."""
+    from pmse.core import condizioni as cnd
+    from pmse.core import sistemi as sis
+    from pmse.core.gioco import SE
+    from pmse.ui.sistemi import EditorSistema, SchedaGruppiTra
+    from tests.test_sistemi import archivio_finto
+    ctx = cnd.Contesto(SE, archivio_finto(SE, 300))
+    numeri = [3, 7, 12, 18, 21, 25, 33, 40, 44, 49, 56, 61, 68, 77, 85]
+    d = SchedaGruppiTra(SE, ctx, numeri)
+    for n in (3, 7, 12, 18):
+        d._clic(n)
+    d.s_min.setValue(1)
+    d.s_max.setValue(2)
+    d._aggiungi()
+    for n in (40, 44, 49):
+        d._clic(n)
+    d.s_min.setValue(0)
+    d.s_max.setValue(1)
+    d._aggiungi()
+    d.t.selectRow(0)
+    d._analisi()
+    assert d.t_an.rowCount() >= 3 and "comune" in d.l_an.text()
+    d.show()
+    app.processEvents()
+    foto("condizione_gruppi_tra", d)
+    d._ok()
+    c = d.risultato
+    assert c.codice == "gruppi_tra" and len(c.gruppi) == 2 and c.minimo == 2
+    s = sis.Sistema(tipo="condizionato", gioco="SE", numeri=numeri, condizioni=cnd.a_json([c]))
+    C = sis.sviluppa(s, ctx).colonne.tolist()
+    assert C and all(1 <= len(set(r) & {3, 7, 12, 18}) <= 2 and len(set(r) & {40, 44, 49}) <= 1 for r in C)
+    a = Archivio(tmp_path / "gt.db", gioco=SE)
+    e = EditorSistema(a, "condizionato", s)
+    assert any("Gruppi tra" in e.lista.item(i).text() for i in range(e.lista.count()))
+    e.close()
+    a.chiudi()

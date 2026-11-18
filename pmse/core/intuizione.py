@@ -51,7 +51,8 @@ Fisse: numeri presenti in tutte le colonne (al massimo 2), devono essere tra i n
 Condizioni: usa SOLO i codici elencati nel quadro. Formato: {{"codice": "pari", "valori": [2,3,4]}} per le \
 condizioni a valori, {{"codice": "somme", "minimo": 200, "massimo": 330}} per quelle a intervallo, \
 {{"codice": "gruppo", "numeri": [7,21,33], "minimo": 1, "massimo": 2}} per un gruppo di numeri di cui ne \
-devono uscire da minimo a massimo. Facoltativo "param" dove la condizione ha un parametro. Da 0 a 6 condizioni.
+devono uscire da minimo a massimo. Per più gruppi insieme: {{"codice": "gruppi_tra", "gruppi": [{{"numeri": [3,7,12], \
+"minimo": 1, "massimo": 2}}, {{"numeri": [40,44,49], "minimo": 0, "massimo": 1}}]}}. Facoltativo "param" dove la condizione ha un parametro. Da 0 a 6 condizioni.
 "errori_max": quante condizioni una colonna può non rispettare (0 o 1).
 
 Rispondi in italiano e SOLO con un oggetto JSON valido, senza testo prima o dopo:
@@ -184,6 +185,16 @@ def interpreta(d: dict, g: Gioco) -> Proposta:
             continue
         cod = str(c.get("codice", "")).strip().lower()
         try:
+            if cod == "gruppi_tra":
+                gr = []
+                for x in c.get("gruppi", []):
+                    nums = sorted({int(y) for y in x.get("numeri", []) if 1 <= int(y) <= g.n})
+                    if nums:
+                        gr.append((nums, int(x.get("minimo", 0)), int(x.get("massimo", len(nums)))))
+                if not gr:
+                    raise ValueError
+                condizioni.append(cnd.gruppi_tra(gr))
+                continue
             if cod == "gruppo":
                 nums = sorted({int(x) for x in c.get("numeri", []) if 1 <= int(x) <= g.n})
                 if not nums:

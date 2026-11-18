@@ -157,6 +157,7 @@ class Macchina:
     in_viaggio: list = field(default_factory=list)
     sullo_scivolo: int = 0            # palline ferme sullo scivolo
     particelle: list = field(default_factory=list)
+    eventi: list = field(default_factory=list)       # suoni da riprodurre: "tubo", "rotola", "toc", "casella"
 
     def __post_init__(self):
         self.rng = np.random.default_rng()
@@ -300,6 +301,7 @@ class Macchina:
                 self.aspirata = -1
                 v = Viaggio(guida + 1, self.euro, r, *self.uscita, ang=float(self.ANG[guida]))
                 self.in_viaggio.append(v)
+                self.eventi.append("tubo")
 
     def _particelle(self, dt):
         if self.potenza > 0.05 and len(self.particelle) < int(26 * self.potenza):
@@ -325,11 +327,15 @@ class Macchina:
                 v.s_stop = self.lun_scivolo - v.r - 6 - self.sullo_scivolo * (2 * v.r + 1)
                 self.sullo_scivolo += 1
                 v.durata = (1.2 + v.s_stop / 420) * lento
+                self.eventi.append("rotola")
         elif v.stato == "scivolo":
             u = min(1.0, v.t / v.durata)
             if u < 1:
                 s = v.s_stop * (u ** 1.7)
             else:                                   # piccolo rimbalzo contro l'arresto o la pallina davanti
+                if not v.r_arrivo:
+                    v.r_arrivo = 1.0
+                    self.eventi.append("toc")
                 b = min(1.0, (v.t - v.durata) / (0.45 * lento))
                 s = v.s_stop - 9 * math.sin(math.pi * b) * (1 - b)
                 if b >= 1:
@@ -347,6 +353,7 @@ class Macchina:
             v.ang *= (1 - min(1.0, dt * 4))
             if u >= 1:
                 v.stato = "arrivata"
+                self.eventi.append("casella")
 
     def scegli(self) -> int:
         """Indice della pallina estratta: scelta con il generatore casuale del sistema operativo."""
@@ -517,6 +524,8 @@ class Scena(QWidget):
         self.copione = None
         self.istantaneo = False
         self.alla_fine = None
+        from .suoni import Suoni
+        self.suoni = Suoni(self)
         self.orologio = QElapsedTimer()
         self.timer = QTimer(self)
         self.timer.setInterval(16)
@@ -534,6 +543,7 @@ class Scena(QWidget):
         self.t += dt
         for m in self.macchine:
             m.passo(dt, self.lento)
+        self._suoni()
         if self.copione is not None:
             try:
                 next(self.copione)
@@ -541,6 +551,26 @@ class Scena(QWidget):
                 self.copione = None
                 if self.alla_fine:
                     self.alla_fine()
+
+    def _suoni(self):
+        su = self.suoni
+        pot = max(m.potenza for m in self.macchine)
+        su.ciclo("aria", 0.55 * pot)
+        su.ciclo("palline", 0.6 * pot)
+        for m in self.macchine:
+            for e in m.eventi:
+                if self.istantaneo:
+                    continue
+                if e == "toc":
+                    su.ferma("rotola")
+                    su.suona("toc", 0.8)
+                elif e == "rotola":
+                    su.suona("rotola", 0.9 if not m.euro else 0.75)
+                elif e == "tubo":
+                    su.suona("tubo", 0.7)
+                elif e == "casella":
+                    su.suona("casella", 0.6)
+            m.eventi.clear()
 
     def simula(self, secondi: float, dt: float = 1 / 60):
         """Per le prove: fa avanzare la scena senza aspettare il tempo reale."""
@@ -584,6 +614,7 @@ class Scena(QWidget):
         if self.istantaneo:
             return self._completa_viaggio(m, i)
         self.annuncio = (v.numero, m.euro, f"{ordine}° {nome}: {v.numero}", self.t)
+        self.suoni.suona("annuncio", 0.7)
         self.testo = f"Uscito il {v.numero}!"
         return v
 
@@ -793,6 +824,11 @@ class FinestraMacchina(QDialog):
         self.b_avvia.setMinimumHeight(34)
         self.b_avvia.clicked.connect(self.avvia)
         h.addWidget(self.b_avvia)
+        self.cb_suoni = QCheckBox("🔊 Suoni")
+        self.cb_suoni.setChecked((arch.leggi_impostazione("macchina_suoni") or "1") == "1")
+        self.scena.suoni.attivo = self.cb_suoni.isChecked()
+        self.cb_suoni.toggled.connect(self._suoni)
+        h.addWidget(self.cb_suoni)
         self.b_salta = QPushButton("⏭ Salta l'animazione")
         self.b_salta.setEnabled(False)
         self.b_salta.clicked.connect(self.salta)
@@ -821,6 +857,12 @@ class FinestraMacchina(QDialog):
         h2.addWidget(b)
         v.addLayout(h2)
         self._prepara_tabellone()
+
+    def _suoni(self, on):
+        self.scena.suoni.attivo = on
+        self.arch.scrivi_impostazione("macchina_suoni", "1" if on else "0")
+        if not on:
+            self.scena.suoni.zitto()
 
     def _aggiungi(self, lay, testo, fun):
         b = QPushButton(testo)
@@ -915,6 +957,7 @@ class FinestraMacchina(QDialog):
         sc, g = self.scena, self.g
         principale = sc.macchine[0]
         sc.testo = "Accensione della macchina..."
+        sc.suoni.suona("avvio", 0.6)
         yield from sc.attendi(1.2)
         sc.testo = "Le palline vengono mescolate dall'aria..."
         sc.aria(True)
@@ -961,12 +1004,15 @@ class FinestraMacchina(QDialog):
                 yield from sc.attendi(1.8)
         sc.aria(False)
         sc.testo = "Estrazione terminata. Buona fortuna!"
+        if not sc.istantaneo:
+            sc.suoni.suona("fine", 0.6)
 
     def _copione_sistema(self):
         sc, g = self.scena, self.g
         principale = sc.macchine[0]
         n = self.sp_n.value()
         sc.testo = "Accensione della macchina..."
+        sc.suoni.suona("avvio", 0.6)
         yield from sc.attendi(1.2)
         sc.testo = "Le palline vengono mescolate dall'aria..."
         sc.aria(True)
@@ -993,6 +1039,8 @@ class FinestraMacchina(QDialog):
         self.risultati = [{"numeri": sorted(numeri), "extra": sorted(extra)}]
         sc.aria(False)
         sc.testo = "I numeri del sistema sono pronti: scegli lo sviluppo."
+        if not sc.istantaneo:
+            sc.suoni.suona("fine", 0.6)
 
     def salta(self):
         sc = self.scena
@@ -1000,6 +1048,7 @@ class FinestraMacchina(QDialog):
             return
         sc.istantaneo = True
         sc.annuncio = None
+        sc.suoni.zitto()
         cop = sc.copione
         sc.copione = None
         try:
@@ -1083,8 +1132,10 @@ class FinestraMacchina(QDialog):
 
     def closeEvent(self, ev):
         self.scena.timer.stop()
+        self.scena.suoni.zitto()
         super().closeEvent(ev)
 
     def reject(self):
         self.scena.timer.stop()
+        self.scena.suoni.zitto()
         super().reject()

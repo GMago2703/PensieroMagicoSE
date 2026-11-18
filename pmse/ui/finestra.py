@@ -201,6 +201,7 @@ class FinestraPrincipale(QMainWindow):
                        ("Combinazioni speciali: numeri alti", "alti", ""),
                        ("Combinazioni speciali: numeri primi", "primi", ""),
                        ("Combinazioni filtro", "filtro", "Ctrl+F"), ("Sequele", "gruppo", ""),
+                       ("Gruppi tra", "gruppi_tra", "Ctrl+G"),
                        ("Popolarità (quanto è giocata)", "popolarita", "")]
 
     def _menu_sistemi(self):
