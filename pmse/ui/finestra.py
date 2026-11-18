@@ -29,7 +29,7 @@ VERDE_SCURO, VERDE, LIME, ARANCIO, ARDESIA = "#00653B", "#0B7D3E", "#BED62F", "#
 
 SFONDO = """
 QToolButton#selettore { font-weight: bold; padding: 2px 8px; }
-QFrame#pannello { background: white; border: 2px solid #2F3C43; border-radius: 6px; }
+QFrame#pannello { background: white; border: 3px solid #1e5bb8; border-radius: 6px; }
 QLabel#titolo { font-family: 'Segoe UI Black', 'Segoe UI'; font-size: 26px; font-weight: 900;
                 font-style: italic; }
 QPushButton[class="lato"] { text-align: left; padding: 6px 10px; font-size: 12px; min-width: 100px; }

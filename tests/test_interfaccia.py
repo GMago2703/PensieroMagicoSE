@@ -34,7 +34,10 @@ def entra_nello_schermo(finestra, app):
 
 @pytest.fixture(scope="module")
 def app():
-    return QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    a = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    from pmse.ui.stile import applica
+    applica(a)
+    return a
 
 
 @pytest.fixture

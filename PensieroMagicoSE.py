@@ -13,6 +13,8 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Pensiero Magico SE")
     app.setStyle("Fusion")
+    from pmse.ui.stile import applica
+    applica(app)
     from pathlib import Path
 
     from PySide6.QtGui import QIcon

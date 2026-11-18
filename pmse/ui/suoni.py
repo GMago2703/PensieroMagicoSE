@@ -13,14 +13,12 @@ import wave
 
 import numpy as np
 
-try:
-    from PySide6.QtCore import QUrl
-    from PySide6.QtMultimedia import QSoundEffect
-except Exception:          # QtMultimedia assente: niente suoni
-    QSoundEffect = None
+import sys
+import threading
+import time
 
 FREQ = 44100
-VERSIONE = 2
+VERSIONE = 3
 
 
 def _rng(seme):
@@ -147,101 +145,191 @@ def scrivi(cartella: str) -> dict[str, str]:
     return percorsi
 
 
+class Miscelatore:
+    """Uscita audio di Windows (winmm, waveOut) con un piccolo mixer: più suoni insieme, cicli e volumi.
+    Non usa librerie esterne; se non c'è una scheda audio resta muto."""
+    BLOCCO = 1024              # campioni per buffer (circa 23 ms)
+    BUFFER = 4
+
+    def __init__(self):
+        self.voci: list[dict] = []
+        self.lock = threading.Lock()
+        self.ok = False
+        self.fermo = False
+        if sys.platform != "win32":
+            return
+        import ctypes
+        from ctypes import wintypes
+        self.ct = ctypes
+        winmm = ctypes.WinDLL("winmm")
+        self.winmm = winmm
+
+        class WAVEFORMATEX(ctypes.Structure):
+            _fields_ = [("wFormatTag", wintypes.WORD), ("nChannels", wintypes.WORD),
+                        ("nSamplesPerSec", wintypes.DWORD), ("nAvgBytesPerSec", wintypes.DWORD),
+                        ("nBlockAlign", wintypes.WORD), ("wBitsPerSample", wintypes.WORD),
+                        ("cbSize", wintypes.WORD)]
+
+        class WAVEHDR(ctypes.Structure):
+            pass
+        WAVEHDR._fields_ = [("lpData", ctypes.c_void_p), ("dwBufferLength", wintypes.DWORD),
+                            ("dwBytesRecorded", wintypes.DWORD), ("dwUser", ctypes.c_size_t),
+                            ("dwFlags", wintypes.DWORD), ("dwLoops", wintypes.DWORD),
+                            ("lpNext", ctypes.c_void_p), ("reserved", ctypes.c_size_t)]
+        self.WAVEHDR = WAVEHDR
+        fmt = WAVEFORMATEX(1, 1, FREQ, FREQ * 2, 2, 16, 0)
+        self.h = ctypes.c_void_p()
+        winmm.waveOutOpen.argtypes = [ctypes.POINTER(ctypes.c_void_p), wintypes.UINT, ctypes.c_void_p,
+                                      ctypes.c_size_t, ctypes.c_size_t, wintypes.DWORD]
+        for nome in ("waveOutPrepareHeader", "waveOutWrite", "waveOutUnprepareHeader"):
+            getattr(winmm, nome).argtypes = [ctypes.c_void_p, ctypes.c_void_p, wintypes.UINT]
+        winmm.waveOutReset.argtypes = [ctypes.c_void_p]
+        winmm.waveOutClose.argtypes = [ctypes.c_void_p]
+        if winmm.waveOutOpen(ctypes.byref(self.h), 0xFFFFFFFF, ctypes.byref(fmt), 0, 0, 0) != 0:
+            return
+        self.dati = [ctypes.create_string_buffer(self.BLOCCO * 2) for _ in range(self.BUFFER)]
+        self.hdr = []
+        for d in self.dati:
+            h = WAVEHDR()
+            h.lpData = ctypes.cast(d, ctypes.c_void_p)
+            h.dwBufferLength = self.BLOCCO * 2
+            winmm.waveOutPrepareHeader(self.h, ctypes.byref(h), ctypes.sizeof(WAVEHDR))
+            self.hdr.append(h)
+        self.ok = True
+        for i in range(self.BUFFER):
+            self._scrivi(i)
+        self.thread = threading.Thread(target=self._ciclo, daemon=True)
+        self.thread.start()
+
+    def _mescola(self) -> bytes:
+        n = self.BLOCCO
+        out = np.zeros(n, dtype=np.float32)
+        with self.lock:
+            vive = []
+            for v in self.voci:
+                x, pos, vol = v["x"], v["pos"], v["vol"]
+                if v["loop"]:
+                    idx = (pos + np.arange(n)) % len(x)
+                    out += x[idx] * vol
+                    v["pos"] = (pos + n) % len(x)
+                    vive.append(v)
+                else:
+                    pezzo = x[pos:pos + n]
+                    out[:len(pezzo)] += pezzo * vol
+                    v["pos"] = pos + n
+                    if v["pos"] < len(x):
+                        vive.append(v)
+            self.voci = vive
+        return (np.clip(out, -1, 1) * 32767).astype("<i2").tobytes()
+
+    def _scrivi(self, i: int):
+        ct = self.ct
+        ct.memmove(self.dati[i], self._mescola(), self.BLOCCO * 2)
+        h = self.hdr[i]
+        h.dwFlags &= ~1                 # toglie WHDR_DONE
+        self.winmm.waveOutWrite(self.h, ct.byref(h), ct.sizeof(self.WAVEHDR))
+
+    def _ciclo(self):
+        while not self.fermo:
+            for i, h in enumerate(self.hdr):
+                if self.fermo:
+                    return
+                if h.dwFlags & 1:          # WHDR_DONE: il buffer è stato suonato, lo riempiamo
+                    try:
+                        self._scrivi(i)
+                    except Exception:
+                        return
+            time.sleep(0.005)
+
+    def aggiungi(self, nome: str, x: np.ndarray, vol: float, loop: bool = False):
+        with self.lock:
+            if loop:
+                for v in self.voci:
+                    if v["nome"] == nome:
+                        v["vol"] = vol
+                        return
+            self.voci.append({"nome": nome, "x": x, "pos": 0, "vol": vol, "loop": loop})
+
+    def togli(self, nome: str):
+        with self.lock:
+            self.voci = [v for v in self.voci if v["nome"] != nome]
+
+    def suona_ciclo(self, nome: str) -> bool:
+        with self.lock:
+            return any(v["nome"] == nome for v in self.voci)
+
+    def chiudi(self):
+        if not self.ok:
+            return
+        self.fermo = True
+        try:
+            self.thread.join(0.5)
+            self.winmm.waveOutReset(self.h)
+            for h in self.hdr:
+                self.winmm.waveOutUnprepareHeader(self.h, self.ct.byref(h), self.ct.sizeof(self.WAVEHDR))
+            self.winmm.waveOutClose(self.h)
+        except Exception:
+            pass
+        self.ok = False
+
+
+_MIX: Miscelatore | None = None
+_CAMPIONI: dict[str, np.ndarray] | None = None
+
+
+def _miscelatore() -> Miscelatore | None:
+    global _MIX, _CAMPIONI
+    if os.environ.get("PMSE_SENZA_SUONI"):
+        return None
+    if _MIX is None:
+        try:
+            _MIX = Miscelatore()
+            _CAMPIONI = {k: v.astype(np.float32) for k, v in genera().items()} if _MIX.ok else {}
+        except Exception:
+            _MIX = None
+    return _MIX if _MIX is not None and _MIX.ok else None
+
+
+@atexit.register
+def _chiudi_tutti():
+    if _MIX is not None:
+        _MIX.chiudi()
+
+
 class Suoni:
-    """Riproduce i suoni; tace se l'audio non è disponibile o se è spento."""
-    CICLI = ("aria", "palline")
+    """Riproduce i suoni della macchina; tace se l'audio non è disponibile o se è spento."""
 
     def __init__(self, parent=None):
         self.attivo = True
         self.volume = 0.8
-        self.effetti: dict[str, list] = {}
-        self.turno: dict[str, int] = {}
-        if QSoundEffect is None or os.environ.get("PMSE_SENZA_SUONI"):
-            return
-        _APERTI.append(self)
-        try:
-            cartella = os.path.join(tempfile.gettempdir(), f"pensieromagico_suoni_{VERSIONE}")
-            for nome, p in scrivi(cartella).items():
-                copie = 3 if nome in ("casella", "toc") else 1
-                lista = []
-                for _ in range(copie):
-                    e = QSoundEffect(parent)
-                    e.setSource(QUrl.fromLocalFile(p))
-                    if nome in self.CICLI:
-                        e.setLoopCount(QSoundEffect.Infinite)
-                    lista.append(e)
-                self.effetti[nome] = lista
-        except Exception:
-            self.effetti = {}
+        self.mix = _miscelatore()
+
+    @property
+    def disponibile(self) -> bool:
+        return self.mix is not None
 
     def suona(self, nome: str, volume: float = 1.0):
-        if not self.attivo or nome not in self.effetti:
-            return
-        try:
-            lista = self.effetti[nome]
-            i = self.turno.get(nome, 0) % len(lista)
-            self.turno[nome] = i + 1
-            e = lista[i]
-            e.setVolume(max(0.0, min(1.0, volume * self.volume)))
-            e.play()
-        except Exception:
-            pass
+        if self.attivo and self.mix and _CAMPIONI and nome in _CAMPIONI:
+            self.mix.aggiungi(nome, _CAMPIONI[nome], volume * self.volume)
 
     def ferma(self, nome: str):
-        for e in self.effetti.get(nome, []):
-            try:
-                e.stop()
-            except Exception:
-                pass
+        if self.mix:
+            self.mix.togli(nome)
 
     def ciclo(self, nome: str, volume: float):
         """Suoni continui (aria, palline): partono, cambiano volume, si fermano."""
-        lista = self.effetti.get(nome)
-        if not lista:
+        if not self.mix or not _CAMPIONI:
             return
-        e = lista[0]
-        try:
-            if not self.attivo or volume < 0.02:
-                if e.isPlaying():
-                    e.stop()
-                return
-            e.setVolume(max(0.0, min(1.0, volume * self.volume)))
-            if not e.isPlaying():
-                e.play()
-        except Exception:
-            pass
+        if not self.attivo or volume < 0.02:
+            self.mix.togli(nome)
+        else:
+            self.mix.aggiungi(nome, _CAMPIONI[nome], volume * self.volume, loop=True)
 
     def zitto(self):
-        for nome in self.effetti:
-            self.ferma(nome)
+        if self.mix:
+            with self.mix.lock:
+                self.mix.voci = []
 
     def chiudi(self):
-        """Ferma e distrugge subito gli effetti sonori (prima che l'applicazione si chiuda)."""
-        try:
-            from shiboken6 import delete, isValid
-        except Exception:
-            delete = isValid = None
-        for lista in self.effetti.values():
-            for e in lista:
-                try:
-                    if isValid is None or isValid(e):
-                        e.stop()
-                        if delete:
-                            delete(e)
-                except Exception:
-                    pass
-        self.effetti = {}
-        if self in _APERTI:
-            _APERTI.remove(self)
-
-
-
-_APERTI: list = []
-
-
-def _chiudi_tutti():
-    for s in list(_APERTI):
-        s.chiudi()
-
-
-atexit.register(_chiudi_tutti)
+        """Alla chiusura della finestra: silenzio (il dispositivo audio resta aperto per la prossima volta)."""
+        self.zitto()

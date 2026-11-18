@@ -23,11 +23,12 @@ class Cella(QLabel):
         self.setMinimumSize(30, 26)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         f = QFont("Segoe UI", 11)
+        f.setBold(True)
         self.setFont(f)
         self.imposta(CELLA_BASE, "#0b2a6b")
 
     def imposta(self, sfondo: str, testo: str = "#0b2a6b", bordo: str | None = None, tooltip: str = ""):
-        b = f"2px solid {bordo}" if bordo else "1px solid transparent"
+        b = f"2px solid {bordo}" if bordo else "1px solid #5b8fd6"
         self.setStyleSheet(f"QLabel {{ background:{sfondo}; color:{testo}; border:{b}; border-radius:3px; }}")
         self.setToolTip(tooltip)
 

@@ -828,6 +828,8 @@ class FinestraMacchina(QDialog):
         self.cb_suoni.setChecked((arch.leggi_impostazione("macchina_suoni") or "1") == "1")
         self.scena.suoni.attivo = self.cb_suoni.isChecked()
         self.cb_suoni.toggled.connect(self._suoni)
+        if not self.scena.suoni.disponibile:
+            self.cb_suoni.setToolTip("Nessuna uscita audio trovata su questo computer")
         h.addWidget(self.cb_suoni)
         self.b_salta = QPushButton("⏭ Salta l'animazione")
         self.b_salta.setEnabled(False)
@@ -861,7 +863,9 @@ class FinestraMacchina(QDialog):
     def _suoni(self, on):
         self.scena.suoni.attivo = on
         self.arch.scrivi_impostazione("macchina_suoni", "1" if on else "0")
-        if not on:
+        if on:
+            self.scena.suoni.suona("annuncio", 0.6)          # prova: si sente subito la campanella
+        else:
             self.scena.suoni.zitto()
 
     def _aggiungi(self, lay, testo, fun):

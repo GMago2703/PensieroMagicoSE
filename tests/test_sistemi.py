@@ -181,3 +181,17 @@ def test_suoni_generati(tmp_path):
     assert set(p) >= {"rotola", "aria", "palline", "annuncio", "toc"}
     with wave.open(p["rotola"]) as w:
         assert w.getframerate() == 44100 and w.getnframes() > 44100
+
+
+def test_miscelatore():
+    import numpy as np
+    from pmse.ui import suoni
+    m = suoni.Miscelatore.__new__(suoni.Miscelatore)
+    m.voci, m.lock = [], __import__("threading").Lock()
+    m.aggiungi("a", np.ones(3000, dtype=np.float32) * 0.5, 0.5, loop=True)
+    m.aggiungi("b", np.ones(500, dtype=np.float32), 0.4)
+    x = np.frombuffer(m._mescola(), dtype="<i2")
+    assert len(x) == suoni.Miscelatore.BLOCCO and abs(x[0] / 32767 - 0.65) < 0.01 and abs(x[-1] / 32767 - 0.25) < 0.01
+    assert [v["nome"] for v in m.voci] == ["a"]          # il suono breve è finito, il ciclo continua
+    m.aggiungi("a", np.ones(3000, dtype=np.float32), 0.1, loop=True)
+    assert len(m.voci) == 1 and m.voci[0]["vol"] == 0.1
