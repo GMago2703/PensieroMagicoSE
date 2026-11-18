@@ -27,7 +27,11 @@ jobs:
         env:
           QT_QPA_PLATFORM: windows
           FOTO_DIR: foto
-        run: python -m pytest -v
+        run: |
+          python -X faulthandler -m pytest -v
+          $codice = $LASTEXITCODE
+          Write-Host "Codice di uscita dei test: $codice"
+          exit $codice
 
       - name: Carica le immagini delle finestre
         uses: actions/upload-artifact@v4
