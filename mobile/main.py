@@ -565,7 +565,7 @@ class PaginaSistemi(Pagina):
             sch.add_widget(r)
         sch.add_widget(bottone("+ Aggiungi condizione", lambda: self._apri_condizione(None), VERDE, alto=dp(48)))
         if self.condizioni:
-            sch.add_widget(regolatore("Condizioni che una colonna può non rispettare", self.errori_max, 0,
+            sch.add_widget(regolatore("Condizioni non rispettate ammesse", self.errori_max, 0,
                                       max(0, len(self.condizioni) - 1), self._errori))
         return sch
 
