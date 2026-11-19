@@ -54,13 +54,21 @@ jobs:
           name: PensieroMagicoSE-exe
           path: dist/PensieroMagicoSE.exe
 
+      - name: Dà all'eseguibile un nome con la versione
+        id: ver
+        shell: bash
+        run: |
+          V=$(python -c "import pmse; print(pmse.__version__)")
+          cp dist/PensieroMagicoSE.exe "dist/PensieroMagicoSE-v$V.exe"
+          echo "v=$V" >> "$GITHUB_OUTPUT"
+
       - name: Pubblica la release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Pensiero Magico SE (build ${{ github.run_number }})
-          body: Versione generata automaticamente dal commit ${{ github.sha }}. Scarica PensieroMagicoSE.exe qui sotto.
-          files: dist/PensieroMagicoSE.exe
+          name: Pensiero Magico SE ${{ steps.ver.outputs.v }} (build ${{ github.run_number }})
+          body: Versione ${{ steps.ver.outputs.v }}, generata automaticamente dal commit ${{ github.sha }}. Scarica PensieroMagicoSE-v${{ steps.ver.outputs.v }}.exe qui sotto.
+          files: dist/PensieroMagicoSE-v${{ steps.ver.outputs.v }}.exe
           make_latest: true
 
       - name: Pubblica le immagini delle finestre sul ramo "foto"

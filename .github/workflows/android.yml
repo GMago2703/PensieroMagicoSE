@@ -192,7 +192,7 @@ jobs:
         run: |
           tag=$(gh api "repos/${{ github.repository }}/releases?per_page=40" --jq '[.[] | select(.name | contains("firmata"))][0].tag_name // empty')
           if [ -n "$tag" ]; then
-            gh release download "$tag" -R "${{ github.repository }}" -p PensieroMagico.apk -O Precedente.apk && echo "Precedente: $tag"
+            gh release download "$tag" -R "${{ github.repository }}" -p "PensieroMagico*.apk" -O Precedente.apk && echo "Precedente: $tag"
           else
             echo "Nessuna release firmata precedente: è la prima."
           fi
@@ -216,17 +216,23 @@ jobs:
           git add -f emu/*
           git commit -q -m "Prova su emulatore ${{ github.run_number }}"
           git push -f -q origin emu-tmp:foto-emulatore
+      - name: Dà all'APK un nome con la versione
+        id: ver
+        run: |
+          V=$(python3 -c "import re; print(re.search(r'__version__ = \"([^\"]+)\"', open('pmse/__init__.py').read()).group(1))")
+          cp PensieroMagico.apk "PensieroMagico-v$V.apk"
+          echo "v=$V" >> "$GITHUB_OUTPUT"
       - name: Pubblica la release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ github.run_number }}
-          name: Pensiero Magico per Android (build ${{ github.run_number }})${{ needs.apk.outputs.firmata == 'si' && ' – firmata' || '' }}
+          name: Pensiero Magico per Android ${{ steps.ver.outputs.v }} (build ${{ github.run_number }})${{ needs.apk.outputs.firmata == 'si' && ' – firmata' || '' }}
           body: |
             App Android (versione ridotta): archivio con aggiornamento da Internet, Magico Pensiero,
             verifica storica, intelligenza artificiale, laboratorio e concorsi con il 6, per SuperEnalotto ed
             Eurojackpot (separati).
             ${{ needs.apk.outputs.firmata == 'si' && 'Firma fissa: si installa sopra la versione precedente e archivio, allenamenti e impostazioni restano.' || 'ATTENZIONE: firma temporanea, per installarla va prima disinstallata la versione precedente.' }}
-            Scarica PensieroMagico.apk dal telefono e installalo (consenti l'installazione da fonti sconosciute).
+            Scarica PensieroMagico-v${{ steps.ver.outputs.v }}.apk dal telefono e installalo (consenti l'installazione da fonti sconosciute).
             Commit ${{ github.sha }}.
-          files: PensieroMagico.apk
+          files: PensieroMagico-v${{ steps.ver.outputs.v }}.apk
           make_latest: false

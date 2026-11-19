@@ -12,7 +12,7 @@ Applicazione per Windows che gestisce l'archivio delle estrazioni del SuperEnalo
 
 ## Scaricare il programma
 Ogni modifica caricata su GitHub genera automaticamente l'eseguibile:
-**Releases → l'ultima "Pensiero Magico SE (build N)" → `PensieroMagicoSE.exe`**.
+**Releases → l'ultima "Pensiero Magico SE (build N)" → `PensieroMagicoSE-vX.Y.Z.exe` (con la versione nel nome)**.
 Non serve installare niente: basta avviare il file. Al primo avvio Windows potrebbe mostrare l'avviso SmartScreen ("App non riconosciuta"): clicca *Ulteriori informazioni → Esegui comunque*.
 
 L'archivio viene salvato in `%APPDATA%\PensieroMagicoSE\archivio.db`.
