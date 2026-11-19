@@ -19,6 +19,7 @@ from .magico import carica_impostazioni, punteggi_personalizzati
 from .schermo import adatta_schermo
 
 CONVERSA_FINTA = None          # solo per le prove automatiche: funzione conversa(messaggi)
+MODELLO_GEMINI = "gemini-3.5-flash-lite"      # veloce e con molte richieste al giorno: bastano 2 domande
 COLORI = {"casuale": "#6d4c41", "magico": "#2e7d32", "magico_ai": "#00838f", "ai": "#1565c0",
           "piu_probabile": "#ef6c00", "meno_probabile": "#6a1b9a"}
 
@@ -53,6 +54,8 @@ class Lavoro(QThread):
                     conversa, nome = CONVERSA_FINTA, "AI di prova"
                 else:
                     forn, chiave, modello, ws = impostazioni_ai(arch)
+                    if forn == "gemini":
+                        modello = MODELLO_GEMINI
                     conversa = it.conversatore(forn, chiave, modello, cm.sistema_ai(g), ws,
                                                avviso=self.stato.emit) if chiave else None
                 if conversa is not None:
@@ -108,6 +111,8 @@ class FinestraColonnaMagica(QDialog):
         h = QHBoxLayout()
         forn, chiave, modello, _ = impostazioni_ai(arch)
         nome = "Gemini" if forn == "gemini" else "Claude"
+        if forn == "gemini":
+            modello = MODELLO_GEMINI
         self.cb_ai = QCheckBox(f"Interroga l'intelligenza artificiale ({nome}, {modello})")
         self.cb_ai.setChecked(bool(chiave))
         self.cb_ai.setEnabled(bool(chiave))
