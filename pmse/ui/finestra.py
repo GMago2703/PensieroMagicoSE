@@ -35,7 +35,7 @@ QLabel#titolo { font-family: 'Segoe UI Black', 'Segoe UI'; font-size: 26px; font
 QPushButton[class="lato"] { text-align: left; padding: 6px 10px; font-size: 12px; min-width: 100px; }
 """
 
-MENU_VUOTI = ["Metodi"]
+MENU_VUOTI: list = []
 
 # Menu in stile Enavision, inseriti ma non ancora attivi ("-" = separatore,
 # (nome, [voci]) = sottomenu). La voce "SUPERSTAR" diventa il nome giusto per ogni gioco.
@@ -446,6 +446,26 @@ class FinestraPrincipale(QMainWindow):
         a.setShortcut(QKeySequence("Ctrl+R"))
         self._azione(m, "📈 E se avessi giocato… (simulatore)...", self.simulatore)
 
+    def _menu_mie_giocate(self):
+        """Il vecchio menu Metodi: tutte le combinazioni generate e giocate, per sezione."""
+        from ..core import mie_giocate as mg
+        m = self.menuBar().addMenu("Le mie &giocate")
+        icone = {"colonne_casuali": "🎲", "sistemi_casuali": "🎱", "magico": "✨", "magico_ai": "🤖",
+                 "sistemi": "📐"}
+        for cat, nome in mg.CATEGORIE[:5]:
+            sotto = m.addMenu(f"{icone[cat]} {nome}")
+            self._azione(sotto, "Elenco (generate e giocate)...", lambda _=False, c=cat: self.mie_giocate(c))
+            self._azione(sotto, "Solo quelle giocate...", lambda _=False, c=cat: self.mie_giocate(c, "giocate"))
+            self._azione(sotto, "Le nascoste...", lambda _=False, c=cat: self.mie_giocate(c, "nascoste"))
+        m.addSeparator()
+        a = self._azione(m, "📚 Tutte le mie giocate...", lambda: self.mie_giocate())
+        a.setShortcut(QKeySequence("Ctrl+M"))
+        self._azione(m, "📝 Registro delle giocate (spesa e vincite)...", self.registro_giocate)
+
+    def mie_giocate(self, categoria=None, filtro="visibili"):
+        from .mie_giocate import FinestraMieGiocate
+        FinestraMieGiocate(self.arch, self, categoria, filtro).exec()
+
     def registro_giocate(self):
         from .giocate import FinestraGiocate
         FinestraGiocate(self.arch, self).exec()
@@ -526,6 +546,7 @@ class FinestraPrincipale(QMainWindow):
             self._menu_disattivo(nome, voci)
         for nome in MENU_VUOTI:
             self._menu_vuoto(nome)
+        self._menu_mie_giocate()
 
         m = mb.addMenu("&Archivio")
         self._azione(m, "Consulta archivio...", self.apri_archivio)

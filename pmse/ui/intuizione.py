@@ -274,6 +274,11 @@ class FinestraIntuizione(QDialog):
                     "gioca con moderazione.</p>".replace(",", "."))
         self.testo.setHtml("".join(html))
         ULTIMO[self.g.codice] = (s, e.sviluppo.possibili_colonne)
+        try:
+            from ..core import mie_giocate as mg
+            mg.da_sistema(self.arch, s, "magico_ai", f"Suggerimento AI: {p.titolo or 'intuizione'}")
+        except Exception:            # noqa: BLE001 – l'elenco «Le mie giocate» non deve bloccare il resto
+            pass
         self.b_colonne.setEnabled(True)
         self.b_editor.setEnabled(self.apri_editor is not None)
 

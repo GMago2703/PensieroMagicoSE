@@ -942,6 +942,11 @@ class EditorSistema(QDialog):
         s.colonne = sv.colonne.tolist()
         s.info = {"integrale": sv.integrale, "possibili": sv.possibili, "secondi": round(sv.secondi, 2)}
         ULTIMO[self.g.codice] = (s, sv.possibili_colonne)
+        try:
+            from ..core import mie_giocate as mg
+            mg.da_sistema(self.arch, s, "sistemi")
+        except Exception:            # noqa: BLE001 – l'elenco «Le mie giocate» non deve bloccare il resto
+            pass
         FinestraSviluppo(self.arch, s, sv.possibili_colonne, self).exec()
 
     def _memorizza_impostazioni(self):

@@ -866,3 +866,69 @@ def test_riepilogo_sezioni(app, tmp_path):
         assert "compariranno" in w2.l_sestine.text()
         w2.close()
         a.chiudi()
+
+
+def test_le_mie_giocate(app, tmp_path):
+    """Menu Le mie giocate: voci create da sole, distinzione generate/giocate, verifica, nascondi, elimina."""
+    from unittest import mock
+
+    from pmse.core import giocate as gc
+    from pmse.core import mie_giocate as mg
+    from pmse.core import sistemi as sis
+    from pmse.core.gioco import EJ, SE
+    from pmse.ui import mie_giocate as umg
+    from pmse.ui.finestra import FinestraPrincipale
+    from tests.test_sistemi import archivio_finto
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"mg_{g.codice}.db", gioco=g)
+        a.unisci(archivio_finto(g, 300))
+        w = FinestraPrincipale(a, avvio_automatico=False)
+        menu = {x.text().replace("&", ""): x.menu() for x in w.menuBar().actions() if x.menu() is not None}
+        assert "Le mie giocate" in menu and "Metodi" not in menu
+        sotto = [x.text() for x in menu["Le mie giocate"].actions()]
+        assert any("Colonne casuali" in t for t in sotto) and any("Sistemi ridotti" in t for t in sotto)
+        w.genera()
+        mg.da_macchina(a, "sestine", [{"numeri": list(range(1, g.k + 1)), "extra": [] if g is SE else [1, 2]}])
+        mg.da_macchina(a, "sistema", [{"numeri": list(range(1, 11)), "extra": [] if g is SE else [3, 4]}])
+        s = sis.Sistema(tipo="immediato", gioco=g.codice, numeri=list(range(1, 11)), garanzia=1)
+        s.colonne = sis.sviluppa(s).colonne.tolist()
+        mg.da_sistema(a, s)
+        gc.aggiungi(a, gc.Giocata(g.codice, [list(range(1, g.k + 1))], [[] if g is SE else [1, 2]], "2020-01-01",
+                                  1, 1.0, "Mia", "Macchina dell'estrazione"))
+        f = umg.FinestraMieGiocate(a, w)
+        testi = [f.t.item(i, 1).text() for i in range(f.t.rowCount())]
+        assert f.t.rowCount() == 4 and testi.count("🎟 Giocata") == 1
+        # verifica su tutto l'archivio del sistema casuale (integrale, calcolo esatto)
+        i = next(i for i, x in enumerate(f.voci) if x.categoria == "sistemi_casuali")
+        f.t.selectRow(i)
+        f.verifica("storico")
+        f.thread.wait(20000)
+        app.processEvents()
+        assert "su tutto l'archivio: 300 concorsi" in f.dett.toPlainText()
+        # nascondi: sparisce dalla vista normale, ricompare tra le nascoste
+        with mock.patch("pmse.ui.mie_giocate.QMessageBox.information"):
+            f.nascondi()
+        assert f.t.rowCount() == 3
+        f.c_filtro.setCurrentIndex(f.c_filtro.findData("nascoste"))
+        assert f.t.rowCount() == 1
+        f.t.selectRow(0)
+        f.nascondi()
+        assert f.t.rowCount() == 0
+        f.c_filtro.setCurrentIndex(0)
+        # ricarica delle colonne casuali nella memoria della macchina
+        from pmse.ui import macchina as mc
+        mc.CASUALI.clear()
+        i = next(i for i, x in enumerate(f.voci) if x.categoria == "colonne_casuali")
+        f.t.selectRow(i)
+        with mock.patch("pmse.ui.mie_giocate.QMessageBox.information"):
+            f.ricarica_voce()
+        assert mc.combinazioni_casuali(g)
+        # elimina la generata del Magico Pensiero
+        i = next(i for i, x in enumerate(f.voci) if x.categoria == "magico")
+        f.t.selectRow(i)
+        with mock.patch("pmse.ui.mie_giocate.QMessageBox.question", return_value=umg.QMessageBox.Yes):
+            f.elimina()
+        assert not any(x.categoria == "magico" for x in f.voci)
+        f.close()
+        w.close()
+        a.chiudi()

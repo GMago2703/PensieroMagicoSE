@@ -271,19 +271,25 @@ def chiedi_euronumeri(parent, quante: int) -> list[list[int]] | None:
     return [nums for _ in range(quante)]
 
 
-def registra(arch: Archivio, parent, colonne, extra=None, origine="") -> bool:
-    """Apre il dialogo di registrazione già compilato (da Sviluppo, macchina, ecc.)."""
+def registra(arch: Archivio, parent, colonne, extra=None, origine=""):
+    """Apre il dialogo di registrazione già compilato (da Sviluppo, macchina, ecc.).
+    Restituisce la giocata registrata (None se annullato)."""
     if arch.gioco.is_ej and (not extra or not all(extra)):
         extra = chiedi_euronumeri(parent, len(colonne))
         if extra is None:
-            return False
+            return None
     d = DialogoGiocata(arch, parent, colonne, extra, origine)
     if d.exec():
+        try:
+            from ..core import mie_giocate as mg
+            mg.sincronizza(arch)          # la voce generata con le stesse colonne diventa "giocata"
+        except Exception:                 # noqa: BLE001 – l'elenco si sistema alla prossima apertura
+            pass
         QMessageBox.information(parent, "Giocata registrata", "La giocata è nel registro (Ricevitoria → Registro "
-                                                              "delle giocate): dopo ogni estrazione il programma "
-                                                              "la controlla da solo.")
-        return True
-    return False
+                                                              "delle giocate) e in «Le mie giocate»: dopo ogni "
+                                                              "estrazione il programma la controlla da solo.")
+        return d.giocata
+    return None
 
 
 # ------------------------------------------------------------------ scaricamento delle quote

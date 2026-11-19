@@ -28,8 +28,9 @@ from ..core.db import Archivio
 from ..core.gioco import Gioco
 from .schermo import adatta_schermo
 
-# Ultime combinazioni estratte con la macchina, per gioco: restano SOLO in memoria finché il programma è
-# aperto (si cancellano cambiando programma SE/EJ o chiudendo), così si usano altrove senza copia-incolla.
+# Ultime combinazioni estratte con la macchina, per gioco: in memoria finché il programma è aperto (si
+# cancellano cambiando programma SE/EJ o chiudendo), così si usano altrove senza copia-incolla. Restano
+# comunque nell'elenco «Le mie giocate», da dove si possono ricaricare.
 CASUALI: dict[str, dict] = {}
 
 
@@ -1102,6 +1103,11 @@ class FinestraMacchina(QDialog):
     def _finito(self):
         if self.risultati:
             CASUALI[self.g.codice] = {"modo": self.modo, "risultati": [dict(r) for r in self.risultati]}
+            try:
+                from ..core import mie_giocate as mg
+                mg.da_macchina(self.arch, self.modo, [dict(r) for r in self.risultati])
+            except Exception:            # noqa: BLE001 – l'elenco «Le mie giocate» non deve bloccare il resto
+                pass
         self.b_salta.setEnabled(False)
         for w in (self.b_avvia, self.sp_n, self.cb_ss, *self.dopo):
             w.setEnabled(True)
@@ -1165,6 +1171,11 @@ class FinestraMacchina(QDialog):
         s.colonne = sv.colonne.tolist()
         s.info = {"integrale": sv.integrale, "possibili": sv.possibili}
         ULTIMO[self.g.codice] = (s, sv.possibili_colonne)
+        try:
+            from ..core import mie_giocate as mg
+            mg.da_sistema(self.arch, s, "sistemi_casuali")
+        except Exception:            # noqa: BLE001 – l'elenco «Le mie giocate» non deve bloccare il resto
+            pass
         FinestraSviluppo(self.arch, s, sv.possibili_colonne, self).exec()
 
     def editor(self):
