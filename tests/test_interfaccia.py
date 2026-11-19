@@ -929,7 +929,7 @@ def test_le_mie_giocate(app, tmp_path):
         # nascondi: sparisce dalla vista normale, ricompare tra le nascoste
         with mock.patch("pmse.ui.mie_giocate.QMessageBox.information"):
             f.nascondi()
-        assert f.t.rowCount() == 3
+        assert f.t.rowCount() == 4
         f.c_filtro.setCurrentIndex(f.c_filtro.findData("nascoste"))
         assert f.t.rowCount() == 1
         f.t.selectRow(0)
