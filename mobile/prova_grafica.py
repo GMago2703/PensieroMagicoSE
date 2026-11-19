@@ -154,7 +154,7 @@ class Prova(main.PensieroMagicoApp):
         yield
         yield
         v = self.pagine["verifica"]
-        v.slider.value = 40
+        v.e_n.text = "40"
         v._avvia()
         yield
         yield
@@ -342,7 +342,7 @@ class Prova(main.PensieroMagicoApp):
         yield
         yield
         v = self.pagine["verifica"]
-        v.slider.value = 20
+        v.e_n.text = "20"
         v._avvia()
         yield
         yield

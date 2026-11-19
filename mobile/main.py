@@ -1247,6 +1247,7 @@ class PaginaVerifica(Pagina):
         super().__init__(app, name="verifica", **kw)
         self.stop = False
         self.risultato = None
+        self.ultimo_n = 100
 
     def mostra(self):
         c = self.corpo
@@ -1254,11 +1255,23 @@ class PaginaVerifica(Pagina):
         sch = Scheda()
         sch.add_widget(Testo("Previsioni su quanto già avvenuto: per ogni concorso passato Magico Pensiero "
                              "usa solo i dati precedenti e si confronta con i numeri usciti e con il caso."))
-        self.l_n = Testo("")
+        self.l_n = Testo("Quanti concorsi verificare (da 10 a 1000): scrivi il numero oppure scegli un valore rapido.")
         sch.add_widget(self.l_n)
-        self.slider = Slider(min=10, max=1000, step=10, value=100, size_hint_y=None, height=dp(44),
+        riga = BoxLayout(size_hint_y=None, height=dp(52), spacing=dp(8))
+        self.e_n = TextInput(text=str(self.ultimo_n), multiline=False, input_filter="int", input_type="number",
+                             halign="center", font_size=sp(20), size_hint_x=0.4, padding=[dp(8), dp(12)])
+        self.e_n.bind(text=lambda *_: self._etichetta())
+        riga.add_widget(self.e_n)
+        riga.add_widget(Label(text="concorsi", color=(0.12, 0.12, 0.12, 1), font_size=sp(16), halign="left"))
+        sch.add_widget(riga)
+        rapidi = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(6))
+        for v in (10, 50, 100, 250, 500, 1000):
+            rapidi.add_widget(bottone(str(v), lambda v=v: setattr(self.e_n, "text", str(v)), VERDE_SCURO,
+                                      alto=dp(44)))
+        sch.add_widget(rapidi)
+        self.slider = Slider(min=10, max=1000, step=10, value=self.ultimo_n, size_hint_y=None, height=dp(44),
                              cursor_size=(dp(30), dp(30)))
-        self.slider.bind(value=lambda *_: self._etichetta())
+        self.slider.bind(value=lambda _s, v: setattr(self.e_n, "text", str(int(v))))
         sch.add_widget(self.slider)
         self._etichetta()
         r = BoxLayout(size_hint_y=None, height=dp(40))
@@ -1279,8 +1292,17 @@ class PaginaVerifica(Pagina):
         if self.risultato and self.risultato[0] is self.g:
             self._mostra_esito(*self.risultato[1:])
 
+    def _numero(self) -> int:
+        """Il valore scritto, riportato tra 10 e 1000 (se vuoto o non valido: l'ultimo usato)."""
+        try:
+            return max(10, min(1000, int(self.e_n.text)))
+        except ValueError:
+            return self.ultimo_n
+
     def _etichetta(self):
-        self.l_n.text = f"Concorsi da verificare: [b]{int(self.slider.value)}[/b]  (10 – 1000)"
+        n = self._numero()
+        if self.e_n.text.strip().isdigit() and 10 <= int(self.e_n.text) <= 1000 and self.slider.value != n:
+            self.slider.value = n
 
     def _avvia(self):
         if self.app.occupato:
@@ -1288,7 +1310,9 @@ class PaginaVerifica(Pagina):
             self.b_avvia.text = "Interruzione..."
             return
         self.stop = False
-        n, impara, g = int(self.slider.value), self.cb.active, self.g
+        n, impara, g = self._numero(), self.cb.active, self.g
+        self.ultimo_n = n
+        self.e_n.text = str(n)
         self.b_avvia.text = "Ferma"
         self.barra.opacity, self.barra.value = 1, 0
         self.l_stato.text = "Verifica in corso... (con 1000 concorsi può volerci qualche minuto)"
