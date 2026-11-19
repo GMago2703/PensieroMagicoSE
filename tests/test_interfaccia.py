@@ -904,7 +904,7 @@ def test_le_mie_giocate(app, tmp_path):
         f.verifica("storico")
         f.thread.wait(20000)
         app.processEvents()
-        assert "su tutto l'archivio: 300 concorsi" in f.dett.toPlainText()
+        assert f"su tutto l'archivio: {a.conta()} concorsi" in f.dett.toPlainText()
         # nascondi: sparisce dalla vista normale, ricompare tra le nascoste
         with mock.patch("pmse.ui.mie_giocate.QMessageBox.information"):
             f.nascondi()
