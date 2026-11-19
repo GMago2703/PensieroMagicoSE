@@ -193,3 +193,17 @@ def test_condizionati_e_casuali_servizio(tmp_path):
         with pytest.raises(ValueError):
             s.sviluppa_condizionato(range(1, 41), [], conds, 0, 0)
         s.chiudi()
+
+
+def test_guida_testo():
+    from pmse.core import guida
+    from pmse.core.gioco import EJ, SE
+    for g in (SE, EJ):
+        c = guida.capitoli(g)
+        assert len(c) == 14 and len({i for i, _, _ in c}) == 14
+        tutto = guida.pagina(g)
+        assert "Colonna magica" in tutto and "Magico Pensiero" in tutto
+        assert ("Jolly" in tutto) != g.is_ej or "SuperStar" in tutto
+        assert "cinquina" in tutto.lower() if g.is_ej else "sestina" in tutto.lower()
+        corpo = tutto.split("</style>")[1]
+        assert "{" not in corpo and "}" not in corpo

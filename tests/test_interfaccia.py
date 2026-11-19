@@ -986,3 +986,35 @@ def test_colonna_magica(app, tmp_path):
         d.close()
         w.close()
         a.chiudi()
+
+
+def test_guida(app, tmp_path):
+    """Help → Guida: menu, capitoli, ricerca e salvataggio in PDF."""
+    from unittest import mock
+
+    from pmse.core.gioco import EJ, SE
+    from pmse.ui.finestra import FinestraPrincipale
+    from pmse.ui.guida import FinestraGuida
+    from tests.test_sistemi import archivio_finto
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"gd_{g.codice}.db", gioco=g)
+        a.unisci(archivio_finto(g, 50))
+        w = FinestraPrincipale(a, avvio_automatico=False)
+        menu = {x.text().replace("&", ""): x.menu() for x in w.menuBar().actions() if x.menu() is not None}
+        assert any("Guida all'uso" in x.text() for x in menu["Help"].actions())
+        d = FinestraGuida(g, w, "colonna_non_esiste")
+        assert d.elenco.count() == 14 and "Per cominciare" in d.testo.toPlainText()
+        d.elenco.setCurrentRow(5)
+        assert "Colonna magica" in d.testo.toPlainText()
+        d.e_cerca.setText("backup")
+        with mock.patch("pmse.ui.guida.QMessageBox.information"):
+            d.cerca()
+        assert d.elenco.currentRow() in (2, 10)
+        pdf = tmp_path / f"guida_{g.codice}.pdf"
+        with mock.patch("pmse.ui.guida.QFileDialog.getSaveFileName", return_value=(str(pdf), "")), \
+                mock.patch("pmse.ui.guida.QMessageBox.information"):
+            d.salva_pdf()
+        assert pdf.exists() and pdf.stat().st_size > 5000
+        d.close()
+        w.close()
+        a.chiudi()

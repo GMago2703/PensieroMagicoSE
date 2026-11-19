@@ -608,6 +608,13 @@ class FinestraPrincipale(QMainWindow):
         for nome in MENU_VUOTI_DOPO:
             self._menu_vuoto(nome)
         m = mb.addMenu("&Help")
+        a = self._azione(m, "📖 Guida all'uso del programma", self.guida)
+        a.setShortcut(QKeySequence("F1"))
+        sm = m.addMenu("Guida per argomento")
+        from ..core import guida as _guida
+        for cod, titolo, _ in _guida.capitoli(self.g):
+            self._azione(sm, titolo, lambda _=False, c=cod: self.guida(c))
+        m.addSeparator()
         self._azione(m, f"Informazioni su {self.g.nome_app}", self.informazioni)
 
     # -------------------------------------------------------------- centro
@@ -992,6 +999,10 @@ class FinestraPrincipale(QMainWindow):
     def storico_magico(self):
         from .magico import FinestraStorico
         FinestraStorico(self.arch, self).exec()
+
+    def guida(self, capitolo=None):
+        from .guida import FinestraGuida
+        FinestraGuida(self.g, self, capitolo if isinstance(capitolo, str) else None).exec()
 
     def informazioni(self):
         QMessageBox.about(self, self.g.nome_app, (
