@@ -981,7 +981,7 @@ def test_colonna_magica(app, tmp_path):
         app.processEvents()
         assert d.risultato is not None and len(set(d.risultato.colonna)) == g.k
         assert d.voce is not None and d.b_reg.isEnabled()
-        assert "Provenienza" not in d.testo.toPlainText() and "Casuale" in d.testo.toPlainText()
+        assert "Numero casuale" in d.testo.toPlainText() and "Magico Pensiero" in d.testo.toPlainText()
         assert len([x for x in mg.carica(a) if x.categoria == "colonna_magica"]) == 1
         d.close()
         w.close()
