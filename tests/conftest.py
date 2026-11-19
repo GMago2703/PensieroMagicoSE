@@ -30,5 +30,5 @@ def pytest_sessionfinish(session, exitstatus):
 def pytest_runtest_logreport(report):
     """Il riepilogo finale non viene stampato (usciamo prima): l'errore si mostra subito."""
     if report.failed:
-        print(f"\n===== ERRORE in {report.nodeid} ({report.when}) =====\n{report.longreprtext[-6000:]}\n",
+        print(f"\n===== ERRORE in {report.nodeid} ({report.when}) =====\n{report.longreprtext[-6000:]}\n".encode("ascii", "replace").decode(),
               flush=True)
