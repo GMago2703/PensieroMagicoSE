@@ -222,6 +222,7 @@ def avviso(titolo, testo):
 # ------------------------------------------------------------------ pagine
 class Pagina(Screen):
     titolo = ""
+    indietro = "home"          # dove porta il pulsante "<"
 
     def __init__(self, app, **kw):
         super().__init__(**kw)
@@ -231,7 +232,7 @@ class Pagina(Screen):
         if self.name != "home":
             testa = BoxLayout(size_hint_y=None, height=dp(56), padding=(dp(4), dp(4)), spacing=dp(6))
             sfondo(testa, "#00000040")
-            testa.add_widget(bottone("<", lambda: app.vai("home"), ARANCIO, alto=dp(48),
+            testa.add_widget(bottone("<", lambda: app.vai(self.indietro), ARANCIO, alto=dp(48),
                                      size_hint_x=None, width=dp(56)))
             self.l_titolo = adatta_testo(Label(text=self.titolo, bold=True, italic=True, font_size=sp(21),
                                                color=hexc(LIME)))
@@ -302,7 +303,8 @@ class Home(Pagina):
         c.add_widget(bottone("Magico Pensiero", lambda: self.app.vai("magico"), ARANCIO))
         c.add_widget(bottone("Verifica storica", lambda: self.app.vai("verifica"), ARANCIO))
         c.add_widget(bottone("Intelligenza artificiale", lambda: self.app.vai("ai"), ARANCIO))
-        c.add_widget(bottone("Sistemi ridotti", lambda: self.app.vai("sistemi"), ARANCIO))
+        c.add_widget(bottone("Sistemi (ridotti e condizionati)", lambda: self.app.vai("sistemi"), ARANCIO))
+        c.add_widget(bottone("Combinazioni casuali", lambda: self.app.vai("casuali"), ARANCIO))
         c.add_widget(bottone("Laboratorio: è davvero casuale?", lambda: self.app.vai("laboratorio"), ARANCIO))
         c.add_widget(bottone("Archivio estrazioni", lambda: self.app.vai("archivio"), VERDE))
         piede = Testo(f"versione {__version__} – i numeri del lotto sono casuali: gioca con moderazione",
@@ -417,54 +419,116 @@ def salva_documento(nome: str, dati: bytes, mime: str, condividi: bool = False) 
     return dove
 
 
+TIPI_SISTEMA = [("immediato", "Ridotto immediato"), ("ridotto", "Ridotto a garanzia"),
+                ("condizionato", "Condizionato"), ("condizionato_ridotto", "Condizionato ridotto")]
+
+
+def griglia_numeri(n, al_tocco, alto=dp(36)) -> tuple[GridLayout, dict]:
+    """Griglia 10 per riga con tutti i numeri del gioco."""
+    griglia = GridLayout(cols=10, spacing=dp(3), size_hint_y=None)
+    griglia.bind(minimum_height=griglia.setter("height"))
+    tasti = {}
+    for x in range(1, n + 1):
+        b = Button(text=str(x), bold=True, font_size=sp(14), size_hint_y=None, height=alto,
+                   background_normal="", background_down="")
+        b.bind(on_release=lambda _b, x=x: al_tocco(x))
+        tasti[x] = b
+        griglia.add_widget(b)
+    return griglia, tasti
+
+
+def colora_tasti(tasti, scelti, fisse=()):
+    for x, b in tasti.items():
+        if x in fisse:
+            b.background_color, b.color = hexc("#c62828"), (1, 1, 1, 1)
+        elif x in scelti:
+            b.background_color, b.color = hexc(VERDE), (1, 1, 1, 1)
+        else:
+            b.background_color, b.color = hexc("#7ff0f6"), hexc("#0b2a6b")
+
+
+def regolatore(etichetta, valore, minimo, massimo, al_cambio, passo=1) -> BoxLayout:
+    """Riga  etichetta  [-] valore [+]."""
+    r = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(6))
+    r.add_widget(adatta_testo(Label(text=etichetta, color=(0.1, 0.1, 0.1, 1), font_size=sp(14), halign="left")))
+    l = Label(text=str(valore), bold=True, color=(0.1, 0.1, 0.1, 1), font_size=sp(17), size_hint_x=None,
+              width=dp(56))
+
+    def cambia(d):
+        v = max(minimo, min(massimo, int(l.text) + d))
+        l.text = str(v)
+        al_cambio(v)
+    r.add_widget(bottone("–", lambda: cambia(-passo), ARDESIA, alto=dp(44), size_hint_x=None, width=dp(48)))
+    r.add_widget(l)
+    r.add_widget(bottone("+", lambda: cambia(passo), ARDESIA, alto=dp(44), size_hint_x=None, width=dp(48)))
+    return r
+
+
 class PaginaSistemi(Pagina):
-    """Sistemi ridotti: ridotti immediati (riduzioni già pronte) e integrali ridotti a garanzia."""
-    titolo = "Sistemi ridotti"
+    """Sistemi: ridotti immediati, integrali ridotti a garanzia, condizionati e condizionati ridotti."""
+    titolo = "Sistemi"
 
     def __init__(self, app, **kw):
         super().__init__(app, name="sistemi", **kw)
         self.numeri: set[int] = set()
         self.fisse: set[int] = set()
-        self.immediato = True
+        self.tipo = "immediato"
         self.punti = None                 # punti garantiti scelti
+        self.condizioni: list = []        # condizioni dei sistemi condizionati
+        self.errori_max = 0
         self.sistema = None
         self.gioco_attuale = None
 
-    def mostra(self):
+    @property
+    def immediato(self):
+        return self.tipo == "immediato"
+
+    def ricomincia_se_serve(self):
         if self.gioco_attuale is not self.g:          # giochi separati: si riparte da zero
             self.numeri, self.fisse, self.sistema, self.punti = set(), set(), None, None
+            self.condizioni, self.errori_max, self.tipo = [], 0, "immediato"
             self.gioco_attuale = self.g
+
+    def imposta_numeri(self, numeri, tipo=None):
+        """Dalla pagina delle combinazioni casuali: i numeri estratti diventano il sistema."""
+        self.ricomincia_se_serve()
+        self.numeri, self.fisse, self.sistema = set(numeri), set(), None
+        if tipo:
+            self.tipo = tipo
+
+    def mostra(self):
+        self.ricomincia_se_serve()
         c = self.corpo
         c.clear_widgets()
-        scelta = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(6))
-        for testo, imm in (("Ridotto immediato", True), ("Ridotto a garanzia", False)):
-            b = ToggleButton(text=testo, group="tipo_sistema", state="down" if imm == self.immediato else "normal",
-                             bold=True, font_size=sp(15), background_normal="", background_down="",
-                             background_color=hexc(LIME if imm == self.immediato else "#ffffff30"),
-                             color=(0, 0, 0, 1) if imm == self.immediato else (1, 1, 1, 1),
-                             allow_no_selection=False)
-            b.bind(on_release=lambda _b, v=imm: self._tipo(v))
+        scelta = GridLayout(cols=2, spacing=dp(6), size_hint_y=None, height=dp(106))
+        for codice, testo in TIPI_SISTEMA:
+            sel = codice == self.tipo
+            b = ToggleButton(text=testo, group="tipo_sistema", state="down" if sel else "normal", bold=True,
+                             font_size=sp(15), background_normal="", background_down="",
+                             background_color=hexc(LIME if sel else "#ffffff30"),
+                             color=(0, 0, 0, 1) if sel else (1, 1, 1, 1), allow_no_selection=False)
+            b.bind(on_release=lambda _b, v=codice: self._tipo(v))
             scelta.add_widget(adatta_testo(b))
         c.add_widget(scelta)
-        spieg = (f"[b]Ridotto immediato[/b]: riduzioni già pronte e verificate (da {self.g.k + 1} a 20 numeri, 0-4 "
-                 "fisse): scegli i numeri e la garanzia." if self.immediato else
-                 "[b]Ridotto a garanzia[/b]: l'integrale dei tuoi numeri ridotto dal programma in modo da "
-                 f"garantire i punti scelti (fino a {servizi.MAX_NUMERI_RIDOTTO} numeri).")
+        k = self.g.k
+        spieg = {
+            "immediato": f"[b]Ridotto immediato[/b]: riduzioni già pronte e verificate (da {k + 1} a 20 numeri, 0-4 "
+                         "fisse): scegli i numeri e la garanzia.",
+            "ridotto": "[b]Ridotto a garanzia[/b]: l'integrale dei tuoi numeri ridotto dal programma in modo da "
+                       f"garantire i punti scelti (fino a {servizi.MAX_NUMERI_RIDOTTO} numeri).",
+            "condizionato": "[b]Condizionato[/b]: tutte le colonne dei tuoi numeri che rispettano le condizioni "
+                            f"scelte (fino a {servizi.MAX_NUMERI_CONDIZIONATO} numeri).",
+            "condizionato_ridotto": "[b]Condizionato ridotto[/b]: le colonne che rispettano le condizioni, poi "
+                                    "ridotte con la garanzia scelta (vale se la combinazione vincente rispetta le "
+                                    "condizioni).",
+        }[self.tipo]
         if self.g.is_ej:
             spieg += " Eurojackpot: il sistema riguarda i 5 numeri; gli Euronumeri si scelgono a parte."
         c.add_widget(Testo(spieg, (1, 1, 1, 0.9), font_size=sp(13)))
         sch = Scheda()
         sch.add_widget(Testo("Tocca un numero: 1 volta = giocato (verde), 2 volte = [b][color=c62828]fisso[/color][/b], "
                              "3 volte = tolto.", font_size=sp(13)))
-        griglia = GridLayout(cols=10, spacing=dp(3), size_hint_y=None)
-        griglia.bind(minimum_height=griglia.setter("height"))
-        self.tasti = {}
-        for n in range(1, self.g.n + 1):
-            b = Button(text=str(n), bold=True, font_size=sp(14), size_hint_y=None, height=dp(36),
-                       background_normal="", background_down="")
-            b.bind(on_release=lambda _b, n=n: self._tocca(n))
-            self.tasti[n] = b
-            griglia.add_widget(b)
+        griglia, self.tasti = griglia_numeri(self.g.n, self._tocca)
         sch.add_widget(griglia)
         r = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(6))
         self.l_conta = adatta_testo(Label(color=(0.1, 0.1, 0.1, 1), bold=True, font_size=sp(14)))
@@ -472,6 +536,8 @@ class PaginaSistemi(Pagina):
         r.add_widget(bottone("Azzera", self._azzera, ARDESIA, alto=dp(40), size_hint_x=0.4))
         sch.add_widget(r)
         c.add_widget(sch)
+        if self.tipo.startswith("condizionato"):
+            c.add_widget(self._scheda_condizioni())
         self.box_gar = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6))
         self.box_gar.bind(minimum_height=self.box_gar.setter("height"))
         c.add_widget(self.box_gar)
@@ -484,10 +550,55 @@ class PaginaSistemi(Pagina):
         if self.sistema is not None:
             self._mostra_sistema()
 
+    # ---------------------------------------------------------------- condizioni
+    def _scheda_condizioni(self):
+        sch = Scheda()
+        sch.add_widget(Testo(f"[b]Condizioni ({len(self.condizioni)})[/b]", font_size=sp(15)))
+        if not self.condizioni:
+            sch.add_widget(Testo("Nessuna condizione: aggiungine una. Ogni scheda mostra l'analisi dell'archivio "
+                                 "con il valore più comune.", font_size=sp(13)))
+        for i, cond in enumerate(self.condizioni):
+            sch.add_widget(Testo(f"{i + 1}. {cond.descrivi()}", font_size=sp(13)))
+            r = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(6))
+            r.add_widget(bottone("Modifica", lambda i=i: self._apri_condizione(i), "#1e5bb8", alto=dp(40)))
+            r.add_widget(bottone("Togli", lambda i=i: self._togli_condizione(i), "#c62828", alto=dp(40)))
+            sch.add_widget(r)
+        sch.add_widget(bottone("+ Aggiungi condizione", lambda: self._apri_condizione(None), VERDE, alto=dp(48)))
+        if self.condizioni:
+            sch.add_widget(regolatore("Condizioni che una colonna può non rispettare", self.errori_max, 0,
+                                      max(0, len(self.condizioni) - 1), self._errori))
+        return sch
+
+    def _errori(self, v):
+        self.errori_max = v
+        self.sistema = None
+        self.box_ris.clear_widgets()
+
+    def _apri_condizione(self, indice):
+        if self.s.conta() < 50:
+            avviso("Condizioni", "Servono almeno 50 estrazioni in archivio (aggiornalo dalla home).")
+            return
+        p = self.app.pagine["condizione"]
+        p.prepara(indice, self.condizioni[indice] if indice is not None else None, sorted(self.numeri))
+        self.app.vai("condizione")
+
+    def salva_condizione(self, indice, cond):
+        if indice is None:
+            self.condizioni.append(cond)
+        else:
+            self.condizioni[indice] = cond
+        self.sistema = None
+
+    def _togli_condizione(self, i):
+        del self.condizioni[i]
+        self.errori_max = min(self.errori_max, max(0, len(self.condizioni) - 1))
+        self.sistema = None
+        self.mostra()
+
     # ---------------------------------------------------------------- scelta dei numeri
-    def _tipo(self, immediato):
-        if immediato != self.immediato:
-            self.immediato, self.punti, self.sistema = immediato, None, None
+    def _tipo(self, tipo):
+        if tipo != self.tipo:
+            self.tipo, self.punti, self.sistema = tipo, None, None
         self.mostra()
 
     def _tocca(self, n):
@@ -510,18 +621,14 @@ class PaginaSistemi(Pagina):
         self._garanzie()
 
     def _colori(self):
-        for n, b in self.tasti.items():
-            if n in self.fisse:
-                b.background_color, b.color = hexc("#c62828"), (1, 1, 1, 1)
-            elif n in self.numeri:
-                b.background_color, b.color = hexc(VERDE), (1, 1, 1, 1)
-            else:
-                b.background_color, b.color = hexc("#7ff0f6"), hexc("#0b2a6b")
+        colora_tasti(self.tasti, self.numeri, self.fisse)
         self.l_conta.text = f"Numeri: {len(self.numeri)}" + (f"  (fisse {len(self.fisse)})" if self.fisse else "")
 
     def _garanzie(self):
         box = self.box_gar
         box.clear_widgets()
+        if self.tipo == "condizionato":
+            return
         g, n, f = self.g, len(self.numeri), len(self.fisse)
         sch = Scheda()
         sch.add_widget(Testo("[b]Garanzia[/b] (se i numeri vincenti sono tra i tuoi):", font_size=sp(14)))
@@ -540,8 +647,7 @@ class PaginaSistemi(Pagina):
             self.punti = voci[0][0]
         for p, testo in voci:
             sel = p == self.punti
-            b = bottone(testo, lambda p=p: self._scegli(p), VERDE if sel else "#90a4ae", alto=dp(44))
-            sch.add_widget(b)
+            sch.add_widget(bottone(testo, lambda p=p: self._scegli(p), VERDE if sel else "#90a4ae", alto=dp(44)))
         box.add_widget(sch)
 
     def _scegli(self, punti):
@@ -556,16 +662,25 @@ class PaginaSistemi(Pagina):
         if len(self.numeri) <= g.k:
             avviso("Sistemi", f"Scegli almeno {g.k + 1} numeri.")
             return
-        if not self.punti:
-            avviso("Sistemi", "Scegli la garanzia.")
-            return
-        numeri, fisse, gar, imm = sorted(self.numeri), sorted(self.fisse), g.k - self.punti, self.immediato
+        numeri, fisse = sorted(self.numeri), sorted(self.fisse)
+        if self.tipo.startswith("condizionato"):
+            if not self.condizioni:
+                avviso("Sistemi", "Aggiungi almeno una condizione (oppure scegli un ridotto).")
+                return
+            gar = g.k - self.punti if self.tipo == "condizionato_ridotto" and self.punti else 0
+            conds, err = list(self.condizioni), self.errori_max
+            lavoro = lambda: self.s.sviluppa_condizionato(numeri, fisse, conds, err, gar)  # noqa: E731
+        else:
+            if not self.punti:
+                avviso("Sistemi", "Scegli la garanzia.")
+                return
+            gar, imm = g.k - self.punti, self.immediato
+            lavoro = lambda: servizi.sviluppa_ridotto(g, numeri, fisse, gar, imm)  # noqa: E731
 
         def fatto(s):
             self.sistema = s
             self._mostra_sistema()
-        self.app.in_background("Sviluppo del sistema...",
-                               lambda: servizi.sviluppa_ridotto(g, numeri, fisse, gar, imm), fatto)
+        self.app.in_background("Sviluppo del sistema...", lavoro, fatto)
 
     def _mostra_sistema(self):
         s, g = self.sistema, self.g
@@ -574,11 +689,25 @@ class PaginaSistemi(Pagina):
         n = len(s.colonne)
         prezzo = 2.0 if g.is_ej else 1.0
         sch = Scheda()
-        sch.add_widget(Testo(f"[b]{'Ridotto immediato' if s.tipo == 'immediato' else 'Ridotto a garanzia'}[/b] – "
-                             f"{len(s.numeri)} numeri" + (f", fisse {' '.join(map(str, s.fisse))}" if s.fisse else "")
-                             + f"\nGaranzia n-{s.garanzia}: almeno il {g.k - s.garanzia}\n"
-                             f"Integrale {s.info.get('integrale', 0):,} colonne -> ridotto a [b]{n:,} colonne[/b]\n"
-                             f"Costo: [b]{n * prezzo:,.2f} €[/b]".replace(",", "X").replace(".", ",").replace("X", ".")))
+        if n == 0:
+            sch.add_widget(Testo("Nessuna colonna rispetta tutte le condizioni con questi numeri: allarga le "
+                                 "condizioni o aggiungi numeri.", font_size=sp(14)))
+            box.add_widget(sch)
+            return
+        righe = [f"[b]{dict(TIPI_SISTEMA).get(s.tipo, s.tipo)}[/b] – {len(s.numeri)} numeri" +
+                 (f", fisse {' '.join(map(str, s.fisse))}" if s.fisse else "")]
+        if s.garanzia:
+            righe.append(f"Garanzia n-{s.garanzia}: almeno il {g.k - s.garanzia}")
+        if s.tipo.startswith("condizionato"):
+            righe.append(f"Condizioni: {len(self.condizioni)}"
+                         + (f" (al massimo {s.errori_max} non rispettate)" if s.errori_max else ""))
+            righe.append(f"Integrale {s.info.get('integrale', 0):,} -> con le condizioni "
+                         f"{s.info.get('possibili', 0):,}" + (f" -> ridotto a [b]{n:,} colonne[/b]" if s.garanzia
+                                                               else " colonne"))
+        else:
+            righe.append(f"Integrale {s.info.get('integrale', 0):,} colonne -> ridotto a [b]{n:,} colonne[/b]")
+        righe.append(f"Costo: [b]{n * prezzo:,.2f} €[/b]")
+        sch.add_widget(Testo("\n".join(righe).replace(",", "X").replace(".", ",").replace("X", ".")))
         r = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(6))
         r.add_widget(bottone("Salva PDF", lambda: self._salva("pdf"), VERDE, alto=dp(48)))
         r.add_widget(bottone("Salva TXT", lambda: self._salva("txt"), VERDE, alto=dp(48)))
@@ -602,6 +731,384 @@ class PaginaSistemi(Pagina):
             return
         if not condividi:
             avviso("Salvato", f"Il tabulato è stato salvato in:\n{dove}")
+
+
+class PaginaCondizione(Pagina):
+    """Scelta di una condizione e sua scheda con l'analisi dell'archivio e il suggerimento."""
+    titolo = "Condizione"
+    indietro = "sistemi"
+
+    def __init__(self, app, **kw):
+        super().__init__(app, name="condizione", **kw)
+        self.indice = None
+        self.codice = None
+        self.cond = None
+        self.analisi = None
+        self.numeri_sistema = []
+
+    def prepara(self, indice, cond, numeri_sistema):
+        from pmse.core import condizioni as cnd
+        self.indice = indice
+        self.numeri_sistema = numeri_sistema
+        self.cond = cnd.da_json(cnd.a_json([cond]))[0] if cond is not None else None
+        self.codice = cond.codice if cond is not None else None
+        self.analisi = None
+
+    def mostra(self):
+        c = self.corpo
+        c.clear_widgets()
+        if self.codice is None:
+            self._elenco()
+        elif self.codice == "gruppo":
+            self._scheda_gruppo()
+        else:
+            self._scheda()
+
+    def _elenco(self):
+        c = self.corpo
+        c.add_widget(Testo("Scegli la condizione da aggiungere al sistema:", (1, 1, 1, 0.9)))
+        for t in self.s.tipi_condizioni():
+            c.add_widget(bottone(t.nome, lambda t=t: self._scegli(t.codice), "#1e5bb8", alto=dp(48)))
+        c.add_widget(bottone("Gruppo di numeri (quanti ne devono uscire)", lambda: self._scegli("gruppo"),
+                             "#1e5bb8", alto=dp(48)))
+
+    def _scegli(self, codice):
+        from pmse.core import condizioni as cnd
+        self.codice = codice
+        if codice == "gruppo":
+            self.cond = cnd.Condizione("gruppo", numeri=[], minimo=1, massimo=1)
+        else:
+            t = cnd.TIPI_PER_CODICE[codice]
+            self.cond = cnd.Condizione(codice, param=t.param_def)
+        self.analisi = None
+        self.mostra()
+        self.sv.scroll_y = 1
+
+    def _tipo(self):
+        from pmse.core import condizioni as cnd
+        return cnd.TIPI_PER_CODICE[self.codice]
+
+    def _scheda(self):
+        c = self.corpo
+        t = self._tipo()
+        sch = Scheda()
+        sch.add_widget(Testo(f"[b]{t.nome}[/b]\n{t.descrizione}", font_size=sp(14)))
+        if t.param_nome:
+            sch.add_widget(regolatore(t.param_nome, self.cond.param or t.param_def, t.param_min, t.param_max,
+                                      self._param))
+        c.add_widget(sch)
+        self.box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8))
+        self.box.bind(minimum_height=self.box.setter("height"))
+        c.add_widget(self.box)
+        if self.analisi is None:
+            self._analizza()
+        else:
+            self._disegna_analisi()
+
+    def _param(self, v):
+        self.cond.param = v
+        self.analisi = None
+        self._analizza()
+
+    def _analizza(self):
+        codice, param = self.codice, self.cond.param
+
+        def fatto(a):
+            self.analisi = a
+            nuova = not (self.cond.valori or self.cond.massimo)
+            if nuova:                          # condizione nuova: parte dal suggerimento dell'archivio
+                self._applica_suggerimento(ridisegna=False)
+            self._disegna_analisi()
+        self.app.in_background("Analisi della condizione su tutto l'archivio...",
+                               lambda: self.s.analizza(codice, param), fatto)
+
+    def _applica_suggerimento(self, ridisegna=True):
+        a, t = self.analisi, self._tipo()
+        if t.modo == "intervallo":
+            self.cond.minimo, self.cond.massimo = a.copertura
+        else:
+            self.cond.valori = list(a.valori_80)
+        if ridisegna:
+            self._disegna_analisi()
+
+    def _disegna_analisi(self):
+        box, a, t = self.box, self.analisi, self._tipo()
+        box.clear_widgets()
+        sch = Scheda()
+        sch.add_widget(Testo(f"[b]Analisi su {a.estrazioni} estrazioni[/b]\n{a.suggerimento}", font_size=sp(13)))
+        sch.add_widget(bottone("Applica il suggerimento", self._applica_suggerimento, VERDE, alto=dp(44)))
+        box.add_widget(sch)
+        sch = Scheda()
+        if t.modo == "intervallo":
+            self._intervallo(sch, a)
+        else:
+            sch.add_widget(Testo("Tocca i valori da accettare ([b]*[/b] = consigliati dall'archivio):",
+                                 font_size=sp(13)))
+            for val, usc, pa, pc in a.righe:
+                sel = val in (self.cond.valori or [])
+                caso = f" – caso {pc:.1f}%" if pc == pc else ""
+                testo = f"{val}:  {pa:.1f}% delle estrazioni{caso}" + ("  *" if val in a.valori_80 else "")
+                sch.add_widget(bottone(testo, lambda v=val: self._valore(v), VERDE if sel else "#90a4ae",
+                                       alto=dp(42)))
+        box.add_widget(sch)
+        r = BoxLayout(size_hint_y=None, height=dp(52), spacing=dp(6))
+        r.add_widget(bottone("Salva la condizione", self._salva, ARANCIO, alto=dp(52)))
+        r.add_widget(bottone("Annulla", lambda: self.app.vai("sistemi"), ARDESIA, alto=dp(52)))
+        box.add_widget(r)
+
+    def _intervallo(self, sch, a):
+        vals = [r for r in a.righe if r[1] > 0] or a.righe
+        lo_t, hi_t = vals[0][0], vals[-1][0]
+        if not self.cond.massimo:
+            self.cond.minimo, self.cond.massimo = a.copertura
+        passo = max(1, (hi_t - lo_t) // 60)
+        # distribuzione in 8 fasce
+        n = 8
+        larg = max(1, (hi_t - lo_t + n) // n)
+        righe = []
+        for i in range(n):
+            da, a_ = lo_t + i * larg, lo_t + (i + 1) * larg - 1
+            p = sum(r[2] for r in a.righe if da <= r[0] <= a_)
+            if p > 0:
+                righe.append(f"{da:>4}-{a_:<4} {'=' * int(round(p / 2.5)):<20} {p:4.1f}%")
+        paragrafi(sch, "\n".join(righe), font_name="RobotoMono-Regular", font_size=sp(12))
+        sch.add_widget(regolatore("Minimo", self.cond.minimo, lo_t, hi_t, lambda v: self._estremo("minimo", v),
+                                  passo))
+        sch.add_widget(regolatore("Massimo", self.cond.massimo, lo_t, hi_t, lambda v: self._estremo("massimo", v),
+                                  passo))
+        perc = sum(r[2] for r in a.righe if self.cond.minimo <= r[0] <= self.cond.massimo)
+        self.l_cop = Testo(f"Con questo intervallo: {perc:.0f}% delle estrazioni dell'archivio.", font_size=sp(13))
+        sch.add_widget(self.l_cop)
+
+    def _estremo(self, chi, v):
+        setattr(self.cond, chi, v)
+        a = self.analisi
+        perc = sum(r[2] for r in a.righe if self.cond.minimo <= r[0] <= self.cond.massimo)
+        self.l_cop.text = f"Con questo intervallo: {perc:.0f}% delle estrazioni dell'archivio."
+
+    def _valore(self, v):
+        vals = set(self.cond.valori or [])
+        vals ^= {v}
+        self.cond.valori = sorted(vals)
+        self._disegna_analisi()
+
+    def _salva(self):
+        t = self._tipo() if self.codice != "gruppo" else None
+        if t is not None and t.modo != "intervallo" and not self.cond.valori:
+            avviso("Condizione", "Scegli almeno un valore.")
+            return
+        if t is not None and t.modo == "intervallo" and self.cond.minimo > self.cond.massimo:
+            avviso("Condizione", "Il minimo è più grande del massimo.")
+            return
+        if self.codice == "gruppo":
+            if not self.cond.numeri:
+                avviso("Condizione", "Tocca i numeri del gruppo.")
+                return
+            self.cond.minimo = min(self.cond.minimo, len(self.cond.numeri))
+            self.cond.massimo = max(self.cond.minimo, min(self.cond.massimo, len(self.cond.numeri)))
+        self.app.pagine["sistemi"].salva_condizione(self.indice, self.cond)
+        self.app.vai("sistemi")
+
+    # ---------------------------------------------------------------- gruppo di numeri
+    def _scheda_gruppo(self):
+        c = self.corpo
+        sch = Scheda()
+        sch.add_widget(Testo("[b]Gruppo di numeri[/b]\nTocca i numeri del gruppo e scegli quanti di loro devono "
+                             "essere presenti in ogni colonna.", font_size=sp(14)))
+        griglia, self.tasti = griglia_numeri(self.g.n, self._tocca_gruppo)
+        sch.add_widget(griglia)
+        if self.numeri_sistema:
+            sch.add_widget(Testo("I numeri del sistema hanno il bordo giallo nella scelta: conviene formare il "
+                                 "gruppo con quelli.", font_size=sp(12)))
+        sch.add_widget(regolatore("Presenti almeno", self.cond.minimo, 0, self.g.k,
+                                  lambda v: setattr(self.cond, "minimo", v)))
+        sch.add_widget(regolatore("Presenti al massimo", self.cond.massimo, 0, self.g.k,
+                                  lambda v: setattr(self.cond, "massimo", v)))
+        c.add_widget(sch)
+        self.box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8))
+        self.box.bind(minimum_height=self.box.setter("height"))
+        c.add_widget(self.box)
+        self._colori_gruppo()
+        self._analisi_gruppo()
+
+    def _tocca_gruppo(self, n):
+        nums = set(self.cond.numeri)
+        nums ^= {n}
+        self.cond.numeri = sorted(nums)
+        self._colori_gruppo()
+        self._analisi_gruppo()
+
+    def _colori_gruppo(self):
+        colora_tasti(self.tasti, set(self.cond.numeri))
+        for x, b in self.tasti.items():
+            if x in self.numeri_sistema and x not in self.cond.numeri:
+                b.background_color = hexc("#ffe082")
+
+    def _analisi_gruppo(self):
+        box = self.box
+        box.clear_widgets()
+        sch = Scheda()
+        if self.cond.numeri:
+            a = self.s.analizza_gruppo(self.cond.numeri)
+            righe = [f"{v}: {pa:4.1f}%  (caso {pc:4.1f}%)" + ("  *" if v in a.valori_80 else "")
+                     for v, _, pa, pc in a.righe]
+            sch.add_widget(Testo(f"[b]Gruppo di {len(self.cond.numeri)} numeri[/b] – {a.suggerimento}",
+                                 font_size=sp(13)))
+            paragrafi(sch, "\n".join(righe), font_name="RobotoMono-Regular", font_size=sp(13))
+        else:
+            sch.add_widget(Testo("Tocca i numeri per vedere l'analisi.", font_size=sp(13)))
+        box.add_widget(sch)
+        r = BoxLayout(size_hint_y=None, height=dp(52), spacing=dp(6))
+        r.add_widget(bottone("Salva la condizione", self._salva, ARANCIO, alto=dp(52)))
+        r.add_widget(bottone("Annulla", lambda: self.app.vai("sistemi"), ARDESIA, alto=dp(52)))
+        box.add_widget(r)
+
+
+class PaginaCasuali(Pagina):
+    """Combinazioni casuali (sestine o cinquine, senza Euronumeri) e sistema casuale, con i numeri che
+    escono uno alla volta."""
+    titolo = "Combinazioni casuali"
+
+    def __init__(self, app, **kw):
+        super().__init__(app, name="casuali", **kw)
+        self.modo = "combinazioni"
+        self.quante = 3
+        self.quanti = 10
+        self.risultato = None
+        self.gioco_attuale = None
+        self._evento = None
+
+    def mostra(self):
+        if self.gioco_attuale is not self.g:
+            self.risultato, self.gioco_attuale = None, self.g
+        g = self.g
+        c = self.corpo
+        c.clear_widgets()
+        scelta = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(6))
+        for codice, testo in (("combinazioni", f"{g.nome_comb_pl.capitalize()} casuali"),
+                              ("sistema", "Sistema casuale")):
+            sel = codice == self.modo
+            b = ToggleButton(text=testo, group="modo_casuali", state="down" if sel else "normal", bold=True,
+                             font_size=sp(15), background_normal="", background_down="",
+                             background_color=hexc(LIME if sel else "#ffffff30"),
+                             color=(0, 0, 0, 1) if sel else (1, 1, 1, 1), allow_no_selection=False)
+            b.bind(on_release=lambda _b, v=codice: self._modo(v))
+            scelta.add_widget(adatta_testo(b))
+        c.add_widget(scelta)
+        sch = Scheda()
+        if self.modo == "combinazioni":
+            sch.add_widget(regolatore(f"Quante {g.nome_comb_pl}", self.quante, 1, 10,
+                                      lambda v: setattr(self, "quante", v)))
+        else:
+            sch.add_widget(regolatore("Numeri del sistema", self.quanti, g.k + 1, 20,
+                                      lambda v: setattr(self, "quanti", v)))
+        if g.is_ej:
+            sch.add_widget(Testo("Eurojackpot: solo i 5 numeri, gli Euronumeri si scelgono a parte.",
+                                 font_size=sp(12)))
+        sch.add_widget(bottone("Estrai", self._estrai, ARANCIO, alto=dp(52)))
+        c.add_widget(sch)
+        self.box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8))
+        self.box.bind(minimum_height=self.box.setter("height"))
+        c.add_widget(self.box)
+        if self.risultato:
+            self._disegna(len(self.risultato[1]) if self.risultato[0] == "sistema" else
+                          sum(len(x) for x in self.risultato[1]))
+
+    def _modo(self, m):
+        if self._evento:
+            self._evento.cancel()
+            self._evento = None
+        self.modo, self.risultato = m, None
+        self.mostra()
+
+    def _estrai(self):
+        if self._evento:
+            self._evento.cancel()
+        g = self.g
+        if self.modo == "combinazioni":
+            self.risultato = ("combinazioni", servizi.combinazioni_casuali(g, self.quante))
+            tot = self.quante * g.k
+        else:
+            self.risultato = ("sistema", servizi.numeri_casuali(g, self.quanti))
+            tot = self.quanti
+        self.visibili = 0
+        self._disegna(0)
+        # i numeri escono uno alla volta, con un po' di attesa
+        self._evento = Clock.schedule_interval(lambda dt: self._passo(tot), 0.45)
+
+    def _passo(self, tot):
+        self.visibili += 1
+        self._disegna(self.visibili)
+        if self.visibili >= tot:
+            self._evento.cancel()
+            self._evento = None
+            return False
+
+    def _palla(self, n, visibile=True):
+        b = Button(text=str(n) if visibile else "?", bold=True, font_size=sp(17), size_hint=(None, None),
+                   size=(dp(44), dp(44)), background_normal="", background_down="",
+                   background_color=hexc(VERDE if visibile else "#cfd8dc"),
+                   color=(1, 1, 1, 1) if visibile else (0.3, 0.3, 0.3, 1))
+        return b
+
+    def _disegna(self, visibili):
+        box = self.box
+        box.clear_widgets()
+        tipo, dati = self.risultato
+        sch = Scheda()
+        conta = 0
+        if tipo == "combinazioni":
+            for i, comb in enumerate(dati, 1):
+                r = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(4))
+                r.add_widget(Label(text=f"{i}", color=(0.2, 0.2, 0.2, 1), bold=True, size_hint_x=None, width=dp(24)))
+                for n in comb:
+                    conta += 1
+                    r.add_widget(self._palla(n, conta <= visibili))
+                sch.add_widget(r)
+        else:
+            griglia = GridLayout(cols=5, spacing=dp(6), size_hint_y=None)
+            griglia.bind(minimum_height=griglia.setter("height"))
+            for n in dati:
+                conta += 1
+                griglia.add_widget(self._palla(n, conta <= visibili))
+            sch.add_widget(griglia)
+        box.add_widget(sch)
+        if visibili >= conta:
+            r = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(6))
+            if tipo == "sistema":
+                r.add_widget(bottone("Usa nei sistemi", self._usa, VERDE, alto=dp(50)))
+            r.add_widget(bottone("Salva PDF", lambda: self._salva("pdf"), VERDE, alto=dp(50)))
+            r.add_widget(bottone("Condividi", lambda: self._salva("pdf", True), ARANCIO, alto=dp(50)))
+            box.add_widget(r)
+
+    def _testo(self):
+        tipo, dati = self.risultato
+        g = self.g
+        r = [f"{'Sistema casuale' if tipo == 'sistema' else 'Combinazioni casuali'} – {g.nome}", ""]
+        if tipo == "sistema":
+            r.append("Numeri: " + " ".join(f"{n:2d}" for n in sorted(dati)))
+        else:
+            r += [f"{i:2d})  " + " ".join(f"{n:2d}" for n in c) for i, c in enumerate(dati, 1)]
+        return "\n".join(r)
+
+    def _salva(self, formato, condividi=False):
+        from datetime import datetime
+
+        from pmse.core import pdf
+        testo = self._testo()
+        nome = f"PensieroMagico{self.g.codice}_casuali_{datetime.now():%Y%m%d_%H%M%S}.pdf"
+        try:
+            dove = salva_documento(nome, pdf.crea(testo.splitlines()[0], testo), "application/pdf", condividi)
+        except Exception as ex:          # noqa: BLE001
+            avviso("Errore", f"Non riesco a salvare il file: {ex}")
+            return
+        if not condividi:
+            avviso("Salvato", f"Salvato in:\n{dove}")
+
+    def _usa(self):
+        p = self.app.pagine["sistemi"]
+        p.imposta_numeri(self.risultato[1])
+        self.app.vai("sistemi")
 
 
 class PaginaMagico(Pagina):
@@ -969,7 +1476,8 @@ class PensieroMagicoApp(App):
         self.serv = servizi.Servizio(self.cartella, servizi.ultimo_gioco(self.cartella))
         self.sm = ScreenManager(transition=SlideTransition(duration=0.18))
         self.pagine = {}
-        for cls in (Home, PaginaArchivio, PaginaMagico, PaginaVerifica, PaginaAI, PaginaLaboratorio, PaginaSistemi):
+        for cls in (Home, PaginaArchivio, PaginaMagico, PaginaVerifica, PaginaAI, PaginaLaboratorio, PaginaSistemi,
+                    PaginaCondizione, PaginaCasuali):
             p = cls(self)
             self.pagine[p.name] = p
             self.sm.add_widget(p)
@@ -1049,7 +1557,8 @@ class PensieroMagicoApp(App):
         return False
 
     def vai(self, nome):
-        self.sm.transition.direction = "right" if nome == "home" else "left"
+        indietro = nome == "home" or (nome == "sistemi" and self.sm.current == "condizione")
+        self.sm.transition.direction = "right" if indietro else "left"
         if self.sm.current == nome:
             self.pagine[nome].on_pre_enter()
         self.sm.current = nome

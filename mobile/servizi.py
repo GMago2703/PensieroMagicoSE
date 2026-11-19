@@ -73,6 +73,52 @@ class Servizio:
     def chiudi(self) -> None:
         self.arch.chiudi()
 
+    # ---------------------------------------------------------------- condizioni e sistemi condizionati
+    def contesto(self):
+        """Archivio pronto per le condizioni (calcolato una volta, rifatto dopo un aggiornamento)."""
+        if getattr(self, "_ctx", None) is None or self._ctx_n != self.arch.conta():
+            from pmse.core import sistemi as sis
+            self._ctx = sis.contesto_da_archivio(self.arch)
+            self._ctx_n = self.arch.conta()
+        return self._ctx
+
+    def tipi_condizioni(self):
+        from pmse.core import condizioni as cnd
+        ctx = self.contesto() if self.arch.conta() else None
+        return [t for t in cnd.tipi_del_gioco(self.g)
+                if not (t.codice == "popolarita" and (ctx is None or ctx.popolarita is None))]
+
+    def analizza(self, codice: str, param: int):
+        from pmse.core import condizioni as cnd
+        return cnd.analizza(codice, self.contesto(), param)
+
+    def analizza_gruppo(self, numeri):
+        from pmse.core import condizioni as cnd
+        return cnd.analizza_gruppo(numeri, self.contesto())
+
+    def sviluppa_condizionato(self, numeri, fisse, condizioni, errori_max: int, garanzia: int):
+        """Sistema condizionato (garanzia 0) o condizionato ridotto (garanzia n-j)."""
+        from pmse.core import condizioni as cnd
+        from pmse.core import sistemi as sis
+        numeri, fisse = sorted(set(numeri)), sorted(set(fisse))
+        if len(numeri) > MAX_NUMERI_CONDIZIONATO:
+            raise ValueError(f"Sul telefono il condizionato arriva a {MAX_NUMERI_CONDIZIONATO} numeri.")
+        s = sis.Sistema(nome="", tipo="condizionato_ridotto" if garanzia else "condizionato", gioco=self.g.codice,
+                        numeri=numeri, fisse=fisse, condizioni=cnd.a_json(condizioni), errori_min=0,
+                        errori_max=errori_max, garanzia=garanzia, qualita=8)
+        if garanzia:
+            prova = sis.Sistema.da_json(s.a_json())
+            prova.tipo, prova.garanzia = "condizionato", 0
+            n = len(sis.sviluppa(prova, self.contesto()).colonne)
+            if n > MAX_RIDUZIONE_TELEFONO:
+                raise ValueError(f"Le condizioni lasciano {n:,} colonne: troppe da ridurre sul telefono (massimo "
+                                 f"{MAX_RIDUZIONE_TELEFONO:,}). Aggiungi condizioni o togli numeri."
+                                 .replace(",", "."))
+        sv = sis.sviluppa(s, self.contesto())
+        s.colonne = sv.colonne.tolist()
+        s.info = {"integrale": sv.integrale, "possibili": sv.possibili}
+        return s
+
     # ---------------------------------------------------------------- archivio
     def conta(self) -> int:
         return self.arch.conta()
@@ -265,6 +311,20 @@ __all__ = ["Servizio", "EsitoAggiornamento", "FORNITORI", "SE", "EJ", "GIOCHI", 
 
 # ------------------------------------------------------------------ sistemi ridotti (versione Android)
 MAX_NUMERI_RIDOTTO = 25          # sul telefono: integrali ridotti fino a 25 numeri (177.100 colonne per il SE)
+MAX_NUMERI_CONDIZIONATO = 35     # condizionati fino a 35 numeri (1.623.160 colonne da filtrare per il SE)
+MAX_RIDUZIONE_TELEFONO = 200_000 # colonne rimaste dopo le condizioni che il telefono riduce ancora bene
+
+
+def combinazioni_casuali(g: Gioco, quante: int) -> list[list[int]]:
+    """Combinazioni casuali (generatore del sistema operativo); per l'Eurojackpot solo i 5 numeri."""
+    import random
+    caso = random.SystemRandom()
+    return [sorted(caso.sample(range(1, g.n + 1), g.k)) for _ in range(quante)]
+
+
+def numeri_casuali(g: Gioco, quanti: int) -> list[int]:
+    import random
+    return random.SystemRandom().sample(range(1, g.n + 1), quanti)
 
 
 def ridotti_disponibili(g: Gioco, numeri: int, fisse: int) -> list[tuple[int, int]]:

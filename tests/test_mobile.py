@@ -169,3 +169,27 @@ def test_sistemi_ridotti_servizio():
     import pytest
     with pytest.raises(ValueError):
         servizi.sviluppa_ridotto(SE, range(1, 31), [], 1, False)
+
+
+def test_condizionati_e_casuali_servizio(tmp_path):
+    from pmse.core import condizioni as cnd
+    from tests.test_sistemi import archivio_finto
+    for g in (SE, EJ):
+        s = servizi.Servizio(tmp_path, g)
+        s.arch.unisci(archivio_finto(g, 300))
+        tipi = [t.codice for t in s.tipi_condizioni()]
+        assert "pari" in tipi and not ("popolarita" in tipi and g is EJ)
+        a = s.analizza("pari", 0)
+        assert a.valori_80 and a.estrazioni > 200
+        conds = [cnd.Condizione("pari", valori=a.valori_80), cnd.gruppo([1, 2, 3, 4], 0, 1)]
+        x = s.sviluppa_condizionato(range(1, 16), [], conds, 0, 0)
+        assert x.colonne and all(len(set(c) & {1, 2, 3, 4}) <= 1 for c in x.colonne)
+        y = s.sviluppa_condizionato(range(1, 16), [], conds, 0, 1)
+        assert 0 < len(y.colonne) < len(x.colonne) and y.tipo == "condizionato_ridotto"
+        cs = servizi.combinazioni_casuali(g, 4)
+        assert len(cs) == 4 and all(len(set(c)) == g.k and max(c) <= g.n for c in cs)
+        ns = servizi.numeri_casuali(g, 12)
+        assert len(set(ns)) == 12
+        with pytest.raises(ValueError):
+            s.sviluppa_condizionato(range(1, 41), [], conds, 0, 0)
+        s.chiudi()

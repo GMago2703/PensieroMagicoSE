@@ -101,7 +101,7 @@ def apri_programma(codice: str, avvio_automatico: bool = True) -> "FinestraPrinc
     w = FinestraPrincipale(Archivio(gioco=g), avvio_automatico=avvio_automatico)
     QSettings("PensieroMagico", "Avvio").setValue("ultimo_programma", g.codice)
     FINESTRE.append(w)
-    w.show()
+    w.showMaximized()                  # si apre a tutto schermo (con la barra delle applicazioni visibile)
     return w
 
 

@@ -222,7 +222,7 @@ class Prova(main.PensieroMagicoApp):
         assert any(f.endswith(".pdf") for f in file) and any(f.endswith(".txt") for f in file), file
         pdf = next(f for f in file if f.endswith(".pdf"))
         assert open(os.path.join(cartella, pdf), "rb").read(5) == b"%PDF-"
-        si._tipo(False)
+        si._tipo("ridotto")
         yield
         si._tocca(7)                               # terza volta: tolto
         si._tocca(9)
@@ -234,6 +234,88 @@ class Prova(main.PensieroMagicoApp):
         si.sv.scroll_y = 0.3
         yield
         self.foto("a12_sistemi_garanzia_se")
+        # ---- condizionato: condizioni con l'analisi dell'archivio
+        si._tipo("condizionato")
+        yield
+        si._apri_condizione(None)
+        yield
+        yield
+        pc = self.pagine["condizione"]
+        self.foto("a13_condizioni_elenco_se")
+        pc._scegli("pari")
+        yield
+        yield
+        assert pc.analisi and pc.cond.valori
+        self.foto("a14_condizione_pari_se")
+        pc._salva()
+        yield
+        yield
+        si._apri_condizione(None)
+        yield
+        yield
+        pc._scegli("somme")
+        yield
+        yield
+        assert pc.cond.massimo > pc.cond.minimo
+        pc.sv.scroll_y = 0
+        yield
+        self.foto("a15_condizione_somme_se")
+        pc._salva()
+        yield
+        yield
+        si._apri_condizione(None)
+        yield
+        yield
+        pc._scegli("gruppo")
+        yield
+        for n in (3, 12, 18):
+            pc._tocca_gruppo(n)
+        yield
+        self.foto("a16_condizione_gruppo_se")
+        pc._salva()
+        yield
+        yield
+        assert len(si.condizioni) == 3
+        si._sviluppa()
+        yield
+        yield
+        assert si.sistema is not None
+        si.sv.scroll_y = 0.3
+        yield
+        self.foto("a17_sistema_condizionato_se")
+        si._tipo("condizionato_ridotto")
+        yield
+        si._sviluppa()
+        yield
+        yield
+        assert si.sistema is not None and si.sistema.tipo in ("condizionato_ridotto", "condizionato")
+        si.sv.scroll_y = 0.2
+        yield
+        self.foto("a18_condizionato_ridotto_se")
+        # ---- combinazioni casuali e sistema casuale
+        self.vai("casuali")
+        yield
+        yield
+        ca = self.pagine["casuali"]
+        ca._estrai()
+        for _ in range(8):
+            yield
+        self.foto("a19_casuali_in_corso_se")
+        for _ in range(16):
+            yield
+        assert ca.visibili >= 18
+        self.foto("a20_casuali_se")
+        ca._modo("sistema")
+        yield
+        ca._estrai()
+        for _ in range(14):
+            yield
+        self.foto("a21_sistema_casuale_se")
+        estratti = list(ca.risultato[1])
+        ca._usa()
+        yield
+        yield
+        assert self.pagine["sistemi"].numeri == set(estratti)
         self.vai("home")
         yield
         yield
@@ -285,6 +367,17 @@ class Prova(main.PensieroMagicoApp):
         si.sv.scroll_y = 0.3
         yield
         self.foto("b06_sistemi_ej")
+        self.vai("casuali")
+        yield
+        yield
+        ca = self.pagine["casuali"]
+        assert ca.risultato is None or ca.gioco_attuale is self.serv.g
+        ca._modo("combinazioni")
+        ca._estrai()
+        for _ in range(20):
+            yield
+        assert all(len(c) == 5 for c in ca.risultato[1])
+        self.foto("b065_casuali_ej")
         self.vai("home")
         yield
         self.cambia_gioco(SE)
