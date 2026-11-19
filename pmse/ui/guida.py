@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QTextDocument
+from PySide6.QtGui import QTextCursor, QTextDocument
 from PySide6.QtPrintSupport import QPrinter
 from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QMessageBox,
                                QPushButton, QSplitter, QTextBrowser, QVBoxLayout)
@@ -70,7 +70,7 @@ class FinestraGuida(QDialog):
             i = (self.elenco.currentRow() + passo) % n
             if q in self.cap[i][2].lower() or q in self.cap[i][1].lower():
                 self.elenco.setCurrentRow(i)
-                self.testo.moveCursor(self.testo.textCursor().Start)
+                self.testo.moveCursor(QTextCursor.Start)
                 self.testo.find(q)
                 return
         QMessageBox.information(self, "Cerca", f"«{self.e_cerca.text()}» non compare nella guida.")
