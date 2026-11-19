@@ -316,6 +316,16 @@ class FinestraMieGiocate(QDialog):
             h.append(self._html_verifica(x, *ver))
         if x.id in self.analisi:
             h.append(self._html_analisi(x, self.analisi[x.id]))
+        if x.origini:
+            from ..core import colonna_magica as cm
+            h.append("<h4>Provenienza dei numeri</h4><table cellpadding=3 border=1 "
+                     "style='border-collapse:collapse'>")
+            for o in sorted(x.origini, key=lambda o: [c for c, _, _ in cm.FONTI].index(o["fonte"])):
+                h.append(f"<tr><td align=center><b>{o['numero']}</b></td><td>{cm.ICONA_FONTE.get(o['fonte'], '')} "
+                         f"{escape(cm.NOME_FONTE.get(o['fonte'], o['fonte']))}"
+                         + (" <i>(sostituito)</i>" if o.get("sostituito") else "") +
+                         f"</td><td>{escape(o['nota'])}</td></tr>")
+            h.append("</table>")
         if x.integrale():
             eu = f" + Euronumeri {' '.join(map(str, x.numeri_extra))}" if x.numeri_extra else ""
             h.append(f"<h4>Numeri del sistema ({len(x.numeri)})</h4><pre>{' '.join(f'{n:2d}' for n in x.numeri)}"

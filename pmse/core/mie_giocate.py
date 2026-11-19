@@ -28,6 +28,7 @@ CATEGORIE = [("mie_colonne", "Le mie colonne"),
              ("sistemi_casuali", "Sistemi casuali"),
              ("magico", "Magico Pensiero"),
              ("magico_ai", "Magico Pensiero + AI"),
+             ("colonna_magica", "Colonna magica"),
              ("sistemi", "Sistemi ridotti / condizionati / integrali"),
              ("altre", "Altre giocate")]
 NOMI = dict(CATEGORIE)
@@ -49,6 +50,7 @@ class Voce:
     note: str = ""
     chiave: str = ""                                       # origine importata (previsione / registro)
     previsione: dict = field(default_factory=dict)         # previsione di Magico Pensiero (per la home)
+    origini: list = field(default_factory=list)            # colonna magica: provenienza di ogni numero
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:10])
 
     @property
@@ -124,6 +126,7 @@ def aggiungi(archivio, voce: Voce) -> Voce:
             v.creata, v.dal = voce.creata, voce.dal
             v.sistema = voce.sistema or v.sistema
             v.colonne = voce.colonne or v.colonne
+            v.origini = voce.origini or v.origini
             salva_tutte(archivio, voci)
             return v
         # sistema casuale estratto e poi sviluppato: la voce dei soli numeri prende le colonne
@@ -213,6 +216,8 @@ def _categoria_da_origine(origine: str) -> str:
     o = (origine or "").lower()
     if "mie colonne" in o:
         return "mie_colonne"
+    if "colonna magica" in o:
+        return "colonna_magica"
     if "magico" in o and any(x in o for x in ("ai", "gemini", "claude", "intelligenza")):
         return "magico_ai"
     if "magico" in o:
@@ -557,3 +562,11 @@ def profilo(g: Gioco, colonne, ctx, righe_archivio) -> list[ProfiloColonna]:
         uscite = {p: int((col == p).sum()) for p in range(2, g.k + 1) if nr and (col == p).any()}
         out.append(ProfiloColonna(c.tolist(), car, mx, quando, uscite))
     return out
+
+
+def aggiungi_colonna_magica(archivio, r) -> Voce:
+    """Salva una colonna magica (core.colonna_magica.ColonnaMagica) con la provenienza di ogni numero."""
+    from datetime import datetime as _dt
+    voce = Voce("colonna_magica", f"Colonna magica del {_dt.now():%d/%m/%Y %H:%M}", colonne=[r.colonna],
+                extra=[list(r.euronumeri)] if r.euronumeri else [[]], origini=[n.a_dict() for n in r.numeri])
+    return aggiungi(archivio, voce)

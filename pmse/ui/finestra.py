@@ -451,11 +451,11 @@ class FinestraPrincipale(QMainWindow):
         from ..core import mie_giocate as mg
         m = self.menuBar().addMenu("Le mie &giocate")
         icone = {"mie_colonne": "✍", "colonne_casuali": "🎲", "sistemi_casuali": "🎱", "magico": "✨", "magico_ai": "🤖",
-                 "sistemi": "📐"}
+                 "colonna_magica": "🎩", "sistemi": "📐"}
         a = self._azione(m, "✍ Aggiungi le mie colonne...", self.mie_colonne_nuove)
         a.setShortcut(QKeySequence("Ctrl+Shift+M"))
         m.addSeparator()
-        for cat, nome in mg.CATEGORIE[:6]:
+        for cat, nome in mg.CATEGORIE[:-1]:
             sotto = m.addMenu(f"{icone[cat]} {nome}")
             self._azione(sotto, "Elenco (generate e giocate)...", lambda _=False, c=cat: self.mie_giocate(c))
             self._azione(sotto, "Solo quelle giocate...", lambda _=False, c=cat: self.mie_giocate(c, "giocate"))
@@ -591,6 +591,9 @@ class FinestraPrincipale(QMainWindow):
         self._azione(m, "🤖 Magico Pensiero + intelligenza artificiale (Gemini o Claude)...", self.claude)
         self._azione(m, "💡 Suggerimenti AI: un piccolo sistema per intuizione...", self.suggerimenti_ai)
         self._azione(m, "🖨 Stampa o registra le combinazioni di Magico Pensiero...", lambda: self.riepilogo("magico"))
+        sm = m.addMenu("🎩 Colonna magica")
+        self._azione(sm, "Genera la colonna magica...", self.colonna_magica)
+        self._azione(sm, "Le colonne magiche già generate...", lambda: self.mie_giocate("colonna_magica"))
         m.addSeparator()
         self._azione(m, "Impostazioni dell'algoritmo...", self.impostazioni_magico)
         self._azione(m, "Verifica storica (previsioni su quanto già avvenuto)...", self.verifica_magico)
@@ -942,6 +945,10 @@ class FinestraPrincipale(QMainWindow):
             self.mostra_magico(SimpleNamespace(sestine=[SimpleNamespace(numeri=s) for s in p["sestine"]],
                                                jolly=p["jolly"], superstar=p.get("superstar")),
                                "Proposta dell'algoritmo" if o == "Algoritmo" else f"Scelta di {o.split(' ')[0]}")
+
+    def colonna_magica(self):
+        from .colonna_magica import FinestraColonnaMagica
+        FinestraColonnaMagica(self.arch, self).exec()
 
     def suggerimenti_ai(self):
         from .intuizione import FinestraIntuizione

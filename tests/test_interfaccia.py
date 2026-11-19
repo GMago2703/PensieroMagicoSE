@@ -953,3 +953,36 @@ def test_le_mie_giocate(app, tmp_path):
         f.close()
         w.close()
         a.chiudi()
+
+
+def test_colonna_magica(app, tmp_path):
+    """Menu Magico Pensiero → Colonna magica: generazione (AI non impostata: numeri sostituiti) e salvataggio."""
+    import time
+
+    from pmse.core import mie_giocate as mg
+    from pmse.core.gioco import EJ, SE
+    from pmse.ui.colonna_magica import FinestraColonnaMagica
+    from pmse.ui.finestra import FinestraPrincipale
+    from tests.test_sistemi import archivio_finto
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"cmg_{g.codice}.db", gioco=g)
+        a.unisci(archivio_finto(g, 300))
+        w = FinestraPrincipale(a, avvio_automatico=False)
+        menu = {x.text().replace("&", ""): x.menu() for x in w.menuBar().actions() if x.menu() is not None}
+        assert any("Colonna magica" in x.text() for x in menu["Magico Pensiero"].actions())
+        d = FinestraColonnaMagica(a, w)
+        assert not d.cb_ai.isChecked()
+        d.genera()
+        t0 = time.time()
+        while d.thread.isRunning() and time.time() - t0 < 120:
+            app.processEvents()
+            time.sleep(0.05)
+        d.thread.wait()
+        app.processEvents()
+        assert d.risultato is not None and len(set(d.risultato.colonna)) == g.k
+        assert d.voce is not None and d.b_reg.isEnabled()
+        assert "Provenienza" not in d.testo.toPlainText() and "Casuale" in d.testo.toPlainText()
+        assert len([x for x in mg.carica(a) if x.categoria == "colonna_magica"]) == 1
+        d.close()
+        w.close()
+        a.chiudi()
