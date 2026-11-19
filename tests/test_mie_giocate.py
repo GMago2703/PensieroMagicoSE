@@ -89,3 +89,28 @@ def test_voci_sincronizza_e_verifica(tmp_path):
     assert not mg.sincronizza(a)[0].giocata                           # torna "generata"
     assert mg.primo_concorso(datetime(2026, 1, 1, 21)) == date(2026, 1, 2)
     a.chiudi()
+
+
+def test_mie_colonne_e_analisi(tmp_path):
+    from pmse.core import sistemi as sis
+    for g in (SE, EJ):
+        a = _arch(tmp_path, g)
+        cols = [list(range(1, g.k + 1)), [7, 19, 33, 48, 50, 60][:g.k]]
+        extra = [[3, 9], [1, 2]] if g.is_ej else [[5], []]
+        v = mg.aggiungi_mie_colonne(a, "Le mie", cols, extra, "note")
+        mg.aggiungi_mie_colonne(a, "Le mie", cols, extra)           # uguali: restano due voci distinte
+        voci = mg.sincronizza(a)
+        assert sum(x.categoria == "mie_colonne" for x in voci) == 2 and v.n_colonne == 2
+        righe = list(a.sestine())
+        pr = mg.profilo(g, cols, sis.contesto_da_archivio(a), righe)
+        assert len(pr) == 2 and len(pr[0].caratteristiche) >= 15
+        assert 0 <= pr[0].tipiche <= len(pr[0].caratteristiche)
+        # il numero di numeri in comune con l'estrazione più simile è giusto
+        assert pr[1].migliore == max(len(set(cols[1]) & set(r[1])) for r in righe)
+        ver = mg.verifica(g, v, righe, "storico")
+        assert len(ver.concorsi) == len(righe)
+        # giocata registrata con queste colonne: la voce diventa "giocata" senza duplicati
+        gc.aggiungi(a, gc.Giocata(g.codice, cols, extra, "2020-01-01", 1, 2.0, "G", "Le mie colonne"))
+        voci = mg.sincronizza(a)
+        assert sum(x.categoria == "mie_colonne" for x in voci) == 2 and sum(x.giocata for x in voci) == 1
+        a.chiudi()

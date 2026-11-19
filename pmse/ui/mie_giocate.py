@@ -8,15 +8,15 @@ from math import comb
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QHBoxLayout, QInputDialog, QLabel,
-                               QMessageBox, QPushButton, QSplitter, QTableWidget, QTableWidgetItem,
-                               QTextBrowser, QVBoxLayout)
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QFileDialog, QFormLayout, QHBoxLayout,
+                               QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QSplitter,
+                               QTableWidget, QTableWidgetItem, QTextBrowser, QVBoxLayout)
 
 from ..core import giocate as gc
 from ..core import mie_giocate as mg
 from ..core import sistemi as sis
 from ..core.db import Archivio
-from .giocate import colonna_txt, euro
+from .giocate import EditorColonne, colonna_txt, euro
 from .schermo import adatta_schermo
 from .stampa import pulsanti_stampa
 
@@ -42,6 +42,100 @@ class LavoroVerifica(QThread):
             self.finito.emit(None)
 
 
+class LavoroAnalisi(QThread):
+    finito = Signal(object)
+
+    def __init__(self, g, voce, ctx_fun, righe):
+        super().__init__()
+        self.args = (g, voce, ctx_fun, righe)
+        self.errore = ""
+
+    def run(self):
+        g, voce, ctx_fun, righe = self.args
+        try:
+            self.finito.emit(mg.profilo(g, voce.colonne, ctx_fun(), righe))
+        except Exception as ex:          # noqa: BLE001 – mostrato all'utente
+            self.errore = str(ex)
+            self.finito.emit(None)
+
+
+class DialogoMieColonne(QDialog):
+    """Inserimento (o modifica) di colonne scritte dall'utente: restano memorizzate in Le mie giocate."""
+    MAX = 1000
+
+    def __init__(self, arch: Archivio, parent=None, voce: mg.Voce | None = None):
+        super().__init__(parent)
+        self.arch = arch
+        self.g = arch.gioco
+        self.voce = voce
+        self.risultato: mg.Voce | None = None
+        self.setWindowTitle(("Modifica le mie colonne" if voce else "Aggiungi le mie colonne") + f" – {self.g.nome}")
+        adatta_schermo(self, 900, 640)
+        v = QVBoxLayout(self)
+        quale = ("6 numeri (e, se vuoi, la SuperStar: «3 15 27 44 61 88 SuperStar 42»)" if not self.g.is_ej
+                 else "5 numeri + 2 Euronumeri (es. «3 15 27 44 49 + 2 11»)")
+        info = QLabel(f"Scrivi le tue colonne, una per riga: {quale}. Dopo averle memorizzate le trovi in «Le mie "
+                      "giocate → Le mie colonne»: puoi analizzarle, confrontarle con l'archivio, registrarle come "
+                      "giocate, nasconderle o eliminarle.")
+        info.setWordWrap(True)
+        v.addWidget(info)
+        f = QFormLayout()
+        self.e_nome = QLineEdit(voce.titolo if voce else "")
+        self.e_nome.setPlaceholderText("es. I miei numeri fortunati")
+        f.addRow("Nome", self.e_nome)
+        self.e_note = QLineEdit(voce.note if voce else "")
+        f.addRow("Note", self.e_note)
+        v.addLayout(f)
+        self.colonne = EditorColonne(arch, self)
+        v.addWidget(self.colonne, 1)
+        if voce:
+            self.colonne.imposta(voce.colonne, voce.extra or None)
+        h = QHBoxLayout()
+        b = QPushButton("📂 Leggi da un file di testo...")
+        b.clicked.connect(self.da_file)
+        h.addWidget(b)
+        h.addStretch()
+        b = QPushButton("✔ Memorizza")
+        b.clicked.connect(self._ok)
+        h.addWidget(b)
+        b = QPushButton("Annulla")
+        b.clicked.connect(self.reject)
+        h.addWidget(b)
+        v.addLayout(h)
+
+    def da_file(self):
+        nome, _ = QFileDialog.getOpenFileName(self, "Colonne da un file", "", "Testo (*.txt *.csv);;Tutti i file (*)")
+        if not nome:
+            return
+        try:
+            with open(nome, encoding="utf-8", errors="replace") as fh:
+                testo = fh.read()
+        except OSError as ex:
+            QMessageBox.warning(self, "File", str(ex))
+            return
+        attuale = self.colonne.ed.toPlainText().rstrip()
+        self.colonne.ed.setPlainText((attuale + "\n" if attuale else "") + testo.replace(";", " "))
+
+    def _ok(self):
+        try:
+            cols, extra = self.colonne.leggi()
+        except ValueError as ex:
+            QMessageBox.warning(self, "Le mie colonne", str(ex))
+            return
+        if len(cols) > self.MAX:
+            QMessageBox.warning(self, "Le mie colonne", f"Al massimo {self.MAX} colonne per volta.")
+            return
+        nome = self.e_nome.text().strip()
+        if self.voce is None:
+            self.risultato = mg.aggiungi_mie_colonne(self.arch, nome or f"Le mie colonne ({len(cols)})", cols, extra,
+                                                     self.e_note.text())
+        else:
+            mg.modifica(self.arch, self.voce.id, titolo=nome or self.voce.titolo, note=self.e_note.text().strip(),
+                        colonne=[sorted(c) for c in cols], extra=extra)
+            self.risultato = self.voce
+        self.accept()
+
+
 class FinestraMieGiocate(QDialog):
     def __init__(self, arch: Archivio, parent=None, categoria: str | None = None, filtro: str = "visibili"):
         super().__init__(parent)
@@ -50,6 +144,8 @@ class FinestraMieGiocate(QDialog):
         self.f = parent                 # finestra principale (per ricaricare nell'editor o in home)
         self.thread = None
         self.verifiche: dict[str, tuple[str, mg.Verifica]] = {}
+        self.analisi: dict[str, list] = {}
+        self._ctx = None
         self.setWindowTitle(f"🎟 Le mie giocate – {self.g.nome}")
         adatta_schermo(self, 1260, 800)
         v = QVBoxLayout(self)
@@ -88,9 +184,14 @@ class FinestraMieGiocate(QDialog):
         sp.addWidget(self.dett)
         sp.setSizes([420, 330])
         v.addWidget(sp, 1)
+        self.riga_pulsanti = QVBoxLayout()
+        v.addLayout(self.riga_pulsanti)
         h = QHBoxLayout()
         self.pulsanti = {}
-        for chiave, testo, fun in (("dopo", "🔍 Verifica dalla creazione", lambda: self.verifica("dopo")),
+        for chiave, testo, fun in (("nuova", "✍ Aggiungi le mie colonne...", self.nuove_colonne),
+                                   ("modifica", "✏ Modifica colonne", self.modifica_colonne),
+                                   ("analizza", "🔬 Analizza le colonne", self.analizza),
+                                   ("dopo", "🔍 Verifica dalla creazione", lambda: self.verifica("dopo")),
                                    ("storico", "📜 Verifica su tutto l'archivio", lambda: self.verifica("storico")),
                                    ("ricarica", "📤 Ricarica nel programma", self.ricarica_voce),
                                    ("registra", "🎟 Registra come giocata", self.registra),
@@ -102,8 +203,11 @@ class FinestraMieGiocate(QDialog):
             b.clicked.connect(fun)
             h.addWidget(b)
             self.pulsanti[chiave] = b
+            if chiave == "modifica":
+                self.riga_pulsanti.addLayout(h)
+                h = QHBoxLayout()
         h.addStretch()
-        v.addLayout(h)
+        self.riga_pulsanti.addLayout(h)
         h = QHBoxLayout()
         self.l_info = QLabel()
         h.addWidget(self.l_info)
@@ -178,6 +282,9 @@ class FinestraMieGiocate(QDialog):
         x = self._scelta()
         for b in self.pulsanti.values():
             b.setEnabled(x is not None)
+        self.pulsanti["nuova"].setEnabled(True)
+        self.pulsanti["modifica"].setEnabled(x is not None and x.categoria == "mie_colonne")
+        self.pulsanti["analizza"].setEnabled(x is not None and bool(x.colonne))
         if x is not None:
             self.pulsanti["nascondi"].setText("👁 Mostra di nuovo" if x.nascosta else "🙈 Nascondi")
             self.pulsanti["registra"].setEnabled(not x.giocata)
@@ -207,6 +314,8 @@ class FinestraMieGiocate(QDialog):
         ver = self.verifiche.get(x.id)
         if ver:
             h.append(self._html_verifica(x, *ver))
+        if x.id in self.analisi:
+            h.append(self._html_analisi(x, self.analisi[x.id]))
         if x.integrale():
             eu = f" + Euronumeri {' '.join(map(str, x.numeri_extra))}" if x.numeri_extra else ""
             h.append(f"<h4>Numeri del sistema ({len(x.numeri)})</h4><pre>{' '.join(f'{n:2d}' for n in x.numeri)}"
@@ -255,7 +364,89 @@ class FinestraMieGiocate(QDialog):
             h.append("</p>")
         return "".join(h)
 
+    def _html_analisi(self, x, profili) -> str:
+        g = self.g
+        h = ["<h4>🔬 Analisi delle colonne sull'archivio</h4><p style='color:#555'>Per ogni caratteristica: il "
+             "valore della colonna, quante estrazioni reali lo hanno avuto e se è tra quelli «tipici» "
+             "(✔ = nell'80% più frequente). Una colonna con molti ⚠ è insolita rispetto a ciò che esce di "
+             "solito; questo non cambia però la probabilità di vincere.</p>"]
+        if len(profili) > 1:
+            h.append("<table cellpadding=3 border=1 style='border-collapse:collapse'><tr><th>#</th><th>Colonna"
+                     "</th><th>Tipiche</th><th>Più simile in archivio</th></tr>")
+            for k, p in enumerate(profili[:60]):
+                h.append(f"<tr><td align=right>{k + 1}</td><td>{' '.join(f'{n:2d}' for n in p.colonna)}</td>"
+                         f"<td align=center>{p.tipiche}/{len(p.caratteristiche)}</td>"
+                         f"<td>{p.migliore} numeri</td></tr>")
+            h.append("</table>" + ("<p>...</p>" if len(profili) > 60 else ""))
+        for k, p in enumerate(profili[:12]):
+            h.append(f"<p><b>Colonna {k + 1}:</b> {' '.join(f'{n:2d}' for n in p.colonna)} – "
+                     f"{p.tipiche} caratteristiche tipiche su {len(p.caratteristiche)}<br>"
+                     f"Più simile all'estrazione del "
+                     + (", ".join(f"{d:%d/%m/%Y}" for d in p.quando[-3:]) if p.quando else "–")
+                     + f" ({p.migliore} numeri in comune"
+                     + (f"; punteggi che avrebbe fatto: " + ", ".join(f"{n}× {pt} punti" for pt, n in
+                                                                      sorted(p.uscite.items(), reverse=True))
+                        if p.uscite else "") + ")</p>")
+            h.append("<table cellpadding=2 border=0>")
+            for c in p.caratteristiche:
+                caso = "" if c.perc_caso != c.perc_caso else f" (caso {c.perc_caso:.1f}%)"
+                h.append(f"<tr><td>{'✔' if c.tipica else '⚠'}</td><td>{escape(c.nome)}</td>"
+                         f"<td align=right><b>{c.valore}</b></td><td align=right>{c.perc_archivio:.1f}%{caso}</td>"
+                         "</tr>")
+            h.append("</table>")
+        if len(profili) > 12:
+            h.append(f"<p>Dettaglio mostrato per le prime 12 colonne su {len(profili)}.</p>")
+        return "".join(h)
+
     # ---------------------------------------------------------------- azioni
+    def nuove_colonne(self):
+        d = DialogoMieColonne(self.arch, self)
+        if d.exec() and d.risultato is not None:
+            self.c_cat.setCurrentIndex(self.c_cat.findData("mie_colonne"))
+            self.c_filtro.setCurrentIndex(self.c_filtro.findData("visibili"))
+            self.ricarica()
+            i = next((i for i, x in enumerate(self.voci) if x.id == d.risultato.id), 0)
+            self.t.selectRow(i)
+
+    def modifica_colonne(self):
+        x = self._scelta()
+        if x is None or x.categoria != "mie_colonne":
+            return
+        if DialogoMieColonne(self.arch, self, x).exec():
+            self.verifiche.pop(x.id, None)
+            self.analisi.pop(x.id, None)
+            self.ricarica()
+
+    def analizza(self):
+        x = self._scelta()
+        if x is None or not x.colonne or (self.thread and self.thread.isRunning()):
+            return
+        if self.arch.conta() < 30:
+            QMessageBox.information(self, "Analisi", "Servono almeno 30 estrazioni in archivio.")
+            return
+        self.setCursor(Qt.WaitCursor)
+        self.pulsanti["analizza"].setEnabled(False)
+
+        def ctx():
+            if self._ctx is None:
+                self._ctx = sis.contesto_da_archivio(self.arch)
+            return self._ctx
+        self.thread = LavoroAnalisi(self.g, x, ctx, self.righe)
+        self.in_verifica = (x, "analisi")
+        self.thread.finito.connect(self._analizzata)
+        self.thread.start()
+
+    def _analizzata(self, profili):
+        x = self.in_verifica[0]
+        self.unsetCursor()
+        self._pulsanti()
+        if profili is None:
+            QMessageBox.warning(self, "Analisi", f"Analisi non riuscita: {self.thread.errore}")
+            return
+        self.analisi[x.id] = profili
+        if self._scelta() is x:
+            self._dettaglio()
+
     def verifica(self, modo):
         x = self._scelta()
         if x is None or (self.thread and self.thread.isRunning()):
@@ -372,7 +563,8 @@ class FinestraMieGiocate(QDialog):
             self.f.mostra_previsione(x.previsione)
             QMessageBox.information(self, "Ricaricata", "Le combinazioni sono di nuovo in home.")
             return
-        if x.sistema or x.categoria in ("sistemi", "sistemi_casuali") or len(x.colonne) > 10:
+        if x.categoria != "mie_colonne" and (x.sistema or x.categoria in ("sistemi", "sistemi_casuali")
+                                             or len(x.colonne) > 10):
             if x.sistema:
                 s = sis.Sistema.da_json(x.sistema)
             else:
@@ -386,7 +578,7 @@ class FinestraMieGiocate(QDialog):
         from .macchina import CASUALI
         CASUALI[g.codice] = {"modo": "sestine", "risultati": [
             {"numeri": list(c), "extra": list(x.extra[k]) if x.extra and k < len(x.extra) else []}
-            for k, c in enumerate(x.colonne)]}
+            for k, c in enumerate(x.colonne[:10])]}
         QMessageBox.information(self, "Ricaricata", "Le colonne sono pronte: le trovi con il pulsante «Macchina "
                                                     "dell'estrazione» in Verifica colonne casuali, nel registro "
                                                     "delle giocate, nel simulatore e nell'editor dei sistemi.")

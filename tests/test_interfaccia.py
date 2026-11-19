@@ -886,6 +886,7 @@ def test_le_mie_giocate(app, tmp_path):
         menu = {x.text().replace("&", ""): x.menu() for x in w.menuBar().actions() if x.menu() is not None}
         assert "Le mie giocate" in menu and "Metodi" not in menu
         sotto = [x.text() for x in menu["Le mie giocate"].actions()]
+        assert any("Aggiungi le mie colonne" in t for t in sotto) and any("Le mie colonne" in t for t in sotto)
         assert any("Colonne casuali" in t for t in sotto) and any("Sistemi ridotti" in t for t in sotto)
         w.genera()
         mg.da_macchina(a, "sestine", [{"numeri": list(range(1, g.k + 1)), "extra": [] if g is SE else [1, 2]}])
@@ -895,9 +896,29 @@ def test_le_mie_giocate(app, tmp_path):
         mg.da_sistema(a, s)
         gc.aggiungi(a, gc.Giocata(g.codice, [list(range(1, g.k + 1))], [[] if g is SE else [1, 2]], "2020-01-01",
                                   1, 1.0, "Mia", "Macchina dell'estrazione"))
+        # le mie colonne: inserimento dal dialogo, analisi, modifica
+        d = umg.DialogoMieColonne(a, w)
+        d.e_nome.setText("Fortunate")
+        d.colonne.ed.setPlainText("\n".join(
+            (" ".join(map(str, c)) + (" + 2 11" if g is EJ else "")) for c in ([3, 15, 27, 44, 49] if g is EJ else
+                                                                             [3, 15, 27, 44, 61, 88],
+                                                                             [1, 2, 3, 4, 5] if g is EJ else
+                                                                             [1, 2, 3, 4, 5, 6])))
+        d._ok()
+        assert d.risultato and len(d.risultato.colonne) == 2
         f = umg.FinestraMieGiocate(a, w)
         testi = [f.t.item(i, 1).text() for i in range(f.t.rowCount())]
-        assert f.t.rowCount() == 4 and testi.count("🎟 Giocata") == 1
+        i = next(i for i, x in enumerate(f.voci) if x.categoria == "mie_colonne")
+        f.t.selectRow(i)
+        assert f.pulsanti["modifica"].isEnabled() and f.pulsanti["analizza"].isEnabled()
+        f.analizza()
+        f.thread.wait(60000)
+        app.processEvents()
+        assert "Analisi delle colonne sull'archivio" in f.dett.toPlainText()
+        f.close()
+        f = umg.FinestraMieGiocate(a, w)
+        testi = [f.t.item(i, 1).text() for i in range(f.t.rowCount())]
+        assert f.t.rowCount() == 5 and testi.count("🎟 Giocata") == 1
         # verifica su tutto l'archivio del sistema casuale (integrale, calcolo esatto)
         i = next(i for i, x in enumerate(f.voci) if x.categoria == "sistemi_casuali")
         f.t.selectRow(i)

@@ -450,9 +450,12 @@ class FinestraPrincipale(QMainWindow):
         """Il vecchio menu Metodi: tutte le combinazioni generate e giocate, per sezione."""
         from ..core import mie_giocate as mg
         m = self.menuBar().addMenu("Le mie &giocate")
-        icone = {"colonne_casuali": "🎲", "sistemi_casuali": "🎱", "magico": "✨", "magico_ai": "🤖",
+        icone = {"mie_colonne": "✍", "colonne_casuali": "🎲", "sistemi_casuali": "🎱", "magico": "✨", "magico_ai": "🤖",
                  "sistemi": "📐"}
-        for cat, nome in mg.CATEGORIE[:5]:
+        a = self._azione(m, "✍ Aggiungi le mie colonne...", self.mie_colonne_nuove)
+        a.setShortcut(QKeySequence("Ctrl+Shift+M"))
+        m.addSeparator()
+        for cat, nome in mg.CATEGORIE[:6]:
             sotto = m.addMenu(f"{icone[cat]} {nome}")
             self._azione(sotto, "Elenco (generate e giocate)...", lambda _=False, c=cat: self.mie_giocate(c))
             self._azione(sotto, "Solo quelle giocate...", lambda _=False, c=cat: self.mie_giocate(c, "giocate"))
@@ -461,6 +464,11 @@ class FinestraPrincipale(QMainWindow):
         a = self._azione(m, "📚 Tutte le mie giocate...", lambda: self.mie_giocate())
         a.setShortcut(QKeySequence("Ctrl+M"))
         self._azione(m, "📝 Registro delle giocate (spesa e vincite)...", self.registro_giocate)
+
+    def mie_colonne_nuove(self):
+        from .mie_giocate import DialogoMieColonne
+        if DialogoMieColonne(self.arch, self).exec():
+            self.mie_giocate("mie_colonne")
 
     def mie_giocate(self, categoria=None, filtro="visibili"):
         from .mie_giocate import FinestraMieGiocate

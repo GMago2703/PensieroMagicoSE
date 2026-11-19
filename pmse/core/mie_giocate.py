@@ -23,7 +23,8 @@ CHIAVE = "mie_giocate"
 MAX_COLONNE = 300_000          # oltre, del sistema si salvano solo le impostazioni (si risviluppa)
 MAX_VOCI = 2000
 
-CATEGORIE = [("colonne_casuali", "Colonne casuali"),
+CATEGORIE = [("mie_colonne", "Le mie colonne"),
+             ("colonne_casuali", "Colonne casuali"),
              ("sistemi_casuali", "Sistemi casuali"),
              ("magico", "Magico Pensiero"),
              ("magico_ai", "Magico Pensiero + AI"),
@@ -210,6 +211,8 @@ def da_sistema(archivio, s, categoria: str = "sistemi", titolo: str = "") -> Voc
 
 def _categoria_da_origine(origine: str) -> str:
     o = (origine or "").lower()
+    if "mie colonne" in o:
+        return "mie_colonne"
     if "magico" in o and any(x in o for x in ("ai", "gemini", "claude", "intelligenza")):
         return "magico_ai"
     if "magico" in o:
@@ -476,3 +479,81 @@ def riassunto(g: Gioco, v: Verifica) -> str:
         return f"{len(v.concorsi)} concorsi: nessuna vincita (al massimo {v.migliore} punti)"
     m = migliore_categoria(g, t)
     return f"{len(v.concorsi)} concorsi: {sum(t.values())} vincite, la migliore {gc.nome_categoria(m)}"
+
+
+# ------------------------------------------------------------------ le mie colonne (scritte dall'utente)
+def aggiungi_mie_colonne(archivio, titolo: str, colonne, extra=None, note: str = "") -> Voce:
+    """Colonne scritte dall'utente: restano nell'elenco finché non le elimina (anche se uguali a altre)."""
+    voci = carica(archivio)
+    v = Voce("mie_colonne", titolo.strip() or "Le mie colonne", colonne=[sorted(c) for c in colonne],
+             extra=[list(e) for e in (extra or [[] for _ in colonne])], note=note.strip())
+    v.dal = primo_concorso(datetime.fromisoformat(v.creata)).isoformat()
+    voci.append(v)
+    salva_tutte(archivio, voci)
+    return v
+
+
+# ------------------------------------------------------------------ analisi di una colonna
+@dataclass
+class Caratteristica:
+    nome: str
+    valore: int
+    perc_archivio: float        # % delle estrazioni che hanno questo valore
+    perc_caso: float            # % attesa da combinazioni casuali (nan se non calcolabile)
+    tipica: bool                # nell'insieme / intervallo che copre l'80% delle estrazioni
+
+
+@dataclass
+class ProfiloColonna:
+    colonna: list[int]
+    caratteristiche: list[Caratteristica]
+    migliore: int                # numeri in comune con l'estrazione più simile
+    quando: list[date]           # estrazioni (al massimo 5) in cui è successo
+    uscite: dict[int, int]       # punti -> quante volte la colonna avrebbe fatto quel punteggio (>=2)
+
+    @property
+    def tipiche(self) -> int:
+        return sum(1 for c in self.caratteristiche if c.tipica)
+
+
+def profilo(g: Gioco, colonne, ctx, righe_archivio) -> list[ProfiloColonna]:
+    """Per ogni colonna: il valore di ogni condizione (somma, pari, consecutivi...) con la frequenza che quel
+    valore ha avuto nelle estrazioni reali, e l'estrazione dell'archivio più simile."""
+    from . import condizioni as cnd
+    C = np.asarray(colonne, dtype=np.int64).reshape(-1, g.k)
+    analisi: list[tuple[str, object, object, object]] = []
+    for t in cnd.tipi_del_gioco(g):
+        if t.codice == "posizione":
+            params = [(1, "1ª posizione"), (g.k, f"{g.k}ª posizione")]
+        else:
+            params = [(t.param_def, "")]
+        for par, etichetta in params:
+            try:
+                a = cnd.analizza(t.codice, ctx, par)
+                val = t.funzione(C, ctx, par)
+            except Exception:                # noqa: BLE001 – es. popolarità senza modello
+                continue
+            nome = f"{t.nome} ({etichetta})" if etichetta else t.nome
+            if t.param_nome and not etichetta and t.codice != "posizione":
+                nome += f" – {t.param_nome.lower()} {par}"
+            analisi.append((nome, t, a, val))
+    nr = len(righe_archivio)
+    M = np.zeros((max(nr, 1), g.n + 1), dtype=np.int8)
+    for i, r in enumerate(righe_archivio):
+        M[i, r[1]] = 1
+    punti = M[:, C].sum(axis=2) if nr else np.zeros((1, len(C)), dtype=int)       # estrazioni × colonne
+    out = []
+    for j, c in enumerate(C):
+        car = []
+        for nome, t, a, val in analisi:
+            v = int(val[j])
+            riga = next((r for r in a.righe if r[0] == v), None)
+            perc, caso = (riga[2], riga[3]) if riga else (0.0, float("nan"))
+            tip = (a.copertura[0] <= v <= a.copertura[1]) if t.modo == "intervallo" else v in a.valori_80
+            car.append(Caratteristica(nome, v, perc, caso, bool(tip)))
+        col = punti[:, j]
+        mx = int(col.max()) if nr else 0
+        quando = [righe_archivio[i][0] for i in np.flatnonzero(col == mx)[-5:]] if nr and mx else []
+        uscite = {p: int((col == p).sum()) for p in range(2, g.k + 1) if nr and (col == p).any()}
+        out.append(ProfiloColonna(c.tolist(), car, mx, quando, uscite))
+    return out
