@@ -25,3 +25,10 @@ def pytest_sessionfinish(session, exitstatus):
         k.TerminateProcess.argtypes = [ctypes.c_void_p, ctypes.c_uint]
         k.TerminateProcess(k.GetCurrentProcess(), int(exitstatus))
     os._exit(int(exitstatus))
+
+
+def pytest_runtest_logreport(report):
+    """Il riepilogo finale non viene stampato (usciamo prima): l'errore si mostra subito."""
+    if report.failed:
+        print(f"\n===== ERRORE in {report.nodeid} ({report.when}) =====\n{report.longreprtext[-6000:]}\n",
+              flush=True)
