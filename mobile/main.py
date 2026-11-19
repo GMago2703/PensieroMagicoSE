@@ -18,9 +18,11 @@ from kivy.core.window import Window
 from kivy.graphics import Color, Ellipse, Rectangle, RoundedRectangle
 from kivy.metrics import Metrics, dp
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.button import Button
 from kivy.uix.checkbox import CheckBox
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.image import Image
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.progressbar import ProgressBar
@@ -131,6 +133,82 @@ class Scheda(BoxLayout):
         super().__init__(orientation="vertical", size_hint_y=None, **kw)
         self.bind(minimum_height=self.setter("height"))
         sfondo(self, "#ffffff", 14)
+
+
+ICONE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icone")
+
+
+def icona(nome, **kw) -> Image:
+    """Icona bianca (mobile/icone, disegnate da strumenti/disegna_icone.py), colorabile con 'color'."""
+    kw.setdefault("fit_mode", "contain")
+    return Image(source=os.path.join(ICONE, nome + ".png"), **kw)
+
+
+def tasto_tondo(testo, attivo, azione, colore_attivo=LIME) -> Button:
+    """Pulsante con gli angoli arrotondati (come le schede)."""
+    b = Button(text=testo, bold=True, font_size=sp(17), background_normal="", background_down="",
+               background_color=(0, 0, 0, 0), color=(0, 0, 0, 1) if attivo else (1, 1, 1, 1))
+    sfondo(b, colore_attivo if attivo else "#ffffff30", 14)
+    b.bind(on_release=lambda *_: azione())
+    return adatta_testo(b)
+
+
+class Premibile(ButtonBehavior, BoxLayout):
+    pass
+
+
+def voce_home(descrizione, nome_icona, azione, colore) -> BoxLayout:
+    """Riga della home: descrizione a sinistra, pulsante quadrato arrotondato con l'icona a destra."""
+    r = Premibile(size_hint_y=None, height=dp(76), padding=(dp(14), dp(6), dp(6), dp(6)), spacing=dp(10))
+    sfondo(r, "#ffffff1c", 16)
+    l = Label(text=descrizione, bold=True, font_size=sp(17), color=(1, 1, 1, 1), halign="left", valign="middle")
+    l.bind(size=lambda *_: setattr(l, "text_size", (l.width, l.height)))
+    r.add_widget(l)
+    q = Premibile(size_hint=(None, None), size=(dp(64), dp(64)), padding=dp(12), pos_hint={"center_y": 0.5})
+    c = sfondo(q, colore, 16)
+    q.add_widget(icona(nome_icona))
+    q.bind(state=lambda _q, s: setattr(c, "a", 0.7 if s == "down" else 1))
+    q.bind(on_release=lambda *_: azione())
+    r.add_widget(q)
+    r.bind(on_release=lambda *_: azione())
+    return r
+
+
+BARRA = [("home", "home", "Home"), ("archivio", "archivio", "Archivio"), ("magico", "magico", "Magico P."),
+         ("sistemi", "sistemi", "Sistemi"), ("casuali", "casualita", "Casualità")]
+
+
+class Barra(BoxLayout):
+    """Barra in basso, sempre visibile: Home, Archivio, Magico Pensiero, Sistemi, Casualità."""
+
+    def __init__(self, app, **kw):
+        super().__init__(size_hint_y=None, height=dp(66), padding=(dp(4), dp(4)), **kw)
+        self.app = app
+        self.colore = sfondo(self, "#00000055")
+        with self.canvas.before:
+            Color(1, 1, 1, 0.25)
+            self._linea = Rectangle()
+        self.bind(pos=self._segui, size=self._segui)
+        self.voci = {}
+        for pagina, ic, testo in BARRA:
+            v = Premibile(orientation="vertical", spacing=dp(1))
+            v.ic = icona(ic, size_hint_y=0.62)
+            v.l = adatta_testo(Label(text=testo, font_size=sp(11), bold=True, size_hint_y=0.38), 7)
+            v.add_widget(v.ic)
+            v.add_widget(v.l)
+            v.bind(on_release=lambda *_, p=pagina: app.vai(p))
+            self.voci[pagina] = v
+            self.add_widget(v)
+
+    def _segui(self, *_):
+        self._linea.pos, self._linea.size = (self.x, self.top - dp(1)), (self.width, dp(1))
+
+    def evidenzia(self, pagina):
+        pagina = {"condizione": "sistemi"}.get(pagina, pagina)
+        for nome, v in self.voci.items():
+            col = hexc(LIME) if nome == pagina else (1, 1, 1, 0.78)
+            v.ic.color = col
+            v.l.color = col
 
 
 class Palla(Label):
@@ -255,6 +333,8 @@ class Pagina(Screen):
 
     def on_pre_enter(self, *_):
         self.colore.rgba = hexc(colore_gioco(self.g))
+        if getattr(self.app, "barra", None) is not None:
+            self.app.barra.evidenzia(self.name)
         if hasattr(self, "l_titolo"):
             self.l_titolo.text = f"{self.titolo} – {self.g.nome}"
         self.mostra()
@@ -270,14 +350,9 @@ class Home(Pagina):
     def mostra(self):
         c = self.corpo
         c.clear_widgets()
-        scelta = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(6))
+        scelta = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(8))
         for g in (SE, EJ):
-            b = ToggleButton(text=g.nome, group="gioco", state="down" if g is self.g else "normal",
-                             bold=True, font_size=sp(17), background_normal="", background_down="",
-                             background_color=hexc(LIME if g is self.g else "#ffffff30"),
-                             color=(0, 0, 0, 1) if g is self.g else (1, 1, 1, 1), allow_no_selection=False)
-            b.bind(on_release=lambda _b, gg=g: self.app.cambia_gioco(gg))
-            scelta.add_widget(adatta_testo(b))
+            scelta.add_widget(tasto_tondo(g.nome, g is self.g, lambda gg=g: self.app.cambia_gioco(gg)))
         c.add_widget(scelta)
         c.add_widget(adatta_testo(Label(text=self.g.nome, bold=True, italic=True, font_size=sp(44),
                                         color=hexc(LIME), size_hint_y=None, height=dp(70))))
@@ -287,26 +362,29 @@ class Home(Pagina):
         sch = Scheda()
         n, ultima = self.s.conta(), self.s.ultima()
         if ultima:
-            sch.add_widget(Testo(f"[b]Archivio:[/b] {n} estrazioni\n[b]Ultima:[/b] "
-                                 f"{ultima.data:%d/%m/%Y}" + (f" (concorso {ultima.concorso})"
-                                                             if ultima.concorso else "")))
+            sch.add_widget(Testo("[b]Ultima estrazione[/b]", font_size=sp(18)))
+            sch.add_widget(Testo(f"[b]{ultima.data:%d/%m/%Y}" + (f" – concorso n. {ultima.concorso}"
+                                                                if ultima.concorso else "") + "[/b]"))
             sch.add_widget(riga_palle("Estratti", sorted(ultima.numeri), VERDE))
             sch.add_widget(riga_palle("Euro", [ultima.jolly, ultima.superstar], COLORE_EURO) if self.g.is_ej
                            else riga_jolly_superstar(ultima.jolly, ultima.superstar))
+            sch.add_widget(Testo(f"[b]Archivio:[/b] {n} estrazioni", (0.3, 0.3, 0.3, 1), font_size=sp(14)))
         else:
             sch.add_widget(Testo("[b]Archivio vuoto.[/b]\nTocca [b]Aggiorna da Internet[/b] per scaricare "
                                  f"tutte le estrazioni dal {self.g.prima_estrazione.year} a oggi "
                                  "(serve una connessione, circa un minuto)."))
         c.add_widget(sch)
 
-        c.add_widget(bottone("Aggiorna da Internet", self.app.aggiorna, VERDE))
-        c.add_widget(bottone("Magico Pensiero", lambda: self.app.vai("magico"), ARANCIO))
-        c.add_widget(bottone("Verifica storica", lambda: self.app.vai("verifica"), ARANCIO))
-        c.add_widget(bottone("Intelligenza artificiale", lambda: self.app.vai("ai"), ARANCIO))
-        c.add_widget(bottone("Sistemi (ridotti e condizionati)", lambda: self.app.vai("sistemi"), ARANCIO))
-        c.add_widget(bottone("Combinazioni casuali", lambda: self.app.vai("casuali"), ARANCIO))
-        c.add_widget(bottone("Laboratorio: è davvero casuale?", lambda: self.app.vai("laboratorio"), ARANCIO))
-        c.add_widget(bottone("Archivio estrazioni", lambda: self.app.vai("archivio"), VERDE))
+        for testo, ic, azione, colore in (
+                ("Aggiorna da Internet", "aggiorna", self.app.aggiorna, VERDE),
+                ("Magico Pensiero", "magico", lambda: self.app.vai("magico"), ARANCIO),
+                ("Verifica storica", "verifica", lambda: self.app.vai("verifica"), ARANCIO),
+                ("Intelligenza artificiale", "ai", lambda: self.app.vai("ai"), ARANCIO),
+                ("Sistemi (ridotti e condizionati)", "sistemi", lambda: self.app.vai("sistemi"), ARANCIO),
+                ("Combinazioni casuali", "casualita", lambda: self.app.vai("casuali"), ARANCIO),
+                ("Laboratorio: è davvero casuale?", "laboratorio", lambda: self.app.vai("laboratorio"), ARANCIO),
+                ("Archivio estrazioni", "archivio", lambda: self.app.vai("archivio"), VERDE)):
+            c.add_widget(voce_home(testo, ic, azione, colore))
         piede = Testo(f"versione {__version__} – i numeri del lotto sono casuali: gioca con moderazione",
                       (1, 1, 1, 0.7), font_size=sp(11))
         piede.halign = "center"
@@ -1482,7 +1560,12 @@ class PensieroMagicoApp(App):
             self.pagine[p.name] = p
             self.sm.add_widget(p)
         Window.bind(on_keyboard=self._tasto)
-        return self.sm
+        radice = BoxLayout(orientation="vertical")
+        radice.add_widget(self.sm)
+        self.barra = Barra(self)
+        radice.add_widget(self.barra)
+        self.barra.evidenzia(self.sm.current)
+        return radice
 
     def on_start(self):
         if autotest_richiesto():
