@@ -1196,7 +1196,7 @@ def test_quadri_speciali_e_controllo(app, tmp_path):
         attivo.setChecked(True)
         cbs[g.k].setChecked(True)
         cbs[g.k - 1].setChecked(True)
-        ammessi.setChecked(False)                                   # non ammessi
+        ammessi.parent().findChildren(type(ammessi))[1].setChecked(True)      # non ammessi
         d.e_nome.setText("Mai usciti")
         d._ok()
         c = d.risultato
