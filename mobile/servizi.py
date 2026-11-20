@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
-from pmse.core import apprendimento, claude_ai, internet, laboratorio, magico, personalizzate, popolarita, vincite
+from pmse.core import apprendimento, claude_ai, internet, laboratorio, magico, personale, personalizzate, popolarita, vincite
 from pmse.core.db import Archivio, EsitoUnione
 from pmse.core.gioco import EJ, GIOCHI, SE, Gioco
 
@@ -155,7 +155,8 @@ class Servizio:
 
     # ---------------------------------------------------------- Magico Pensiero
     def impostazioni(self) -> magico.Impostazioni:
-        return magico.Impostazioni.da_json(self.arch.leggi_impostazione(magico.CHIAVE_IMP), self.g)
+        return personale.applica(self.arch, magico.Impostazioni.da_json(
+            self.arch.leggi_impostazione(magico.CHIAVE_IMP), self.g))
 
     def _extra(self, imp, storico):
         extra = {}
@@ -179,6 +180,34 @@ class Servizio:
         imp = self.impostazioni()
         imp.evita_popolari = bool(attivo)
         self.arch.scrivi_impostazione(magico.CHIAVE_IMP, imp.a_json())
+
+    def livello_poco_giocate(self) -> str:
+        """'no' oppure 'bassa' / 'moderata' / 'forte' (quanto scartare le combinazioni molto giocate)."""
+        imp = self.impostazioni()
+        if not imp.evita_popolari:
+            return "no"
+        return min(personale.POPOLARI, key=lambda k: abs(personale.POPOLARI[k] - imp.soglia_popolari))
+
+    def imposta_livello_poco_giocate(self, livello: str) -> None:
+        imp = self.impostazioni()
+        imp.evita_popolari = livello != "no"
+        if livello in personale.POPOLARI:
+            imp.soglia_popolari = personale.POPOLARI[livello]
+        self.arch.scrivi_impostazione(magico.CHIAVE_IMP, imp.a_json())
+
+    def variazione(self) -> str:
+        return self.impostazioni().variazione
+
+    def imposta_variazione(self, livello: str) -> None:
+        imp = self.impostazioni()
+        imp.variazione = livello
+        self.arch.scrivi_impostazione(magico.CHIAVE_IMP, imp.a_json())
+
+    def codice_personale(self) -> str:
+        return personale.mostra(personale.codice(self.arch))
+
+    def rigenera_codice(self) -> str:
+        return personale.mostra(personale.rigenera(self.arch))
 
     def previsioni_attuali(self) -> list[dict]:
         """Le previsioni già fatte per il prossimo concorso (algoritmo e/o AI), la più recente per prima."""

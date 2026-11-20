@@ -43,6 +43,7 @@ from datetime import date
 
 import numpy as np
 
+from . import personale
 from .analisi import Storico, limiti_consigliati, massimi_in_comune
 from .gioco import GIOCHI, SE, Gioco, gioco_di
 
@@ -88,8 +89,11 @@ class Impostazioni:
     consecutivi_max: int = 1
     somma_percentile: int = 10           # somma tra il percentile X e 100-X dello storico
     max_stessa_decina: int = 2
-    evita_popolari: bool = False         # SuperEnalotto: solo combinazioni poco giocate (premio meno diviso)
+    evita_popolari: bool = True          # SuperEnalotto: solo combinazioni poco giocate (premio meno diviso)
     soglia_popolari: int = 40            # percentile massimo di popolarità ammesso (0-100)
+    # colonne diverse per ogni utente (vedi personale.py): nessuna, moderata, media, forte
+    variazione: str = "moderata"
+    codice_personale: str = ""           # non si salva: lo mette personale.applica() dal codice dell'installazione
 
     def a_json(self) -> str:
         return json.dumps(asdict(self))
@@ -118,6 +122,8 @@ class Impostazioni:
                     setattr(imp, k, v)
             for k in VOCI:
                 imp.pesi.setdefault(k, 0.0)
+            if "variazione" not in d:           # impostazioni salvate prima: l'opzione "poco giocate" parte attiva
+                imp.evita_popolari = True
             return imp
         except (ValueError, TypeError):
             return Impostazioni.predefinite(g)
@@ -362,12 +368,12 @@ def genera(storico: Storico, imp: Impostazioni | None = None,
     """popolarita: modello pmse.core.popolarita (solo SuperEnalotto) per stimare quanto è giocata ogni
     combinazione; con imp.evita_popolari si tengono solo le candidate poco giocate."""
     g = gioco_di(storico)
-    imp = imp or Impostazioni.predefinite(g)
+    imp = personale.variato(imp or Impostazioni.predefinite(g))
     K, N, quante = g.k, g.n, g.combinazioni_magico
     if len(storico) < 30:
         raise ValueError("Servono almeno 30 estrazioni in archivio.")
     punteggi, voci, lift, m = calcola_punteggi(storico, imp, m, extra)
-    seme = zlib.crc32(f"{storico[-1][0].isoformat()}{len(storico)}{imp.a_json()}".encode())
+    seme = zlib.crc32(f"{storico[-1][0].isoformat()}{len(storico)}{personale.per_seme(imp)}".encode())
     rng = np.random.default_rng(seme)
 
     # 2. candidate: campionamento pesato senza ripetizione
@@ -415,7 +421,7 @@ def genera(storico: Storico, imp: Impostazioni | None = None,
     pari_c, alti_c = _profilo(cand, g)[:2]
     tipicita = freq_forma[pari_c, alti_c] / freq_forma.max()
     coppie_n = (coppie - coppie.min()) / (np.ptp(coppie) + 1e-9)
-    voto = 0.6 * media + 0.25 * coppie_n + 0.15 * tipicita
+    voto = personale.rumore(0.6 * media + 0.25 * coppie_n + 0.15 * tipicita, imp)
 
     # 4. scelta delle 3 sestine diverse tra loro
     scelte: list[SestinaMagica] = []

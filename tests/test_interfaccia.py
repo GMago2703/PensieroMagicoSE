@@ -1018,3 +1018,34 @@ def test_guida(app, tmp_path):
         d.close()
         w.close()
         a.chiudi()
+
+
+def test_impostazioni_colonne_personali(app, tmp_path):
+    """Impostazioni di Magico Pensiero: variazione personale, codice rigenerabile, intensità «poco giocate»."""
+    from unittest import mock
+
+    from pmse.core import personale
+    from pmse.core.gioco import EJ, SE
+    from pmse.ui import magico as um
+    from tests.test_sistemi import archivio_finto
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"pers_{g.codice}.db", gioco=g)
+        a.unisci(archivio_finto(g, 100))
+        d = um.FinestraImpostazioni(a)
+        assert d.c_var.currentData() == "moderata"
+        d.c_var.setCurrentIndex(d.c_var.findData("forte"))
+        vecchio = personale.codice(a)
+        with mock.patch("pmse.ui.magico.QMessageBox.question", return_value=um.QMessageBox.Yes):
+            d._rigenera_codice()
+        assert personale.codice(a) != vecchio
+        if not g.is_ej:
+            assert d.cb_pop.isChecked()
+            d.c_pop.setCurrentIndex(d.c_pop.findData("forte"))
+            d.c_pop.activated.emit(d.c_pop.currentIndex())
+            assert d.s_pop.value() == personale.POPOLARI["forte"]
+        d._salva()
+        imp = um.carica_impostazioni(a)
+        assert imp.variazione == "forte" and imp.codice_personale == personale.codice(a)
+        if not g.is_ej:
+            assert imp.soglia_popolari == personale.POPOLARI["forte"] and imp.evita_popolari
+        a.chiudi()

@@ -254,10 +254,6 @@ class FinestraPrincipale(QMainWindow):
             a = m.addAction(testo, lambda c=codice: self.apri_condizione(c))
             if tasto:
                 a.setShortcut(QKeySequence(tasto))
-        m.addSeparator()
-        for testo in ("Personalizzata", "Quadri"):
-            a = m.addAction(testo + " (in preparazione)")
-            a.setEnabled(False)
 
         m = mb.addMenu("S&viluppo")
         m.addAction("Impostazioni (prezzi)...", self._prezzi)
@@ -270,9 +266,6 @@ class FinestraPrincipale(QMainWindow):
         m.addSeparator()
         a = m.addAction("🎲 Verifica colonne casuali...", self.verifica_colonne)
         a.setShortcut(QKeySequence("Ctrl+K"))
-        m.addSeparator()
-        a = m.addAction("Editor di formazioni numeriche (in preparazione)")
-        a.setEnabled(False)
 
         m = mb.addMenu("C&ombinazioni casuali")
         sest = "Sestine casuali" if not self.g.is_ej else "Cinquine ed Euronumeri casuali"
@@ -290,11 +283,6 @@ class FinestraPrincipale(QMainWindow):
         m.addSeparator()
         m.addAction("Salva / Conversione formati (TXT, CSV)...", lambda: self._ultimo("esporta"))
         m.addAction("Sistemi memorizzati...", self.sistemi_salvati)
-        m.addSeparator()
-        for testo in ("Spoglio multiplo", "Combinazione test", "Operazioni", "Editor di combinazioni",
-                      "Editor basi e varianti"):
-            a = m.addAction(testo + " (in preparazione)")
-            a.setEnabled(False)
 
     def macchina(self, modo):
         from .macchina import FinestraMacchina

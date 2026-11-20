@@ -137,6 +137,27 @@ allenarlo sul passato o azzerarlo.</li>
 <li><b>🧪 Laboratorio:</b> mette alla prova la casualità: cerca regolarità vere nelle estrazioni. Aspettati,
 giustamente, che quasi sempre non ne trovi.</li>
 </ul>
+<h3>Colonne personali: diverse da quelle di ogni altro utente</h3>
+<p>Se più persone usassero il programma con lo stesso archivio, avrebbero tutte le stesse colonne e, in caso di
+vincita, il premio si dividerebbe. Per evitarlo ogni installazione ha un <b>codice personale casuale</b> (creato la
+prima volta e conservato con i tuoi dati) che entra nel calcolo di Magico Pensiero: piccoli spostamenti dei pesi
+delle voci, della «nitidezza» e degli spareggi tra le candidate. Il risultato è che <b>le tue colonne sono diverse da
+quelle degli altri</b>, ma <b>per te restano sempre le stesse</b> a parità di archivio e impostazioni, quindi storico
+e verifiche restano coerenti.</p>
+<p>In <i>Magico Pensiero → Impostazioni dell'algoritmo → Le mie colonne personali</i> scegli quanto differenziare:</p>
+<ul>
+<li><b>Nessuna:</b> le colonne sono uguali per chiunque abbia lo stesso archivio;</li>
+<li><b>Moderata</b> (consigliata): colonne diverse ma con la stessa logica;</li>
+<li><b>Media</b> e <b>Forte</b>: differenze più marcate (la verifica storica può oscillare di più).</li>
+</ul>
+<p>Il pulsante <b>Rigenera il mio codice</b> cambia tutte le colonne future (quelle già salvate restano). Non cambia
+la probabilità di vincere, che è identica per ogni colonna: riduce solo la probabilità di dividere il premio con altri
+utenti del programma.</p>
+{'' if ej else """<h3>Evita le combinazioni molto giocate</h3>
+<p>Dallo studio dei vincitori dei concorsi passati il programma stima quanto è giocata ogni combinazione (date,
+sequenze, numeri «fortunati»...). Se vinci con una combinazione giocata da molti, il premio si divide. L'opzione è
+<b>attiva per impostazione predefinita</b> e ha tre intensità: <b>Bassa</b> (scarta solo le più giocate),
+<b>Moderata</b> (consigliata), <b>Forte</b> (tiene solo le meno giocate). Si regola nelle stesse impostazioni.</p>"""}
 <div class='av'>Come leggere la verifica storica: un piccolo vantaggio sul caso può essere pura fortuna. Fidati
 di scarti che restano su centinaia di concorsi, non di una serie fortunata.</div>
 """))
@@ -292,7 +313,9 @@ visibile: <b>Home, Archivio, Magico Pensiero, Sistemi, Casualità</b>.</p>
 <ul>
 <li><b>Archivio:</b> aggiornamento da Internet e consultazione.</li>
 <li><b>Magico Pensiero:</b> genera le proposte, con l'intelligenza artificiale e la verifica storica (scrivi o scegli il
-numero di concorsi, da 10 a 1000).</li>
+numero di concorsi, da 10 a 1000). Due pulsanti regolano le <b>colonne personali</b> (nessuna, moderata, media,
+forte){'' if ej else " e le combinazioni <b>poco giocate</b> (no, bassa, moderata, forte)"}; «Nuovo codice personale» cambia
+le colonne future.</li>
 <li><b>Sistemi:</b> condizioni, condizionati, condizionati ridotti, ridotti.</li>
 <li><b>Casualità:</b> {CP} casuali e sistema casuale (per l'Eurojackpot solo le cinquine, non gli Euronumeri).</li>
 </ul>
@@ -327,6 +350,9 @@ colonne improbabili per forma.</li>
 <dt><b>L'AI dice che il limite è esaurito</b></dt><dd>Con Gemini, aspetta il giorno dopo o usa il modello leggero;
 il programma prova anche altri modelli da solo.</dd>
 <dt><b>La verifica storica è lenta</b></dt><dd>Scegli meno concorsi (100 bastano per un primo giudizio).</dd>
+<dt><b>Altri utenti hanno le mie stesse colonne?</b></dt><dd>Molto raramente: ogni installazione ha un codice
+personale che rende diverse le colonne (vedi «Magico Pensiero → Colonne personali»). Con «Nessuna» invece sono uguali
+per tutti.</dd>
 <dt><b>Ho cambiato gioco e non vedo più i miei dati</b></dt><dd>SE ed EJ sono separati: torna dal pulsante in alto
 a sinistra.</dd>
 <dt><b>Ho cancellato per errore</b></dt><dd><i>Impostazioni → Ripristina i dati da una copia</i>.</dd>

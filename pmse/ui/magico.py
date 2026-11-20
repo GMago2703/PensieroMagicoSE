@@ -9,14 +9,14 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QStyle, QStyledIte
                                QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSpinBox, QTableWidget,
                                QVBoxLayout, QWidget)
 
-from ..core import magico, personalizzate, popolarita
+from ..core import magico, personale, personalizzate, popolarita
 from ..core.db import Archivio
 from .analisi import riempi_tabella
 from .schermo import adatta_schermo
 
 
 def carica_impostazioni(arch: Archivio) -> magico.Impostazioni:
-    return magico.Impostazioni.da_json(arch.leggi_impostazione(magico.CHIAVE_IMP), arch.gioco)
+    return personale.applica(arch, magico.Impostazioni.da_json(arch.leggi_impostazione(magico.CHIAVE_IMP), arch.gioco))
 
 
 def descrizione_algoritmo(g) -> str:
@@ -131,6 +131,30 @@ class FinestraImpostazioni(QDialog):
         v.addWidget(g3)
         self._anteprima_limiti()
 
+        # colonne diverse per ogni utente
+        g5 = QGroupBox("Le mie colonne personali (diverse da quelle di ogni altro utente)")
+        f5 = QFormLayout(g5)
+        spieg5 = QLabel("Ogni installazione ha un codice personale casuale: a parità di archivio, due utenti "
+                        "ottengono colonne diverse, mentre tu ottieni sempre le stesse (lo storico resta coerente). "
+                        "Non cambia la probabilità di vincere: evita solo che molti giochino la stessa colonna e "
+                        "si divida il premio.")
+        spieg5.setWordWrap(True)
+        f5.addRow(spieg5)
+        self.c_var = QComboBox()
+        for k, nome in personale.NOMI_LIVELLI.items():
+            self.c_var.addItem(nome, k)
+        self.c_var.setCurrentIndex(max(0, self.c_var.findData(imp.variazione)))
+        f5.addRow("Quanto differenziare le mie colonne", self.c_var)
+        rg = QHBoxLayout()
+        self.l_codice = QLabel(f"Il mio codice: <b>{personale.mostra(personale.codice(arch))}</b>")
+        rg.addWidget(self.l_codice)
+        b_rig = QPushButton("Rigenera il mio codice")
+        b_rig.clicked.connect(self._rigenera_codice)
+        rg.addWidget(b_rig)
+        rg.addStretch()
+        f5.addRow(rg)
+        v.addWidget(g5)
+
         # combinazioni poco giocate (solo SuperEnalotto: servono i dati dei vincitori)
         self.cb_pop = QCheckBox("Evita le combinazioni molto giocate")
         self.s_pop = QSpinBox()
@@ -148,6 +172,13 @@ class FinestraImpostazioni(QDialog):
             spieg4.setWordWrap(True)
             f4.addRow(spieg4)
             f4.addRow(self.cb_pop)
+            self.c_pop = QComboBox()
+            for k, nome in personale.NOMI_POPOLARI.items():
+                self.c_pop.addItem(nome, k)
+            self.c_pop.setCurrentIndex(min(range(self.c_pop.count()), key=lambda i: abs(
+                personale.POPOLARI[self.c_pop.itemData(i)] - imp.soglia_popolari)))
+            self.c_pop.activated.connect(lambda _i: self.s_pop.setValue(personale.POPOLARI[self.c_pop.currentData()]))
+            f4.addRow("Intensità", self.c_pop)
             f4.addRow("Tieni solo le combinazioni meno giocate del", self.s_pop)
             self.l_pop = QLabel()
             self.l_pop.setWordWrap(True)
@@ -195,6 +226,13 @@ class FinestraImpostazioni(QDialog):
                            f"al massimo <b>{hi}</b> numeri in comune, e con almeno una estrazione <b>{lo}</b> o più. "
                            "(Dettagli: menu Analisi → Somiglianza con l'archivio)")
 
+    def _rigenera_codice(self):
+        r = QMessageBox.question(self, "Nuovo codice personale",
+                                 "Con un nuovo codice tutte le colonne future di Magico Pensiero cambieranno "
+                                 "(quelle già generate e salvate restano com'erano). Continuare?")
+        if r == QMessageBox.Yes:
+            self.l_codice.setText(f"Il mio codice: <b>{personale.mostra(personale.rigenera(self.arch))}</b>")
+
     def _predefiniti(self):
         imp = magico.Impostazioni.predefinite(self.arch.gioco)
         for k, s in self.pesi.items():
@@ -210,6 +248,7 @@ class FinestraImpostazioni(QDialog):
         self.s_fin.setValue(imp.finestra_archivio)
         self.cb_pop.setChecked(imp.evita_popolari)
         self.s_pop.setValue(imp.soglia_popolari)
+        self.c_var.setCurrentIndex(max(0, self.c_var.findData(imp.variazione)))
 
     def _salva(self):
         imp = carica_impostazioni(self.arch)      # conserva statistiche e filtri appresi
@@ -220,6 +259,7 @@ class FinestraImpostazioni(QDialog):
         imp.limite_archivio = self._imp_limiti().limite_archivio
         imp.soglia_archivio, imp.finestra_archivio = self.s_soglia.value(), self.s_fin.value()
         imp.evita_popolari, imp.soglia_popolari = self.cb_pop.isChecked(), self.s_pop.value()
+        imp.variazione = self.c_var.currentData()
         if not any(imp.pesi.values()) and not imp.personalizzate:
             QMessageBox.warning(self, "Impostazioni", "Almeno una voce deve avere peso maggiore di zero.")
             return

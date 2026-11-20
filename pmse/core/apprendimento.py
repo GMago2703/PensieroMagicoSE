@@ -28,7 +28,7 @@ from datetime import date
 
 import numpy as np
 
-from . import magico
+from . import magico, personale
 from .analisi import Storico
 
 CHIAVE_REGISTRO = "magico_valutazioni"
@@ -248,7 +248,8 @@ def elabora_nuove(archivio) -> list[Valutazione]:
     nuove = [i for i, d in enumerate(date_st) if d > limite]
     if not nuove:
         return []
-    imp = magico.Impostazioni.da_json(archivio.leggi_impostazione(magico.CHIAVE_IMP), archivio.gioco)
+    imp = personale.applica(archivio, magico.Impostazioni.da_json(archivio.leggi_impostazione(magico.CHIAVE_IMP),
+                                                                   archivio.gioco))
     previsioni = magico.leggi_previsioni(archivio)
     registro = leggi_registro(archivio)
     m = magico.matrice(storico)

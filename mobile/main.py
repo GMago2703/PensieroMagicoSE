@@ -1213,25 +1213,56 @@ class PaginaMagico(Pagina):
                 sch.add_widget(w)
             c.add_widget(sch)
         if not self.g.is_ej:
-            attivo = self.s.poco_giocate()
-            c.add_widget(bottone(("Poco giocate: SÌ" if attivo else "Poco giocate: NO") + " (tocca per cambiare)",
-                                 self._cambia_poco_giocate, "#b8860b" if attivo else "#607d8b", alto=dp(46)))
+            liv = self.s.livello_poco_giocate()
+            c.add_widget(bottone("Poco giocate: " + {"no": "NO", "bassa": "bassa", "moderata": "moderata",
+                                                     "forte": "forte"}[liv] + " (tocca per cambiare)",
+                                 self._cambia_poco_giocate, "#607d8b" if liv == "no" else "#b8860b", alto=dp(46)))
+        var = self.s.variazione()
+        c.add_widget(bottone("Colonne personali: " + {"nessuna": "NO", "moderata": "moderata", "media": "media",
+                                                      "forte": "forte"}.get(var, var) + " (tocca per cambiare)",
+                             self._cambia_variazione, "#607d8b" if var == "nessuna" else "#6a1b9a", alto=dp(46)))
         gia = any(p.get("origine", "Algoritmo") == "Algoritmo" for p in prev)
         c.add_widget(bottone("Genera di nuovo" if gia else "Genera con Magico Pensiero", self._genera, ARANCIO))
         c.add_widget(bottone("Chiedi all'intelligenza artificiale", lambda: self.app.vai("ai"), VERDE))
+        c.add_widget(bottone("Nuovo codice personale", self._nuovo_codice, "#455a64", alto=dp(40)))
         c.add_widget(Testo(
             "Magico Pensiero combina eco, affinità, tendenza, maturità e storico dei numeri, scarta le "
             "combinazioni con forma insolita o troppo simili a quelle già uscite e impara da sola dopo ogni "
-            "estrazione (quando aggiorni l'archivio). Con le stesse impostazioni la proposta per un concorso è "
-            "sempre la stessa.", (1, 1, 1, 0.85), font_size=sp(13)))
+            "estrazione (quando aggiorni l'archivio). Le tue colonne sono personali: con lo stesso codice e le stesse "
+            "impostazioni la proposta per un concorso è sempre la stessa, ma diversa da quella degli altri utenti.", (1, 1, 1, 0.85), font_size=sp(13)))
 
     def _cambia_poco_giocate(self):
-        self.s.imposta_poco_giocate(not self.s.poco_giocate())
+        ordine = ["no", "bassa", "moderata", "forte"]
+        nuovo = ordine[(ordine.index(self.s.livello_poco_giocate()) + 1) % len(ordine)]
+        self.s.imposta_livello_poco_giocate(nuovo)
         avviso("Combinazioni poco giocate",
-               ("Attivo: Magico Pensiero sceglierà solo combinazioni poco giocate. La probabilità di vincere non "
-                "cambia, ma in caso di vincita il premio si divide con meno persone." if self.s.poco_giocate() else
-                "Disattivato: Magico Pensiero sceglie senza guardare quanto sono giocate le combinazioni.") +
-               "\n\nTocca 'Genera di nuovo' per una proposta con la nuova impostazione.")
+               {"no": "Disattivato: Magico Pensiero sceglie senza guardare quanto sono giocate le combinazioni.",
+                "bassa": "Bassa: scarta solo le combinazioni più giocate.",
+                "moderata": "Moderata (consigliata): tiene le combinazioni giocate meno della media.",
+                "forte": "Forte: tiene solo le combinazioni tra le meno giocate."}[nuovo] +
+               "\n\nLa probabilità di vincere non cambia, ma in caso di vincita il premio si divide con meno "
+               "persone.\n\nTocca 'Genera di nuovo' per una proposta con la nuova impostazione.")
+        self.mostra()
+
+    def _cambia_variazione(self):
+        ordine = ["nessuna", "moderata", "media", "forte"]
+        att = self.s.variazione()
+        nuovo = ordine[(ordine.index(att) + 1) % len(ordine)] if att in ordine else "moderata"
+        self.s.imposta_variazione(nuovo)
+        avviso("Colonne personali",
+               {"nessuna": "Nessuna: le colonne sono uguali a quelle di chiunque abbia lo stesso archivio.",
+                "moderata": "Moderata (consigliata): le tue colonne differiscono da quelle degli altri utenti.",
+                "media": "Media: differenze più marcate.",
+                "forte": "Forte: ognuno ha un 'carattere' molto diverso."}[nuovo] +
+               f"\n\nIl tuo codice personale: {self.s.codice_personale()}. Con lo stesso codice ottieni sempre le "
+               "stesse colonne. Per cambiarle tocca 'Nuovo codice personale'.\n\nTocca 'Genera di nuovo' per "
+               "una proposta con la nuova impostazione.")
+        self.mostra()
+
+    def _nuovo_codice(self):
+        nuovo = self.s.rigenera_codice()
+        avviso("Nuovo codice personale", f"Il tuo nuovo codice è {nuovo}: le colonne future saranno diverse da "
+                                         "quelle di prima (quelle già salvate restano).")
         self.mostra()
 
     def _genera(self):
