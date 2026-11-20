@@ -1,0 +1,347 @@
+Archivio vero scaricato il 20/11/2026
+
+LABORATORIO – SuperEnalotto: la casualità è davvero casuale?
+Estrazioni studiate: 4304. Epoche: ruote del Lotto 1997-2009 (1425 concorsi); macchina SuperEnalotto dal 2009 (2879 concorsi)
+Prove eseguite: 56 (confronto con 500 archivi simulati perfettamente casuali dove serve).
+
+Sensibilità (ruote del Lotto 1997-2009): una pallina dovrebbe uscire almeno il 45% più (o meno) del normale per essere scoperta in modo affidabile; difetti più piccoli resterebbero invisibili con questi dati.
+Sensibilità (macchina SuperEnalotto dal 2009): una pallina dovrebbe uscire almeno il 31% più (o meno) del normale per essere scoperta in modo affidabile; difetti più piccoli resterebbero invisibili con questi dati.
+
+Come leggere: p = probabilità di vedere un risultato così, o più strano, se le estrazioni fossero perfettamente casuali. Con tante prove qualche p piccola esce per fortuna: si parla di ANOMALIA solo se resta sotto il 5% dopo la correzione di Holm (p corr.).
+
+0. CONTROLLO DEI DATI (l'archivio è affidabile per queste prove?)
+-----------------------------------------------------------------
+[ANOMALIA] L'ordine di uscita nell'archivio è credibile? – ruote del Lotto 1997-2009
+   Cerca: se l'archivio riporta davvero l'ordine di uscita o, in parte, numeri già messi in ordine crescente (in quel caso le prove sulla posizione misurano l'archivio, non la macchina)
+   Misura: inversioni medie 4.66 (vero ordine casuale 7.50); concorsi quasi ordinati 0 (attesi 11.9)
+   p = 0.0000   p corr. = 0.0000
+[ANOMALIA] L'ordine di uscita nell'archivio è credibile? – macchina SuperEnalotto dal 2009
+   Cerca: se l'archivio riporta davvero l'ordine di uscita o, in parte, numeri già messi in ordine crescente (in quel caso le prove sulla posizione misurano l'archivio, non la macchina)
+   Misura: inversioni medie 5.81 (vero ordine casuale 7.50); concorsi quasi ordinati 12 (attesi 18.8)
+   p = 0.0000   p corr. = 0.0000
+
+1. LA MACCHINA (impronte di difetti fisici)
+-------------------------------------------
+[COMPATIBILE CON IL CASO] Frequenza di ogni numero – ruote del Lotto 1997-2009
+   Cerca: palline che escono più o meno delle altre (peso, dimensione, usura)
+   Misura: uscite per numero da 65 a 120, atteso 95.0 ciascuno
+   p = 0.2723   p corr. = 1.0000
+   · più uscito: 88 (120), 81 (116), 1 (114)
+   · meno uscito: 9 (65), 34 (78), 59 (78)
+   · differenze di questa ampiezza sono normali con il caso se p non è piccola
+[COMPATIBILE CON IL CASO] Il numero più anomalo – ruote del Lotto 1997-2009
+   Cerca: una singola pallina difettosa (più pesante, più leggera, rovinata)
+   Misura: il 9 è uscito 65 volte (atteso 95.0, -3.19 deviazioni)
+   p = 0.1298   p corr. = 1.0000
+[ANOMALIA] Posizione di uscita (ruota) – ruote del Lotto 1997-2009
+   Cerca: una posizione (la prima pallina, o una ruota) che preferisce certi numeri
+   Misura: 1425 concorsi con l'ordine di uscita conservato
+   p = 0.0000   p corr. = 0.0000
+   · posizione più irregolare: Roma (p=0.000)
+   · Bari: numero medio 35.0 (atteso 45.5)
+   · Firenze: numero medio 42.9 (atteso 45.5)
+[ANOMALIA] Palline vicine estratte una dopo l'altra – ruote del Lotto 1997-2009
+   Cerca: se le palline restano 'in fila' come sono state caricate, un'estratta tira l'altra
+   Misura: distanza media tra due estratti consecutivi 27.32 (caso 30.34)
+   p = 0.0000   p corr. = 0.0000
+[COMPATIBILE CON IL CASO] Coppie che escono insieme – ruote del Lotto 1997-2009
+   Cerca: palline che tendono a uscire nella stessa estrazione (attrito, cariche elettrostatiche)
+   Misura: dispersione delle 4005 coppie: -0.62 deviazioni dal caso
+   p = 0.5376   p corr. = 1.0000
+   · coppie più frequenti: 6-83 (14 volte, atteso 5.3), 71-85 (14 volte, atteso 5.3), 42-88 (14 volte, atteso 5.3)
+[COMPATIBILE CON IL CASO] La coppia più frequente – ruote del Lotto 1997-2009
+   Cerca: due palline che si 'attirano' in modo particolare
+   Misura: coppia più frequente 14 volte; negli archivi casuali in media 15.4 (massimo 20)
+   p = 0.9940   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Numeri consecutivi nella stessa estrazione – ruote del Lotto 1997-2009
+   Cerca: palline con numeri vicini (spesso caricate vicine) che escono insieme
+   Misura: 0.338 coppie consecutive per estrazione (caso 0.334)
+   p = 0.7673   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Numeri della stessa decina – ruote del Lotto 1997-2009
+   Cerca: gruppi di palline (per esempio caricate per decine) che non si mescolano bene
+   Misura: 1.542 coppie della stessa decina per estrazione (caso 1.518)
+   p = 0.4209   p corr. = 1.0000
+[ANOMALIA] Somma dei numeri estratti – ruote del Lotto 1997-2009
+   Cerca: una macchina che preferisce numeri bassi o alti
+   Misura: somma media 278.8 (attesa 273.0)
+   p = 0.0004   p corr. = 0.0214
+[COMPATIBILE CON IL CASO] Stabilità nel tempo – ruote del Lotto 1997-2009
+   Cerca: un cambio di macchina, di palline o di regolazione che sposta le preferenze
+   Misura: frequenze confrontate in 4 periodi consecutivi
+   p = 0.3937   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Giorno della settimana – ruote del Lotto 1997-2009
+   Cerca: condizioni diverse nei vari giorni (personale, temperatura, umidità, macchina)
+   Misura: frequenze confrontate tra martedì, mercoledì, giovedì, sabato
+   p = 0.1458   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Frequenza del Jolly – ruote del Lotto 1997-2009
+   Cerca: palline che escono più spesso come Jolly
+   Misura: 1425 Jolly
+   p = 0.7047   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Frequenza del SuperStar – ruote del Lotto 1997-2009
+   Cerca: palline che escono più spesso come SuperStar
+   Misura: 511 SuperStar
+   p = 0.9314   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Frequenza di ogni numero – macchina SuperEnalotto dal 2009
+   Cerca: palline che escono più o meno delle altre (peso, dimensione, usura)
+   Misura: uscite per numero da 159 a 222, atteso 191.9 ciascuno
+   p = 0.3724   p corr. = 1.0000
+   · più uscito: 6 (222), 85 (222), 52 (221)
+   · meno uscito: 36 (159), 70 (160), 50 (162)
+   · differenze di questa ampiezza sono normali con il caso se p non è piccola
+[COMPATIBILE CON IL CASO] Il numero più anomalo – macchina SuperEnalotto dal 2009
+   Cerca: una singola pallina difettosa (più pesante, più leggera, rovinata)
+   Misura: il 36 è uscito 159 volte (atteso 191.9, -2.46 deviazioni)
+   p = 1.0000   p corr. = 1.0000
+[ANOMALIA] Posizione di uscita – macchina SuperEnalotto dal 2009
+   Cerca: una posizione (la prima pallina, o una ruota) che preferisce certi numeri
+   Misura: 2260 concorsi con l'ordine di uscita conservato
+   p = 0.0000   p corr. = 0.0000
+   · posizione più irregolare: 6ª pallina (p=0.000)
+   · 1ª pallina: numero medio 39.9 (atteso 45.5)
+   · 2ª pallina: numero medio 44.4 (atteso 45.5)
+[ANOMALIA] Palline vicine estratte una dopo l'altra – macchina SuperEnalotto dal 2009
+   Cerca: se le palline restano 'in fila' come sono state caricate, un'estratta tira l'altra
+   Misura: distanza media tra due estratti consecutivi 27.55 (caso 30.34)
+   p = 0.0000   p corr. = 0.0000
+[COMPATIBILE CON IL CASO] Coppie che escono insieme – macchina SuperEnalotto dal 2009
+   Cerca: palline che tendono a uscire nella stessa estrazione (attrito, cariche elettrostatiche)
+   Misura: dispersione delle 4005 coppie: +0.65 deviazioni dal caso
+   p = 0.5165   p corr. = 1.0000
+   · coppie più frequenti: 19-82 (23 volte, atteso 10.8), 15-74 (22 volte, atteso 10.8), 49-66 (22 volte, atteso 10.8)
+[COMPATIBILE CON IL CASO] La coppia più frequente – macchina SuperEnalotto dal 2009
+   Cerca: due palline che si 'attirano' in modo particolare
+   Misura: coppia più frequente 23 volte; negli archivi casuali in media 24.4 (massimo 30)
+   p = 0.9521   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Numeri consecutivi nella stessa estrazione – macchina SuperEnalotto dal 2009
+   Cerca: palline con numeri vicini (spesso caricate vicine) che escono insieme
+   Misura: 0.325 coppie consecutive per estrazione (caso 0.333)
+   p = 0.4065   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Numeri della stessa decina – macchina SuperEnalotto dal 2009
+   Cerca: gruppi di palline (per esempio caricate per decine) che non si mescolano bene
+   Misura: 1.512 coppie della stessa decina per estrazione (caso 1.516)
+   p = 0.8256   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Somma dei numeri estratti – macchina SuperEnalotto dal 2009
+   Cerca: una macchina che preferisce numeri bassi o alti
+   Misura: somma media 275.3 (attesa 273.0)
+   p = 0.0425   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Stabilità nel tempo – macchina SuperEnalotto dal 2009
+   Cerca: un cambio di macchina, di palline o di regolazione che sposta le preferenze
+   Misura: frequenze confrontate in 4 periodi consecutivi
+   p = 0.1574   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Giorno della settimana – macchina SuperEnalotto dal 2009
+   Cerca: condizioni diverse nei vari giorni (personale, temperatura, umidità, macchina)
+   Misura: frequenze confrontate tra martedì, giovedì, venerdì, sabato
+   p = 0.2895   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Frequenza del Jolly – macchina SuperEnalotto dal 2009
+   Cerca: palline che escono più spesso come Jolly
+   Misura: 2879 Jolly
+   p = 0.6282   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Frequenza del SuperStar – macchina SuperEnalotto dal 2009
+   Cerca: palline che escono più spesso come SuperStar
+   Misura: 2879 SuperStar
+   p = 0.1094   p corr. = 1.0000
+
+2. LA MEMORIA (legami tra un concorso e i successivi)
+-----------------------------------------------------
+[COMPATIBILE CON IL CASO] Numeri ripetuti dal concorso precedente – ruote del Lotto 1997-2009
+   Cerca: palline appena uscite che tornano (o evitano di tornare) subito
+   Misura: in comune con il concorso prima: 0.411 numeri (caso 0.400)
+   p = 0.4918   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Ripetizioni a distanza di 2-10 concorsi – ruote del Lotto 1997-2009
+   Cerca: una 'memoria' più lunga, come se la macchina ricordasse le estrazioni recenti
+   Misura: numeri in comune con ognuno dei 9 concorsi precedenti
+   p = 0.2194   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Vicini dei numeri appena usciti – ruote del Lotto 1997-2009
+   Cerca: dopo l'uscita del 40, più probabilità per 39 e 41 nel concorso dopo
+   Misura: 0.687 vicini per estrazione (caso 0.726)
+   p = 0.0706   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Ritardi (intervalli tra due uscite dello stesso numero) – ruote del Lotto 1997-2009
+   Cerca: numeri 'maturi' che, dopo un lungo ritardo, escono più del dovuto (o il contrario)
+   Misura: 8460 intervalli, ritardo medio 14.9 (caso 15.0)
+   p = 0.8993   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Numeri ripetuti dal concorso precedente – macchina SuperEnalotto dal 2009
+   Cerca: palline appena uscite che tornano (o evitano di tornare) subito
+   Misura: in comune con il concorso prima: 0.381 numeri (caso 0.400)
+   p = 0.0888   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Ripetizioni a distanza di 2-10 concorsi – macchina SuperEnalotto dal 2009
+   Cerca: una 'memoria' più lunga, come se la macchina ricordasse le estrazioni recenti
+   Misura: numeri in comune con ognuno dei 9 concorsi precedenti
+   p = 0.6162   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Vicini dei numeri appena usciti – macchina SuperEnalotto dal 2009
+   Cerca: dopo l'uscita del 40, più probabilità per 39 e 41 nel concorso dopo
+   Misura: 0.736 vicini per estrazione (caso 0.725)
+   p = 0.4360   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Ritardi (intervalli tra due uscite dello stesso numero) – macchina SuperEnalotto dal 2009
+   Cerca: numeri 'maturi' che, dopo un lungo ritardo, escono più del dovuto (o il contrario)
+   Misura: 17184 intervalli, ritardo medio 14.9 (caso 15.0)
+   p = 0.1497   p corr. = 1.0000
+
+3. LA PREVISIONE (gara tra regole, giudicate solo sul futuro)
+-------------------------------------------------------------
+[COMPATIBILE CON IL CASO] I più frequenti di sempre – ruote del Lotto 1997-2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 428 concorsi di prova: 0.360 numeri indovinati in media (caso 0.400), 4 volte almeno 3 punti
+   p = 0.9193   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I più frequenti negli ultimi 50 concorsi – ruote del Lotto 1997-2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 428 concorsi di prova: 0.456 numeri indovinati in media (caso 0.400), 1 volte almeno 3 punti
+   p = 0.0263   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I più frequenti negli ultimi 200 concorsi – ruote del Lotto 1997-2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 428 concorsi di prova: 0.414 numeri indovinati in media (caso 0.400), 2 volte almeno 3 punti
+   p = 0.3184   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I meno frequenti di sempre – ruote del Lotto 1997-2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 428 concorsi di prova: 0.386 numeri indovinati in media (caso 0.400), 0 volte almeno 3 punti
+   p = 0.6932   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I ritardatari (assenti da più tempo) – ruote del Lotto 1997-2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 428 concorsi di prova: 0.402 numeri indovinati in media (caso 0.400), 3 volte almeno 3 punti
+   p = 0.4740   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Ripetere i numeri appena usciti – ruote del Lotto 1997-2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 428 concorsi di prova: 0.402 numeri indovinati in media (caso 0.400), 1 volte almeno 3 punti
+   p = 0.4740   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I vicini (±1) dei numeri appena usciti – ruote del Lotto 1997-2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 428 concorsi di prova: 0.353 numeri indovinati in media (caso 0.400), 1 volte almeno 3 punti
+   p = 0.9500   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Catena di Markov (chi segue chi) – ruote del Lotto 1997-2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 428 concorsi di prova: 0.383 numeri indovinati in media (caso 0.400), 6 volte almeno 3 punti
+   p = 0.7212   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Gli amici abituali dei numeri appena usciti – ruote del Lotto 1997-2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 428 concorsi di prova: 0.404 numeri indovinati in media (caso 0.400), 1 volte almeno 3 punti
+   p = 0.4417   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Modello di apprendimento automatico (regressione logistica) – ruote del Lotto 1997-2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 428 concorsi di prova: 0.407 numeri indovinati in media (caso 0.400), 1 volte almeno 3 punti
+   p = 0.4098   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I più frequenti di sempre – macchina SuperEnalotto dal 2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 864 concorsi di prova: 0.427 numeri indovinati in media (caso 0.400), 2 volte almeno 3 punti
+   p = 0.0899   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I più frequenti negli ultimi 50 concorsi – macchina SuperEnalotto dal 2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 864 concorsi di prova: 0.388 numeri indovinati in media (caso 0.400), 2 volte almeno 3 punti
+   p = 0.7282   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I più frequenti negli ultimi 200 concorsi – macchina SuperEnalotto dal 2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 864 concorsi di prova: 0.384 numeri indovinati in media (caso 0.400), 1 volte almeno 3 punti
+   p = 0.7821   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I meno frequenti di sempre – macchina SuperEnalotto dal 2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 864 concorsi di prova: 0.394 numeri indovinati in media (caso 0.400), 1 volte almeno 3 punti
+   p = 0.6259   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I ritardatari (assenti da più tempo) – macchina SuperEnalotto dal 2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 864 concorsi di prova: 0.380 numeri indovinati in media (caso 0.400), 0 volte almeno 3 punti
+   p = 0.8434   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Ripetere i numeri appena usciti – macchina SuperEnalotto dal 2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 864 concorsi di prova: 0.366 numeri indovinati in media (caso 0.400), 2 volte almeno 3 punti
+   p = 0.9551   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I vicini (±1) dei numeri appena usciti – macchina SuperEnalotto dal 2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 864 concorsi di prova: 0.392 numeri indovinati in media (caso 0.400), 3 volte almeno 3 punti
+   p = 0.6474   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Catena di Markov (chi segue chi) – macchina SuperEnalotto dal 2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 864 concorsi di prova: 0.392 numeri indovinati in media (caso 0.400), 6 volte almeno 3 punti
+   p = 0.6474   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Gli amici abituali dei numeri appena usciti – macchina SuperEnalotto dal 2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 864 concorsi di prova: 0.419 numeri indovinati in media (caso 0.400), 2 volte almeno 3 punti
+   p = 0.1736   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Modello di apprendimento automatico (regressione logistica) – macchina SuperEnalotto dal 2009
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 864 concorsi di prova: 0.416 numeri indovinati in media (caso 0.400), 2 volte almeno 3 punti
+   p = 0.2212   p corr. = 1.0000
+
+VERDETTO
+--------
+ATTENZIONE – in macchina SuperEnalotto dal 2009, ruote del Lotto 1997-2009 l'ordine di uscita riportato dall'archivio non è credibile (troppi concorsi già in ordine crescente o quasi). Le prove basate sull'ordine (posizione di uscita, palline estratte una dopo l'altra) in quelle epoche descrivono come sono stati pubblicati i numeri, NON la macchina: non vanno considerate.
+Trovate 1 anomalie statisticamente solide:
+  - Somma dei numeri estratti (ruote del Lotto 1997-2009)
+Vanno confermate sulle estrazioni future prima di usarle: se un difetto è reale continuerà a vedersi; se era un caso, sparirà.
+CAMPIONE DELL'ARCHIVIO (numeri nell'ordine in cui sono pubblicati)
+03/12/1997  41 39 36 76 20 72  
+06/12/1997  29 25  4 52  2 30  
+10/12/1997  23 14  2 88  1 78  
+13/12/1997  61 34 22 77  5 62  
+17/12/1997  80 77 65 86 10 81  
+20/12/1997  58 48 27 90  3 78  
+24/12/1997  75 63 59 87 13 85  
+27/12/1997  43 35 26 67  8 55  
+31/12/1997  76 71 36 89 34 86  
+03/01/1998  72 36 29 90  2 82  
+07/01/1998  66 29 24 23 73 20  
+10/01/1998  60 40 37 33 86 24  
+22/02/2014  38 28 34 19 82 17  
+25/02/2014  26 51 70 54 52 88  
+27/02/2014  59 54 86 68 32 19  
+01/03/2014  90 56 47  8  7 79  
+04/03/2014  51 65 76 61 40 46  
+06/03/2014  67 66 61 79 76 15  
+08/03/2014  50 82 45 35 51 87  
+11/03/2014  56 51 58 53 81 49  
+13/03/2014  40 57 28 58 78 10  
+15/03/2014   5 24  1 22 41 43  
+18/03/2014  39 58 38 66 83 46  
+20/03/2014  49 28 51 77 15 18  
+08/10/2026  29 52 57 60 65 72  ordinati
+09/10/2026  18 35 44 56 76 82  ordinati
+10/10/2026  26 41 53 61 69 79  ordinati
+13/10/2026   4 21 30 33 38 78  ordinati
+15/10/2026  16 24 46 49 77 80  ordinati
+16/10/2026  35 41 44 54 55 76  ordinati
+17/10/2026  23 25 37 55 77 86  ordinati
+20/10/2026  13 25 37 45 50 72  ordinati
+22/10/2026   3 13 14 18 62 82  ordinati
+23/10/2026  29 34 41 66 81 83  ordinati
+24/10/2026  11 17 32 50 73 80  ordinati
+27/10/2026  23 34 44 48 64 70  ordinati
+29/10/2026  13 20 41 60 77 85  ordinati
+30/10/2026  19 24 49 62 64 85  ordinati
+31/10/2026   4 18 20 33 46 78  ordinati
+03/11/2026  11 13 14 47 52 71  ordinati
+05/11/2026  17 21 28 29 51 56  ordinati
+06/11/2026   5 20 28 47 50 67  ordinati
+07/11/2026  38 41 54 59 80 85  ordinati
+10/11/2026  47 73 74 78 82 90  ordinati
+12/11/2026   3 12 32 63 79 82  ordinati
+13/11/2026  23 24 55 56 82 86  ordinati
+14/11/2026  26 40 49 64 66 74  ordinati
+17/11/2026   1  2 10 79 85 90  ordinati
+19/11/2026  22 38 54 61 68 75  ordinati
+anno 1997: 9 concorsi, già in ordine crescente 0
+anno 1998: 104 concorsi, già in ordine crescente 0
+anno 1999: 104 concorsi, già in ordine crescente 0
+anno 2000: 105 concorsi, già in ordine crescente 0
+anno 2001: 105 concorsi, già in ordine crescente 0
+anno 2002: 109 concorsi, già in ordine crescente 0
+anno 2003: 105 concorsi, già in ordine crescente 0
+anno 2004: 104 concorsi, già in ordine crescente 0
+anno 2005: 133 concorsi, già in ordine crescente 0
+anno 2006: 156 concorsi, già in ordine crescente 0
+anno 2007: 156 concorsi, già in ordine crescente 0
+anno 2008: 157 concorsi, già in ordine crescente 0
+anno 2009: 157 concorsi, già in ordine crescente 0
+anno 2010: 156 concorsi, già in ordine crescente 0
+anno 2011: 157 concorsi, già in ordine crescente 0
+anno 2012: 156 concorsi, già in ordine crescente 0
+anno 2013: 157 concorsi, già in ordine crescente 0
+anno 2014: 156 concorsi, già in ordine crescente 0
+anno 2015: 157 concorsi, già in ordine crescente 0
+anno 2016: 157 concorsi, già in ordine crescente 0
+anno 2017: 156 concorsi, già in ordine crescente 0
+anno 2018: 156 concorsi, già in ordine crescente 1
+anno 2019: 157 concorsi, già in ordine crescente 1
+anno 2020: 139 concorsi, già in ordine crescente 0
+anno 2021: 156 concorsi, già in ordine crescente 0
+anno 2022: 157 concorsi, già in ordine crescente 0
+anno 2023: 182 concorsi, già in ordine crescente 16
+anno 2024: 208 concorsi, già in ordine crescente 208
+anno 2025: 208 concorsi, già in ordine crescente 208
+anno 2026: 185 concorsi, già in ordine crescente 185

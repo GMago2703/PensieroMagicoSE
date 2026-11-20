@@ -1,0 +1,184 @@
+I CONCORSI CON IL 6 – SuperEnalotto
+Concorsi con i vincitori noti: 4293 su 4304; concorsi con almeno un 6: 119 (vincitori del 6 in tutto: 134).
+
+Ogni confronto mette il gruppo dei 6 contro migliaia di gruppi uguali per grandezza presi a caso dagli altri concorsi. p = probabilità che la differenza sia solo fortuna (corretta con Holm).
+
+CONFRONTI
+---------
+[COMPATIBILE CON IL CASO] Numeri da 1 a 31 (date di nascita)
+   media nei concorsi con il 6: 2.19  –  negli altri: 2.01
+   p = 0.0834   p corr. = 0.9173
+[COMPATIBILE CON IL CASO] Numeri da 1 a 12 (mesi)
+   media nei concorsi con il 6: 0.86  –  negli altri: 0.78
+   p = 0.3493   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Numeri pari
+   media nei concorsi con il 6: 3.03  –  negli altri: 2.97
+   p = 0.5819   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Somma dei numeri
+   media nei concorsi con il 6: 267.71  –  negli altri: 276.66
+   p = 0.1237   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Coppie di numeri consecutivi
+   media nei concorsi con il 6: 0.25  –  negli altri: 0.33
+   p = 0.1199   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Decine diverse occupate
+   media nei concorsi con il 6: 4.71  –  negli altri: 4.65
+   p = 0.3872   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Numeri multipli di 5
+   media nei concorsi con il 6: 1.22  –  negli altri: 1.21
+   p = 0.8880   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Distanza tra il più piccolo e il più grande
+   media nei concorsi con il 6: 66.55  –  negli altri: 65.14
+   p = 0.2876   p corr. = 1.0000
+[ANOMALIA] Popolarità della sestina (vincitori di 3 punti rispetto al solito)
+   concorsi con il 6: 1.29 volte il solito  –  altri: 1.06
+   p = 0.0001   p corr. = 0.0013
+[COMPATIBILE CON IL CASO] Numeri in comune tra le sestine del 6
+   in media 0.399 numeri in comune tra due sestine del 6 (caso 0.400)
+   p = 0.9135   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Numeri in comune con il concorso precedente
+   concorsi con il 6: 0.412  –  altri: 0.391
+   p = 0.6950   p corr. = 1.0000
+[ANOMALIA] Giorno della settimana
+   lunedì 3 (attesi 2.4), martedì 20 (attesi 30.0), mercoledì 19 (attesi 10.9), giovedì 19 (attesi 30.3), venerdì 3 (attesi 4.9), sabato 55 (attesi 40.5)
+   p = 0.0014   p corr. = 0.0164
+[COMPATIBILE CON IL CASO] Mese dell'anno
+   gennaio 12 (attesi 10.1), febbraio 9 (attesi 9.1), marzo 9 (attesi 10.0), aprile 11 (attesi 9.4), maggio 13 (attesi 10.1), giugno 12 (attesi 9.8), luglio 7 (attesi 10.3), agosto 8 (attesi 10.3), settembre 8 (attesi 10.0), ottobre 11 (attesi 10.4), novembre 13 (attesi 9.7), dicembre 6 (attesi 10.0)
+   p = 0.8132   p corr. = 1.0000
+
+Numeri più presenti nelle sestine del 6 (informativo: con pochi concorsi le differenze sono soprattutto caso): 22 (14 volte, attese 7.9), 4 (13 volte, attese 7.9), 8 (13 volte, attese 7.9), 55 (13 volte, attese 7.9), 17 (12 volte, attese 7.9), 29 (12 volte, attese 7.9), 40 (12 volte, attese 7.9), 56 (12 volte, attese 7.9)
+
+VERDETTO
+--------
+Differenze solide trovate: Popolarità della sestina (vincitori di 3 punti rispetto al solito); Giorno della settimana.
+La più importante è la popolarità: il 6 arriva più spesso quando la sestina estratta contiene numeri che molte persone giocano. Non è la macchina a 'scegliere' quelle sestine: semplicemente, se più persone le hanno giocate, è più probabile che una di loro vinca.
+Il 6 esce più spesso in certi giorni (soprattutto il sabato) perché quel giorno si giocano più schedine: più giocate, più probabilità che qualcuno abbia la sestina estratta. Per chi gioca la probabilità di vincere è la stessa ogni giorno.
+Le sestine del 6 non hanno 'variabili' in comune: tra due sestine del 6 i numeri condivisi sono quelli attesi dal caso, e i numeri più presenti nel gruppo non vanno oltre quanto il caso produce con questo numero di concorsi.
+Conseguenza pratica: la probabilità di vincere è la stessa per ogni combinazione, ma le combinazioni poco giocate, se escono, si dividono con meno persone.
+
+ELENCO DEI CONCORSI CON IL 6
+17/01/1998  29 37 49 51 55 74  vincitori 1  11.807.025.200,00 €  popolarità 2.17
+21/02/1998   4 19 47 60 73 84  vincitori 1  8.038.854.400,00 €  popolarità 1.36
+18/04/1998  17 38 47 56 76 85  vincitori 1  11.979.902.900,00 €  popolarità 1.45
+23/05/1998   7 12 24 37 58 81  vincitori 1  6.925.219.200,00 €  popolarità 1.20
+06/06/1998  13 18 22 56 67 72  vincitori 1  8.786.255.400,00 €  popolarità 1.26
+11/07/1998  15 16 17 57 60 63  vincitori 1  2.437.718.200,00 €  popolarità 1.12
+19/09/1998   3 33 45 57 78 80  vincitori 1  17.850.402.700,00 €  popolarità 2.18
+31/10/1998   1 21 30 61 73 84  vincitori 1  63.327.737.500,00 €  popolarità 1.90
+07/11/1998  15 19 25 33 40 68  vincitori 1  9.786.065.241,00 €  popolarità 1.32
+25/11/1998  32 39 52 56 69 85  vincitori 1  23.945.533.300,00 €  popolarità 0.87
+23/12/1998   3  9 14 26 47 79  vincitori 2  22.107.142.300,00 €  popolarità 1.26
+06/02/1999   9 10 26 30 44 54  vincitori 1  85.689.273.700,00 €  popolarità 2.28
+13/03/1999   6 18 20 34 72 90  vincitori 1  52.331.306.600,00 €  popolarità 1.29
+03/04/1999  33 41 47 48 60 80  vincitori 1  24.794.726.300,00 €  popolarità 1.06
+03/05/1999   8 49 50 65 66 69  vincitori 1  28.128.405.700,00 €  popolarità 1.06
+16/06/1999   5 20 29 41 56 86  vincitori 1  38.307.723.200,00 €  popolarità 1.45
+19/06/1999  13 23 31 58 67 68  vincitori 1  2.812.448.860,00 €  popolarità 1.35
+03/07/1999   3  6  7 53 65 90  vincitori 1  10.432.547.404,00 €  popolarità 1.53
+29/09/1999   4 16 27 55 67 72  vincitori 1  85.867.406.300,00 €  popolarità 2.51
+30/10/1999  16 21 29 39 70 90  vincitori 1  36.307.522.300,00 €  popolarità 1.52
+03/01/2000  17 38 48 51 55 62  vincitori 1  53.483.084.200,00 €  popolarità 1.37
+22/01/2000  15 21 55 60 70 90  vincitori 1  20.642.655.900,00 €  popolarità 1.27
+04/03/2000   7 19 29 33 40 88  vincitori 2  20.610.734.200,00 €  popolarità 1.29
+22/04/2000  24 35 39 48 82 85  vincitori 2  21.806.783.500,00 €  popolarità 0.95
+15/07/2000   5 18 24 51 55 74  vincitori 1  56.534.443.200,00 €  popolarità 1.67
+09/08/2000  18 36 47 62 75 80  vincitori 1  17.169.160.786,00 €  popolarità 0.82
+08/11/2000  22 42 50 53 78 83  vincitori 1  59.421.528.500,00 €  popolarità 1.31
+11/11/2000   9 27 45 66 68 71  vincitori 1  3.458.958.500,00 €  popolarità 1.24
+22/11/2000  14 25 39 50 72 89  vincitori 1  9.555.793.500,00 €  popolarità 0.91
+25/11/2000   3 14 49 52 65 81  vincitori 1  3.337.756.300,00 €  popolarità 0.98
+20/01/2001  14 25 28 42 82 90  vincitori 1  25.761.224,16 €  popolarità 1.29
+21/03/2001  39 43 56 61 65 81  vincitori 5  1.101.908,99 €  popolarità 1.06
+11/04/2001  11 41 52 71 81 89  vincitori 1  9.473.453,60 €  popolarità 1.06
+30/05/2001  11 18 42 44 45 83  vincitori 1  20.743.743,38 €  popolarità 0.96
+27/10/2001  25 32 36 46 57 58  vincitori 1  36.008.710,05 €  popolarità 1.16
+31/10/2001   5 11 17 21 28 63  vincitori 1  1.542.373,43 €  popolarità 1.40
+05/01/2002  50 52 54 76 77 86  vincitori 1  30.313.122,32 €  popolarità 1.08
+17/04/2002  24 27 35 43 64 88  vincitori 1  40.860.370,58 €  popolarità 1.02
+20/04/2002  19 42 45 51 62 88  vincitori 1  1.411.242,95 €  popolarità 1.02
+27/04/2002  21 37 41 45 60 71  vincitori 1  2.606.531,89 €  popolarità 1.04
+14/09/2002  20 23 30 44 78 88  vincitori 2  14.705.318,30 €  popolarità 1.66
+12/12/2002   3  8 21 33 46 86  vincitori 1  38.601.808,42 €  popolarità 0.94
+08/03/2003   8 27 34 42 83 88  vincitori 1  33.892.459,67 €  popolarità 1.23
+13/08/2003   9 11 39 44 49 86  vincitori 1  65.985.105,96 €  popolarità 2.99
+04/10/2003  22 62 68 73 75 87  vincitori 1  20.756.234,57 €  popolarità 0.92
+08/11/2003   7 30 43 52 57 82  vincitori 1  12.545.912,98 €  popolarità 1.11
+22/11/2003   3 27 54 65 81 83  vincitori 1  4.954.548,57 €  popolarità 1.08
+24/03/2004  24 50 58 69 87 88  vincitori 1  45.740.866,23 €  popolarità 0.93
+12/06/2004  38 44 46 55 67 85  vincitori 1  27.574.453,25 €  popolarità 1.07
+30/06/2004  10 22 34 43 62 68  vincitori 1  5.504.317,28 €  popolarità 0.87
+07/07/2004  14 23 29 44 48 74  vincitori 1  2.216.430,09 €  popolarità 0.93
+27/10/2004  10 14 17 56 65 84  vincitori 1  37.987.704,10 €  popolarità 1.33
+04/05/2005   1 29 49 53 56 74  vincitori 1  71.767.565,57 €  popolarità 1.14
+08/06/2005   6  8 28 29 32 73  vincitori 1  12.347.190,02 €  popolarità 1.11
+25/06/2005   4  8 38 60 82 89  vincitori 1  6.088.193,66 €  popolarità 1.07
+20/09/2005  37 40 70 71 75 80  vincitori 1  41.563.490,46 €  popolarità 0.93
+17/12/2005  20 23 42 70 80 90  vincitori 1  62.524.371,05 €  popolarità 1.52
+07/02/2006  11 18 27 37 65 72  vincitori 1  36.598.230,91 €  popolarità 1.16
+04/04/2006  13 25 45 70 78 88  vincitori 1  34.912.619,77 €  popolarità 0.99
+01/06/2006  18 33 51 66 87 90  vincitori 1  34.435.203,35 €  popolarità 0.97
+19/09/2006   4  6  8 14 21 28  vincitori 1  61.042.310,24 €  popolarità 1.95
+02/11/2006   2  4  5  9 22 75  vincitori 1  24.115.679,05 €  popolarità 1.98
+20/01/2007  18 47 55 64 74 89  vincitori 1  43.692.245,46 €  popolarità 1.18
+19/05/2007   7  8 13 17 38 43  vincitori 1  71.439.610,83 €  popolarità 2.41
+22/05/2007   1 44 67 77 88 90  vincitori 1  1.709.467,29 €  popolarità 1.44
+31/05/2007   7 21 36 38 77 79  vincitori 1  4.021.531,55 €  popolarità 0.89
+14/06/2007  12 42 44 46 52 86  vincitori 1  6.894.487,60 €  popolarità 0.90
+25/08/2007   4 23 25 30 34 57  vincitori 1  34.393.724,84 €  popolarità 1.19
+03/11/2007  11 31 44 64 83 89  vincitori 1  36.119.504,90 €  popolarità 1.13
+13/11/2007   1  2 33 62 68 79  vincitori 1  5.015.468,63 €  popolarità 0.78
+17/01/2008   4 15 21 35 59 73  vincitori 1  33.588.491,07 €  popolarità 0.99
+05/02/2008  22 28 75 78 83 87  vincitori 1  9.453.428,88 €  popolarità 0.81
+26/04/2008  56 64 72 81 83 86  vincitori 1  40.595.858,78 €  popolarità 1.25
+23/10/2008   7 20 21 74 75 81  vincitori 1  100.756.197,30 €  popolarità 2.77
+02/12/2008   8  9 17 33 80 86  vincitori 1  45.084.494,32 €  popolarità 1.39
+31/01/2009   1  3  8 38 83 88  vincitori 5  1.589.436,74 €  popolarità 2.09
+22/08/2009  10 11 27 45 79 88  vincitori 1  147.807.299,08 €  popolarità 1.87
+09/02/2010  20 22 24 40 51 80  vincitori 2  69.511.157,30 €  popolarità 1.18
+30/10/2010   4 26 40 54 55 67  vincitori 1  177.729.043,00 €  popolarità 1.56
+27/12/2010   4 39 62 67 69 78  vincitori 2  17.973.923,50 €  popolarità 0.86
+07/01/2011  14 25 44 54 78 89  vincitori 1  13.570.628,62 €  popolarità 0.78
+28/04/2011  38 42 45 69 86 90  vincitori 1  47.432.499,23 €  popolarità 1.05
+22/09/2011   4  6 27 37 45 58  vincitori 1  65.038.202,47 €  popolarità 1.00
+19/05/2012   1 23 27 33 37 85  vincitori 1  94.836.378,29 €  popolarità 1.42
+24/05/2012  10 29 32 43 56 90  vincitori 1  25.800.137,57 €  popolarità 1.16
+02/08/2012   2  8 55 66 73 83  vincitori 1  18.840.052,58 €  popolarità 1.15
+30/08/2012  17 20 22 40 52 62  vincitori 1  12.321.539,91 €  popolarità 0.92
+16/03/2013  19 41 43 48 73 81  vincitori 1  53.250.221,77 €  popolarità 1.31
+29/06/2013  17 22 54 69 82 88  vincitori 1  40.706.447,91 €  popolarità 1.44
+27/07/2013  17 19 40 43 72 84  vincitori 1  13.912.039,95 €  popolarità 1.25
+15/10/2013  22 36 60 64 71 80  vincitori 1  18.339.932,42 €  popolarità 0.79
+23/01/2014   3  6 12 13 19 67  vincitori 1  26.722.827,62 €  popolarità 2.24
+18/02/2014  15 36 49 62 75 82  vincitori 1  11.952.610,83 €  popolarità 0.74
+24/05/2014   3 22 38 70 77 81  vincitori 1  20.836.103,22 €  popolarità 1.22
+22/11/2014  22 25 55 58 82 85  vincitori 1  40.192.368,22 €  popolarità 1.55
+30/12/2014   5 24 51 76 77 79  vincitori 2  9.022.485,33 €  popolarità 0.96
+10/01/2015   2 13 22 37 48 90  vincitori 1  4.327.432,81 €  popolarità 1.60
+03/02/2015  12 29 43 56 60 75  vincitori 1  4.858.953,03 €  popolarità 0.93
+21/03/2015   4  7  9 19 55 58  vincitori 1  9.577.624,94 €  popolarità 2.53
+16/07/2015  22 27 29 49 69 87  vincitori 1  21.856.879,71 €  popolarità 1.09
+27/10/2016   3 12 23 71 76 83  vincitori 1  163.538.706,00 €  popolarità 1.40
+25/02/2017  11 17 40 69 84 85  vincitori 1  93.720.843,46 €  popolarità 1.23
+01/08/2017   1  8 28 54 82 90  vincitori 1  77.735.412,31 €  popolarità 2.10
+17/04/2018  12 23 39 54 72 73  vincitori 1  130.195.242,12 €  popolarità 1.07
+23/06/2018   4 17 29 55 67 70  vincitori 1  51.316.029,80 €  popolarità 1.44
+13/08/2019   7 32 41 59 75 76  vincitori 1  209.160.441,54 €  popolarità 0.97
+17/09/2019   9 18 26 43 60 79  vincitori 1  66.369.584,83 €  popolarità 1.07
+28/01/2020  16 21 33 50 57 89  vincitori 1  67.218.272,10 €  popolarità 0.94
+07/07/2020  16 24 29 53 73 88  vincitori 1  59.472.355,48 €  popolarità 0.96
+22/05/2021   1  7 37 43 63 81  vincitori 1  156.294.151,36 €  popolarità 1.46
+16/02/2023   1 38 47 52 56 66  vincitori 1  371.133.424,51 €  popolarità 1.02
+25/03/2023   4 15 26 27 72 82  vincitori 1  73.808.593,28 €  popolarità 1.35
+10/06/2023   8 30 33 40 64 78  vincitori 1  42.590.153,89 €  popolarità 1.09
+16/11/2023   9 10 19 40 52 56  vincitori 1  85.102.812,24 €  popolarità 2.02
+10/05/2024   6 20 40 55 71 80  vincitori 1  101.511.953,21 €  popolarità 0.87
+15/10/2024   1 23 44 45 47 60  vincitori 1  89.221.270,22 €  popolarità 1.07
+20/03/2025  36 40 49 54 66 83  vincitori 1  88.232.801,88 €  popolarità 0.77
+22/05/2025   2 19 23 46 49 72  vincitori 1  35.415.534,71 €  popolarità 1.31
+11/09/2026   8 13 16 52 64 70  vincitori 1  223.173.416,83 €  popolarità 1.06
+
+MODELLO DI POPOLARITÀ: R² fuori campione 0.479 su 4292 concorsi
+Più giocati: 9 (+21%), 11 (+21%), 8 (+20%), 7 (+19%), 19 (+18%), 10 (+17%), 3 (+16%), 12 (+16%), 6 (+16%), 5 (+14%), 4 (+14%), 90 (+12%), 1 (+12%), 17 (+10%), 2 (+9%)
+Meno giocati: 58 (-6%), 64 (-6%), 63 (-6%), 46 (-6%), 65 (-7%), 75 (-7%), 84 (-7%), 78 (-7%), 59 (-7%), 32 (-7%), 60 (-8%), 34 (-8%), 76 (-8%), 62 (-9%), 61 (-10%)
+Peso delle coppie consecutive: -0.016
+Popolarità (percentile) delle sestine del 6: 29, 71, 32, 91, 70, 38, 42, 31, 78, 9, 94, 91, 92, 9, 44, 68, 44, 99, 86, 77, 31, 71, 94, 12, 75, 11, 17, 78, 31, 54, 67, 5, 56, 68, 5, 99, 8, 34, 45, 21, 52, 90, 68, 86, 11, 39, 69, 22, 15, 44, 51, 72, 51, 87, 69, 8, 77, 86, 52, 56, 100, 100, 37, 98, 81, 64, 35, 64, 43, 53, 57, 17, 15, 79, 96, 96, 95, 46, 65, 25, 27, 40, 91, 83, 77, 81, 58, 52, 68, 66, 11, 100, 4, 76, 44, 37, 93, 40, 100, 57, 85, 70, 97, 68, 86, 14, 65, 41, 50, 80, 46, 79, 41, 98, 72, 58, 8, 86, 79
+Media percentile sestine del 6: 57.8 (50 = come il caso)

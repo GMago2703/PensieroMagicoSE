@@ -1,0 +1,187 @@
+Archivio vero scaricato il 20/11/2026
+
+LABORATORIO – Eurojackpot: la casualità è davvero casuale?
+Estrazioni studiate: 1008. Epoche: tutto l'archivio (1008 concorsi)
+Prove eseguite: 24 (confronto con 500 archivi simulati perfettamente casuali dove serve).
+
+Sensibilità (tutto l'archivio): una pallina dovrebbe uscire almeno il 43% più (o meno) del normale per essere scoperta in modo affidabile; difetti più piccoli resterebbero invisibili con questi dati.
+
+Come leggere: p = probabilità di vedere un risultato così, o più strano, se le estrazioni fossero perfettamente casuali. Con tante prove qualche p piccola esce per fortuna: si parla di ANOMALIA solo se resta sotto il 5% dopo la correzione di Holm (p corr.).
+
+1. LA MACCHINA (impronte di difetti fisici)
+-------------------------------------------
+[COMPATIBILE CON IL CASO] Frequenza di ogni numero – tutto l'archivio
+   Cerca: palline che escono più o meno delle altre (peso, dimensione, usura)
+   Misura: uscite per numero da 80 a 117, atteso 100.8 ciascuno
+   p = 0.8880   p corr. = 1.0000
+   · più uscito: 20 (117), 35 (117), 17 (116)
+   · meno uscito: 48 (80), 36 (87), 28 (88)
+   · differenze di questa ampiezza sono normali con il caso se p non è piccola
+[COMPATIBILE CON IL CASO] Il numero più anomalo – tutto l'archivio
+   Cerca: una singola pallina difettosa (più pesante, più leggera, rovinata)
+   Misura: il 48 è uscito 80 volte (atteso 100.8, -2.18 deviazioni)
+   p = 1.0000   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Coppie che escono insieme – tutto l'archivio
+   Cerca: palline che tendono a uscire nella stessa estrazione (attrito, cariche elettrostatiche)
+   Misura: dispersione delle 1225 coppie: -1.87 deviazioni dal caso
+   p = 0.0610   p corr. = 1.0000
+   · coppie più frequenti: 34-49 (19 volte, atteso 8.2), 1-7 (17 volte, atteso 8.2), 16-30 (17 volte, atteso 8.2)
+[COMPATIBILE CON IL CASO] La coppia più frequente – tutto l'archivio
+   Cerca: due palline che si 'attirano' in modo particolare
+   Misura: coppia più frequente 19 volte; negli archivi casuali in media 19.1 (massimo 26)
+   p = 0.6587   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Numeri consecutivi nella stessa estrazione – tutto l'archivio
+   Cerca: palline con numeri vicini (spesso caricate vicine) che escono insieme
+   Misura: 0.386 coppie consecutive per estrazione (caso 0.400)
+   p = 0.4340   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Numeri della stessa decina – tutto l'archivio
+   Cerca: gruppi di palline (per esempio caricate per decine) che non si mescolano bene
+   Misura: 1.829 coppie della stessa decina per estrazione (caso 1.840)
+   p = 0.7742   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Somma dei numeri estratti – tutto l'archivio
+   Cerca: una macchina che preferisce numeri bassi o alti
+   Misura: somma media 126.5 (attesa 127.5)
+   p = 0.2998   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Stabilità nel tempo – tutto l'archivio
+   Cerca: un cambio di macchina, di palline o di regolazione che sposta le preferenze
+   Misura: frequenze confrontate in 4 periodi consecutivi
+   p = 0.5365   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Giorno della settimana – tutto l'archivio
+   Cerca: condizioni diverse nei vari giorni (personale, temperatura, umidità, macchina)
+   Misura: frequenze confrontate tra martedì, venerdì
+   p = 0.9610   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Frequenza degli Euronumeri (formula 2 su 12) – tutto l'archivio
+   Cerca: palline degli Euronumeri che escono più delle altre
+   Misura: 486 concorsi
+   p = 0.2091   p corr. = 1.0000
+
+2. LA MEMORIA (legami tra un concorso e i successivi)
+-----------------------------------------------------
+[COMPATIBILE CON IL CASO] Numeri ripetuti dal concorso precedente – tutto l'archivio
+   Cerca: palline appena uscite che tornano (o evitano di tornare) subito
+   Misura: in comune con il concorso prima: 0.502 numeri (caso 0.500)
+   p = 0.9025   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Ripetizioni a distanza di 2-10 concorsi – tutto l'archivio
+   Cerca: una 'memoria' più lunga, come se la macchina ricordasse le estrazioni recenti
+   Misura: numeri in comune con ognuno dei 9 concorsi precedenti
+   p = 0.6140   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Vicini dei numeri appena usciti – tutto l'archivio
+   Cerca: dopo l'uscita del 40, più probabilità per 39 e 41 nel concorso dopo
+   Misura: 0.842 vicini per estrazione (caso 0.864)
+   p = 0.3924   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Ritardi (intervalli tra due uscite dello stesso numero) – tutto l'archivio
+   Cerca: numeri 'maturi' che, dopo un lungo ritardo, escono più del dovuto (o il contrario)
+   Misura: 4990 intervalli, ritardo medio 9.9 (caso 10.0)
+   p = 0.8643   p corr. = 1.0000
+
+3. LA PREVISIONE (gara tra regole, giudicate solo sul futuro)
+-------------------------------------------------------------
+[COMPATIBILE CON IL CASO] I più frequenti di sempre – tutto l'archivio
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 303 concorsi di prova: 0.515 numeri indovinati in media (caso 0.500), 2 volte almeno 3 punti
+   p = 0.3438   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I più frequenti negli ultimi 50 concorsi – tutto l'archivio
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 303 concorsi di prova: 0.512 numeri indovinati in media (caso 0.500), 2 volte almeno 3 punti
+   p = 0.3772   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I più frequenti negli ultimi 200 concorsi – tutto l'archivio
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 303 concorsi di prova: 0.475 numeri indovinati in media (caso 0.500), 4 volte almeno 3 punti
+   p = 0.7486   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I meno frequenti di sempre – tutto l'archivio
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 303 concorsi di prova: 0.475 numeri indovinati in media (caso 0.500), 0 volte almeno 3 punti
+   p = 0.7486   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I ritardatari (assenti da più tempo) – tutto l'archivio
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 303 concorsi di prova: 0.465 numeri indovinati in media (caso 0.500), 1 volte almeno 3 punti
+   p = 0.8260   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Ripetere i numeri appena usciti – tutto l'archivio
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 303 concorsi di prova: 0.531 numeri indovinati in media (caso 0.500), 1 volte almeno 3 punti
+   p = 0.1980   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] I vicini (±1) dei numeri appena usciti – tutto l'archivio
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 303 concorsi di prova: 0.462 numeri indovinati in media (caso 0.500), 0 volte almeno 3 punti
+   p = 0.8480   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Catena di Markov (chi segue chi) – tutto l'archivio
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 303 concorsi di prova: 0.548 numeri indovinati in media (caso 0.500), 5 volte almeno 3 punti
+   p = 0.0975   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Gli amici abituali dei numeri appena usciti – tutto l'archivio
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 303 concorsi di prova: 0.525 numeri indovinati in media (caso 0.500), 3 volte almeno 3 punti
+   p = 0.2514   p corr. = 1.0000
+[COMPATIBILE CON IL CASO] Modello di apprendimento automatico (regressione logistica) – tutto l'archivio
+   Cerca: se questa regola indovina più numeri del caso sui concorsi che non ha mai visto
+   Misura: 303 concorsi di prova: 0.485 numeri indovinati in media (caso 0.500), 0 volte almeno 3 punti
+   p = 0.6562   p corr. = 1.0000
+
+VERDETTO
+--------
+Nessuna anomalia statisticamente solida: con questi dati le estrazioni si comportano come una sorgente perfettamente casuale. Nessuna regola di previsione batte il caso in modo affidabile sui concorsi che non ha visto.
+CAMPIONE DELL'ARCHIVIO (numeri nell'ordine in cui sono pubblicati)
+23/03/2012   5  8 21 37 46  ordinati
+30/03/2012   5  7 12 19 26  ordinati
+06/04/2012   7  8 34 36 38  ordinati
+13/04/2012   5 11 12 27 32  ordinati
+20/04/2012  10 16 30 41 45  ordinati
+27/04/2012  10 13 19 40 45  ordinati
+04/05/2012  29 30 35 41 45  ordinati
+11/05/2012  15 21 38 39 47  ordinati
+18/05/2012  12 18 43 44 46  ordinati
+25/05/2012   4 11 26 32 41  ordinati
+01/06/2012  11 28 34 37 38  ordinati
+08/06/2012  10 15 16 36 44  ordinati
+19/11/2021   6 12 20 21 34  ordinati
+26/11/2021   7 17 21 37 39  ordinati
+03/12/2021   2  5 13 15 23  ordinati
+10/12/2021   8  9 30 34 48  ordinati
+17/12/2021   6  8 16 44 50  ordinati
+24/12/2021   3 17 21 35 42  ordinati
+31/12/2021   7 16 36 42 43  ordinati
+07/01/2022   8 17 21 23 47  ordinati
+14/01/2022   9 15 27 41 44  ordinati
+21/01/2022   2  5  9 29 32  ordinati
+28/01/2022   5 21 23 29 35  ordinati
+04/02/2022  12 18 27 33 41  ordinati
+25/08/2026   4  5  7 48 50  ordinati
+28/08/2026  23 34 39 45 49  ordinati
+01/09/2026   9 14 35 43 50  ordinati
+04/09/2026   5 14 31 33 43  ordinati
+08/09/2026  14 27 34 36 47  ordinati
+11/09/2026  14 21 35 37 49  ordinati
+15/09/2026   5  6 10 27 42  ordinati
+18/09/2026   4 25 30 32 33  ordinati
+22/09/2026  17 23 33 46 47  ordinati
+25/09/2026   2  7 10 29 30  ordinati
+29/09/2026  21 30 36 43 48  ordinati
+02/10/2026   4  6  7 17 45  ordinati
+06/10/2026   7 12 19 28 50  ordinati
+09/10/2026  18 38 41 43 46  ordinati
+13/10/2026  11 17 20 22 35  ordinati
+16/10/2026  12 24 25 29 45  ordinati
+20/10/2026   5 16 32 34 38  ordinati
+23/10/2026  15 20 23 29 30  ordinati
+27/10/2026  11 33 38 42 47  ordinati
+30/10/2026  21 26 37 39 42  ordinati
+03/11/2026   2  5 12 32 43  ordinati
+06/11/2026   7 30 32 35 44  ordinati
+10/11/2026   7 15 17 40 44  ordinati
+13/11/2026   5 12 27 35 44  ordinati
+17/11/2026   1  5  7 15 19  ordinati
+anno 2012: 41 concorsi, già in ordine crescente 41
+anno 2013: 52 concorsi, già in ordine crescente 52
+anno 2014: 52 concorsi, già in ordine crescente 52
+anno 2015: 52 concorsi, già in ordine crescente 52
+anno 2016: 53 concorsi, già in ordine crescente 53
+anno 2017: 52 concorsi, già in ordine crescente 52
+anno 2018: 52 concorsi, già in ordine crescente 52
+anno 2019: 52 concorsi, già in ordine crescente 52
+anno 2020: 52 concorsi, già in ordine crescente 52
+anno 2021: 53 concorsi, già in ordine crescente 53
+anno 2022: 92 concorsi, già in ordine crescente 92
+anno 2023: 104 concorsi, già in ordine crescente 104
+anno 2024: 105 concorsi, già in ordine crescente 105
+anno 2025: 104 concorsi, già in ordine crescente 104
+anno 2026: 92 concorsi, già in ordine crescente 92
