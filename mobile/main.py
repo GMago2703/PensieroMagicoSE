@@ -26,6 +26,7 @@ from kivy.uix.image import Image
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.progressbar import ProgressBar
+from kivy.uix.widget import Widget
 from kivy.uix.screenmanager import Screen, ScreenManager, SlideTransition
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.slider import Slider
@@ -174,34 +175,45 @@ def voce_home(descrizione, nome_icona, azione, colore) -> BoxLayout:
     return r
 
 
-BARRA = [("home", "home", "Home"), ("archivio", "archivio", "Archivio"), ("magico", "magico", "Magico P."),
+BARRA = [("home", "home", "Home"), ("magico", "magico", "Magico P."),
          ("sistemi", "sistemi", "Sistemi"), ("casuali", "casualita", "Casualità")]
+BARRA_ALTA = [("archivio", "archivio", "Archivio"), ("guida", "guida", "Guida"), (None, None, ""),
+              (None, "impostazioni", "Impostazioni")]        # Impostazioni: per ora inattiva
+ALTEZZA_BARRA = 50
 
 
 class Barra(BoxLayout):
-    """Barra in basso, sempre visibile: Home, Archivio, Magico Pensiero, Sistemi, Casualità."""
+    """Barra sempre visibile, in basso (Home, Magico Pensiero, Sistemi, Casualità) o in alto (Archivio, Guida,
+    Impostazioni). Le voci senza pagina sono inattive (sbiadite); le voci senza icona sono solo spazio."""
 
-    def __init__(self, app, **kw):
-        super().__init__(size_hint_y=None, height=dp(66), padding=(dp(4), dp(4)), **kw)
-        self.app = app
+    def __init__(self, app, voci=None, alto=False, **kw):
+        super().__init__(size_hint_y=None, height=dp(ALTEZZA_BARRA), padding=(dp(4), dp(2)), **kw)
+        self.app, self.alto = app, alto
         self.colore = sfondo(self, "#00000055")
         with self.canvas.before:
             Color(1, 1, 1, 0.25)
             self._linea = Rectangle()
         self.bind(pos=self._segui, size=self._segui)
         self.voci = {}
-        for pagina, ic, testo in BARRA:
+        for pagina, ic, testo in (voci or BARRA):
+            if ic is None:
+                self.add_widget(Widget())
+                continue
             v = Premibile(orientation="vertical", spacing=dp(1))
-            v.ic = icona(ic, size_hint_y=0.62)
-            v.l = adatta_testo(Label(text=testo, font_size=sp(11), bold=True, size_hint_y=0.38), 7)
+            v.ic = icona(ic, size_hint_y=0.6)
+            v.l = adatta_testo(Label(text=testo, font_size=sp(10), bold=True, size_hint_y=0.4), 7)
             v.add_widget(v.ic)
             v.add_widget(v.l)
-            v.bind(on_release=lambda *_, p=pagina: app.vai(p))
-            self.voci[pagina] = v
+            if pagina:
+                v.bind(on_release=lambda *_, p=pagina: app.vai(p))
+                self.voci[pagina] = v
+            else:
+                v.opacity = 0.35
             self.add_widget(v)
 
     def _segui(self, *_):
-        self._linea.pos, self._linea.size = (self.x, self.top - dp(1)), (self.width, dp(1))
+        y = self.y if self.alto else self.top - dp(1)
+        self._linea.pos, self._linea.size = (self.x, y), (self.width, dp(1))
 
     def evidenzia(self, pagina):
         pagina = {"condizione": "sistemi"}.get(pagina, pagina)
@@ -333,8 +345,9 @@ class Pagina(Screen):
 
     def on_pre_enter(self, *_):
         self.colore.rgba = hexc(colore_gioco(self.g))
-        if getattr(self.app, "barra", None) is not None:
-            self.app.barra.evidenzia(self.name)
+        for nome in ("barra", "barra_alta"):
+            if getattr(self.app, nome, None) is not None:
+                getattr(self.app, nome).evidenzia(self.name)
         if hasattr(self, "l_titolo"):
             self.l_titolo.text = f"{self.titolo} – {self.g.nome}"
         self.mostra()
@@ -1597,6 +1610,46 @@ def autotest_richiesto() -> bool:
         return False
 
 
+class PaginaGuida(Pagina):
+    """La guida: l'introduzione per Android e l'elenco dei capitoli; toccando un capitolo se ne legge il testo."""
+    titolo = "Guida"
+
+    def __init__(self, app, **kw):
+        super().__init__(app, name="guida", **kw)
+        self.capitolo = None
+
+    def on_pre_enter(self, *_):
+        self.capitolo = None                     # si entra sempre dall'indice
+        super().on_pre_enter(*_)
+
+    def _apri(self, cod):
+        self.capitolo = cod
+        self.mostra()
+        self.sv.scroll_y = 1
+
+    def mostra(self):
+        from pmse.core import guida as gd
+        c = self.corpo
+        c.clear_widgets()
+        capitoli = gd.capitoli(self.g)
+        if self.capitolo is None:
+            sch = Scheda()
+            paragrafi(sch, gd.intro_android(self.g))
+            c.add_widget(sch)
+            c.add_widget(adatta_testo(Label(text="Capitoli", bold=True, font_size=sp(18), color=hexc(LIME),
+                                            size_hint_y=None, height=dp(34))))
+            for cod, titolo, _ in capitoli:
+                c.add_widget(bottone(gd._pulisci_simboli(titolo).strip(), lambda cc=cod: self._apri(cc), VERDE,
+                                     alto=dp(46)))
+            return
+        titolo, html = next(((t, h) for i, t, h in capitoli if i == self.capitolo), ("", ""))
+        c.add_widget(bottone("< Indice della guida", lambda: self._apri(None), ARANCIO, alto=dp(44)))
+        sch = Scheda()
+        paragrafi(sch, gd.a_kivy(html))
+        c.add_widget(sch)
+        c.add_widget(bottone("< Indice della guida", lambda: self._apri(None), ARANCIO, alto=dp(44)))
+
+
 class PensieroMagicoApp(App):
     title = "Pensiero Magico"
 
@@ -1610,16 +1663,19 @@ class PensieroMagicoApp(App):
         self.sm = ScreenManager(transition=SlideTransition(duration=0.18))
         self.pagine = {}
         for cls in (Home, PaginaArchivio, PaginaMagico, PaginaVerifica, PaginaAI, PaginaLaboratorio, PaginaSistemi,
-                    PaginaCondizione, PaginaCasuali):
+                    PaginaCondizione, PaginaCasuali, PaginaGuida):
             p = cls(self)
             self.pagine[p.name] = p
             self.sm.add_widget(p)
         Window.bind(on_keyboard=self._tasto)
         radice = BoxLayout(orientation="vertical")
+        self.barra_alta = Barra(self, BARRA_ALTA, alto=True)
+        radice.add_widget(self.barra_alta)
         radice.add_widget(self.sm)
         self.barra = Barra(self)
         radice.add_widget(self.barra)
         self.barra.evidenzia(self.sm.current)
+        self.barra_alta.evidenzia(self.sm.current)
         return radice
 
     def on_start(self):

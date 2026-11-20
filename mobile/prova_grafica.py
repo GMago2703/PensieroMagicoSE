@@ -384,6 +384,27 @@ class Prova(main.PensieroMagicoApp):
         yield
         assert self.serv.conta() == 400
         self.foto("b07_ritorno_se")
+        # guida: indice, capitolo, barre in alto e in basso
+        assert set(self.barra_alta.voci) == {"archivio", "guida"} and "archivio" not in self.barra.voci
+        self.vai("guida")
+        yield
+        yield
+        gp = self.pagine["guida"]
+        assert gp.capitolo is None and len(gp.corpo.children) > 10
+        self.foto("b08_guida_indice_se")
+        gp._apri("home")
+        yield
+        yield
+        assert gp.capitolo == "home" and "[color=#00653B]" in "".join(
+            getattr(w, "text", "") for w in gp.corpo.walk())
+        self.foto("b09_guida_capitolo_se")
+        gp._apri("magico")
+        yield
+        yield
+        gp._apri(None)
+        yield
+        self.vai("home")
+        yield
         # telefono stretto (320 dp): le palline devono restare dentro i riquadri
         Window.size = (int(320 * DENSITA), int(640 * DENSITA))
         yield

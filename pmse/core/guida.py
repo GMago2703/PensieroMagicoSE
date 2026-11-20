@@ -2,6 +2,9 @@
 Il testo si adatta al gioco: SuperEnalotto (sestine) o Eurojackpot (cinquine + Euronumeri)."""
 from __future__ import annotations
 
+import re
+from html.parser import HTMLParser
+
 from .gioco import Gioco
 
 
@@ -376,9 +379,12 @@ copia prima di aggiornamenti importanti o di <i>Svuota archivio</i>.</li>
 
     c.append(("android", "12. La versione Android", f"""
 <h2>Pensiero Magico per Android</h2>
-<p>È una versione ridotta per il telefono, con SuperEnalotto ed Eurojackpot separati. In basso la barra sempre
-visibile: <b>Home, Archivio, Magico Pensiero, Sistemi, Casualità</b>.</p>
+<p>È una versione ridotta per il telefono, con SuperEnalotto ed Eurojackpot separati. Ci sono due barre sempre
+visibili. <b>In alto:</b> <b>Archivio</b>, <b>Guida</b> e, a destra, <b>Impostazioni</b> (per ora non attiva).
+<b>In basso:</b> <b>Home, Magico Pensiero, Sistemi, Casualità</b>.</p>
 <ul>
+<li><b>Guida:</b> toccando «Guida» nella barra in alto si apre questa stessa guida, con un'introduzione per il
+telefono e l'elenco dei capitoli da toccare; «Indice della guida» riporta all'elenco.</li>
 <li><b>Archivio:</b> aggiornamento da Internet e consultazione.</li>
 <li><b>Magico Pensiero:</b> genera le proposte, con l'intelligenza artificiale e la verifica storica (scrivi o scegli il
 numero di concorsi, da 10 a 1000). Due pulsanti regolano le <b>colonne personali</b> (nessuna, moderata, media,
@@ -446,3 +452,128 @@ def pagina(g: Gioco, quali: list[str] | None = None) -> str:
     """Tutta la guida (o i capitoli indicati) in un unico HTML, per la stampa."""
     parti = [h for i, _, h in capitoli(g) if quali is None or i in quali]
     return f"<html><head><style>{STILE}</style></head><body>{''.join(parti)}</body></html>"
+
+
+# ---------------------------------------------------------------- versione per l'app Android (testo con markup Kivy)
+def _pulisci_simboli(testo: str) -> str:
+    """Toglie emoji e simboli che il carattere dell'app Android non sa disegnare (sarebbero quadratini)."""
+    out = []
+    for ch in testo:
+        o = ord(ch)
+        if o >= 0x1F000 or o in (0xFE0F, 0x200D) or 0x25A0 <= o <= 0x25FF or 0x2600 <= o <= 0x27BF \
+                or 0x2B00 <= o <= 0x2BFF or 0x21A0 <= o <= 0x21FF or o == 0x2605:
+            continue
+        out.append(ch)
+    return re.sub(r"[ \t]{2,}", " ", "".join(out))
+
+
+def a_kivy(html_testo: str) -> str:
+    """Converte l'HTML di un capitolo in testo con il markup di Kivy ([b], [i], [color]): titoli in verde, elenchi con
+    il pallino, tabelle come righe. Pensato per il telefono: niente emoji, paragrafi separati da una riga vuota."""
+    class P(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.out: list[str] = []
+            self.liste: list[list] = []          # [tipo, contatore]
+            self.salta = 0
+            self.celle: list[str] | None = None
+            self.cella = ""
+
+        def _a(self, s):
+            if self.celle is not None:
+                self.cella += s
+            else:
+                self.out.append(s)
+
+        def handle_starttag(self, tag, attrs):
+            if tag in ("style", "head"):
+                self.salta += 1
+            elif tag in ("h2", "h3"):
+                self._a("\n\n[b][color=#00653B]")
+            elif tag == "b":
+                self._a("[b]")
+            elif tag == "i":
+                self._a("[i]")
+            elif tag in ("ul", "ol"):
+                self.liste.append([tag, 0])
+            elif tag == "li":
+                if self.liste:
+                    self.liste[-1][1] += 1
+                    self._a("\n" + ("   " * (len(self.liste) - 1)) +
+                            ("• " if self.liste[-1][0] == "ul" else f"{self.liste[-1][1]}. "))
+            elif tag in ("p", "div", "dl"):
+                self._a("\n\n")
+            elif tag == "dt":
+                self._a("\n\n[b]")
+            elif tag == "dd":
+                self._a("\n")
+            elif tag == "br":
+                self._a("\n")
+            elif tag == "tr":
+                self.celle = []
+            elif tag in ("td", "th"):
+                self.cella = ""
+
+        def handle_endtag(self, tag):
+            if tag in ("style", "head"):
+                self.salta = max(0, self.salta - 1)
+            elif tag in ("h2", "h3"):
+                self._a("[/color][/b]\n")
+            elif tag == "b":
+                self._a("[/b]")
+            elif tag == "i":
+                self._a("[/i]")
+            elif tag in ("ul", "ol"):
+                if self.liste:
+                    self.liste.pop()
+                self._a("\n")
+            elif tag == "dt":
+                self._a("[/b]")
+            elif tag in ("td", "th"):
+                if self.celle is not None:
+                    self.celle.append(self.cella.strip())
+                    self.cella = ""
+            elif tag == "tr":
+                if self.celle is not None:
+                    riga = " – ".join(c for c in self.celle if c)
+                    self.celle = None
+                    self._a("\n• " + riga if riga else "")
+            elif tag == "table":
+                self._a("\n")
+
+        def handle_data(self, dati):
+            if self.salta:
+                return
+            d = _pulisci_simboli(dati).replace("&", "&amp;").replace("[", "&bl;").replace("]", "&br;")
+            d = re.sub(r"\s+", " ", d)
+            self._a(d)
+
+    p = P()
+    p.feed(html_testo)
+    testo = "".join(p.out)
+    testo = re.sub(r"«\s+", "«", re.sub(r"\s+»", "»", testo))
+    testo = re.sub(r"[ \t]+\n", "\n", testo)
+    testo = re.sub(r"\n[ ]+(?=[^\s•\d])", "\n", testo)
+    testo = re.sub(r"\n{3,}", "\n\n", testo)
+    return testo.strip()
+
+
+def intro_android(g: Gioco) -> str:
+    """Il capitolo introduttivo della guida sull'app Android (testo con markup Kivy)."""
+    ej = g.is_ej
+    return (f"[b][color=#00653B]La guida di Pensiero Magico {g.codice} per Android[/color][/b]\n\n"
+            "[b]Le due barre.[/b] In alto: [b]Archivio[/b], [b]Guida[/b] (questa pagina) e, a destra, "
+            "[b]Impostazioni[/b] (per ora non attiva). In basso: [b]Home[/b], [b]Magico P.[/b] "
+            "(l'algoritmo), [b]Sistemi[/b] e [b]Casualità[/b]. Dalla Home raggiungi anche la verifica storica, "
+            "l'intelligenza artificiale e il laboratorio.\n\n"
+            f"[b]Cosa c'è sul telefono.[/b] Archivio delle estrazioni con aggiornamento da Internet, Magico Pensiero "
+            f"({'la cinquina e gli Euronumeri' if ej else 'le 3 sestine, il Jolly e il SuperStar'}), colonna magica, "
+            "verifica storica, suggerimenti con l'intelligenza artificiale (Gemini o Claude), sistemi ridotti e "
+            "condizionati, combinazioni casuali e laboratorio. Il programma completo per Windows ha anche "
+            "statistiche, stampe, ricevitoria e altro.\n\n"
+            "[b]Come leggere i capitoli.[/b] Qui sotto trovi la guida completa del programma: spiega le funzioni "
+            "una per una. Alcune voci (menu, stampe, pulsanti della schermata principale) riguardano il programma per "
+            "Windows e sul telefono possono avere un'altra forma o mancare. La parte sull'algoritmo, sulle analisi, "
+            "sulle condizioni dei sistemi e sulla verifica storica vale anche per l'app.\n\n"
+            "[b]Ricorda.[/b] Le estrazioni sono casuali: nessuna colonna ha più probabilità di un'altra. "
+            "Gioca solo ciò che puoi permetterti di perdere.")

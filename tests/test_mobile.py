@@ -207,3 +207,23 @@ def test_guida_testo():
         assert "cinquina" in tutto.lower() if g.is_ej else "sestina" in tutto.lower()
         corpo = tutto.split("</style>")[1]
         assert "{" not in corpo and "}" not in corpo
+
+
+def test_guida_android():
+    """La guida per il telefono: markup Kivy bilanciato, senza emoji né HTML, introduzione presente."""
+    import re
+
+    from pmse.core import guida
+    from pmse.core.gioco import EJ, SE
+    for g in (SE, EJ):
+        intro = guida.intro_android(g)
+        assert "Archivio" in intro and "Impostazioni" in intro and g.codice in intro
+        for cod, titolo, html in guida.capitoli(g):
+            k = guida.a_kivy(html)
+            assert k and "<" not in k and "{" not in k, cod
+            for tag in ("b", "i", "color"):
+                assert len(re.findall(rf"\[{tag}[=\]]", k)) == len(re.findall(rf"\[/{tag}\]", k)), (cod, tag)
+            assert not re.search("[\U0001F000-\U0001FFFF☀-➿️]", k), cod
+            assert not re.search("[\U0001F000-\U0001FFFF☀-➿️]", guida._pulisci_simboli(titolo))
+    assert guida.a_kivy("<h2>Titolo</h2><p>Uno [x] &amp; due</p><ul><li>a</li><li>b</li></ul>") == \
+        "[b][color=#00653B]Titolo[/color][/b]\n\nUno &bl;x&br; &amp; due\n• a\n• b"

@@ -139,8 +139,35 @@ def laboratorio():
     salva(im, "laboratorio")
 
 
+def guida():
+    """Libro aperto con un punto interrogativo: l'aiuto."""
+    im, d = nuova()
+    d.polygon([(384, 190), (384, 650), (120, 600), (120, 140)], fill=B)
+    d.polygon([(384, 190), (384, 650), (648, 600), (648, 140)], fill=B)
+    f = ImageFont.truetype(FONT, 330)
+    d.text((384, 390), "?", font=f, fill=T, anchor="mm")
+    salva(im, "guida")
+
+
+def impostazioni():
+    """Ingranaggio."""
+    im, d = nuova()
+    cx = cy = 384
+    for i in range(8):
+        a = math.pi * i / 4
+        x, y = cx + 250 * math.cos(a), cy + 250 * math.sin(a)
+        d.polygon([(x + 70 * math.cos(a + 1.5708) - 40 * math.cos(a), y + 70 * math.sin(a + 1.5708) - 40 * math.sin(a)),
+                   (x - 70 * math.cos(a + 1.5708) - 40 * math.cos(a), y - 70 * math.sin(a + 1.5708) - 40 * math.sin(a)),
+                   (x - 55 * math.cos(a + 1.5708) + 55 * math.cos(a), y - 55 * math.sin(a + 1.5708) + 55 * math.sin(a)),
+                   (x + 55 * math.cos(a + 1.5708) + 55 * math.cos(a), y + 55 * math.sin(a + 1.5708) + 55 * math.sin(a))],
+                  fill=B)
+    d.ellipse((cx - 220, cy - 220, cx + 220, cy + 220), fill=B)
+    d.ellipse((cx - 95, cy - 95, cx + 95, cy + 95), fill=T)
+    salva(im, "impostazioni")
+
+
 if __name__ == "__main__":
     os.makedirs(CARTELLA, exist_ok=True)
-    for f in (casa, archivio, magico, sistemi, dado, aggiorna, verifica, ai, laboratorio):
+    for f in (casa, archivio, magico, sistemi, dado, aggiorna, verifica, ai, laboratorio, guida, impostazioni):
         f()
     print("icone in", os.path.abspath(CARTELLA), file=sys.stderr)
