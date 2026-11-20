@@ -34,7 +34,7 @@ prevedere i numeri e nessuna colonna ha più probabilità di un'altra di essere 
 <li><b>Scarica l'archivio.</b> Al primo avvio il programma chiede se scaricare da Internet tutte le estrazioni dal
 {g.prima_estrazione.year}: rispondi <i>Sì</i> e attendi. Poi si aggiorna da solo a ogni avvio (si può disattivare dal
 menu <i>Internet</i>).</li>
-<li><b>Premi «✨ Genera»</b> nella parte destra della schermata principale: compaiono la proposta di Magico
+<li><b>Premi «✨ Genera»</b> nella parte sinistra della schermata principale: compaiono la proposta di Magico
 Pensiero.</li>
 <li><b>Premi «❓ Perché»</b> per leggere come sono nate: ogni numero ha il suo motivo.</li>
 <li>Se ti piace una proposta, registrala come giocata (menu <i>Stampe</i> → «Combinazioni di Magico Pensiero» o
@@ -51,17 +51,20 @@ da <i>Impostazioni → Salva una copia dei dati</i>, oppure attiva le <i>Copie a
 
     c.append(("home", "2. La schermata principale", f"""
 <h2>La schermata principale</h2>
-<p>È divisa in due metà.</p>
+<p>È divisa in due metà, con in alto il jackpot.</p>
 <ul>
-<li><b>A sinistra, la tabella dei {n} numeri:</b> cliccando i numeri li selezioni (diventano colorati). Con i numeri
-selezionati puoi aprire <i>Analisi</i> o confrontare la tua {C} con tutto l'archivio (pulsante «📋 {g.C(plurale=True)}»).
-«Tutti» seleziona tutti i numeri, «Azzera» toglie la selezione.</li>
-<li><b>A destra, la tabella «Magico Pensiero»:</b> mostra la proposta dell'algoritmo con colori diversi per ogni
+<li><b>A sinistra, la tabella «Magico Pensiero»:</b> mostra la proposta dell'algoritmo con colori diversi per ogni
 {C}. Pulsanti: «✨ Genera» (calcola), «❓ Perché» (spiegazione), «🤖 AI» (la stessa proposta rivista
 dall'intelligenza artificiale).</li>
+<li><b>A destra, la scheda del {nome} con la tabella dei {n} numeri:</b> cliccando i numeri li selezioni (diventano
+colorati). Con i numeri selezionati puoi aprire <i>Analisi</i> o confrontare la tua {C} con tutto l'archivio (pulsante
+«📋 {g.C(plurale=True)}»). «Tutti» seleziona tutti i numeri, «Azzera» toglie la selezione. Le due tabelle hanno la base
+allineata.</li>
+<li><b>Sopra la scheda del {nome}, il riquadro «Ultima estrazione»:</b> numero e data del concorso e, con le palline
+colorate, i numeri usciti e {extra}. Si aggiorna da solo quando l'archivio si aggiorna.</li>
 </ul>
-<p>In alto compare l'ultima estrazione{'' if ej else ' e, se disponibile, il jackpot'}. Il menu in alto raccoglie tutte
-le funzioni: questa guida le spiega una per una.</p>
+<p>In alto, in evidenza, compare {'il jackpot del prossimo concorso, se disponibile' if ej else 'il jackpot del prossimo concorso, se disponibile'}.
+Il menu in alto raccoglie tutte le funzioni: questa guida le spiega una per una.</p>
 """))
 
     c.append(("archivio", "3. Archivio ed Internet", f"""

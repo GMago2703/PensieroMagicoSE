@@ -140,6 +140,77 @@ class Pannello(QFrame):
         return b
 
 
+class UltimaEstrazione(QFrame):
+    """Riquadro «Ultima estrazione» sopra la scheda del gioco: concorso, data, numeri e speciali, con palline."""
+
+    def __init__(self, gioco: Gioco):
+        super().__init__()
+        self.g = gioco
+        self.setObjectName("ultima")
+        self.setStyleSheet("QFrame#ultima { background: white; border: 3px solid #1e5bb8; border-radius: 10px; }"
+                           " QFrame#ultima QLabel { border: none; background: transparent; }")
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        v = QVBoxLayout(self)
+        v.setContentsMargins(10, 6, 10, 8)
+        v.setSpacing(4)
+        self.l_titolo = QLabel("<b>ULTIMA ESTRAZIONE</b>")
+        self.l_titolo.setAlignment(Qt.AlignCenter)
+        self.l_titolo.setStyleSheet("color:#1e5bb8; font-size:15px;")
+        v.addWidget(self.l_titolo)
+        self.l_conc = QLabel()
+        self.l_conc.setAlignment(Qt.AlignCenter)
+        self.l_conc.setStyleSheet("font-size:14px; color:#222;")
+        v.addWidget(self.l_conc)
+        self.riga = QHBoxLayout()
+        self.riga.setSpacing(6)
+        v.addLayout(self.riga)
+
+    @staticmethod
+    def _pallina(testo, sfondo, colore, bordo):
+        b = QLabel(str(testo))
+        b.setFixedSize(40, 40)
+        b.setAlignment(Qt.AlignCenter)
+        b.setStyleSheet(f"background:{sfondo}; color:{colore}; border:3px solid {bordo}; border-radius:20px;"
+                        " font-size:16px; font-weight:bold;")
+        return b
+
+    def _svuota(self):
+        while self.riga.count():
+            it = self.riga.takeAt(0)
+            if it.widget():
+                it.widget().deleteLater()
+
+    def _speciale(self, testo, nome, sfondo, colore, bordo):
+        col = QVBoxLayout()
+        col.setSpacing(0)
+        col.addWidget(self._pallina(testo, sfondo, colore, bordo), 0, Qt.AlignHCenter)
+        et = QLabel(nome)
+        et.setAlignment(Qt.AlignCenter)
+        et.setStyleSheet("font-size:10px; color:#444;")
+        col.addWidget(et)
+        self.riga.addLayout(col)
+
+    def aggiorna(self, u):
+        self._svuota()
+        if not u:
+            self.l_conc.setText("Nessuna estrazione in archivio")
+            return
+        self.l_conc.setText(f"Conc. n. <b>{u.concorso}</b> del <b>{u.data:%d/%m/%Y}</b>")
+        self.riga.addStretch()
+        for n in u.sestina:
+            self.riga.addWidget(self._pallina(n, "#ffffff", "#111", VERDE))
+        if self.g.is_ej:
+            self.riga.addSpacing(10)
+            for n in (u.jolly, u.superstar):
+                self._speciale(n, "Euronumero", "#1565c0", "white", "#0d3c7a")
+        else:
+            self.riga.addSpacing(10)
+            self._speciale(u.jolly, "Jolly", COLORE_JOLLY, "white", "#000")
+            if u.superstar:
+                self._speciale(u.superstar, "SuperStar", COLORE_SUPERSTAR, "#000", "#b8860b")
+        self.riga.addStretch()
+
+
 class LettoreJackpot(QThread):
     """Legge il jackpot da Internet con una connessione all'archivio tutta sua (thread separato)."""
     finito = Signal(object)
@@ -643,13 +714,14 @@ class FinestraPrincipale(QMainWindow):
         self.l_jackpot.setObjectName("jackpot")
         self.l_jackpot.setStyleSheet(
             "QLabel#jackpot { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fff8d6, stop:1 #ffd54f);"
-            " border: 3px solid #1e5bb8; border-radius: 10px; padding: 6px 18px; color: #3e2723; }")
+            " border: 3px solid #1e5bb8; border-radius: 12px; padding: 14px 36px; color: #3e2723; }")
+        self.l_jackpot.setMinimumHeight(86)
         self.l_jackpot.setAlignment(Qt.AlignCenter)
         self.l_jackpot.setVisible(False)
         hj.addWidget(self.l_jackpot)
         hj.addStretch()
         esterno.addLayout(hj)
-        esterno.addSpacing(10)
+        esterno.addSpacing(28)
         h = QHBoxLayout()
         esterno.addLayout(h)
         esterno.addStretch()
@@ -695,8 +767,16 @@ class FinestraPrincipale(QMainWindow):
         self.p_dx.sotto.setText("")
         self.p_dx.layout().addWidget(self.l_sestine, 3, 0, 1, 3)
 
-        h.addWidget(self.p_sx)
-        h.addWidget(self.p_dx)
+        # Magico Pensiero a sinistra, il gioco a destra con sopra l'ultima estrazione; le basi dei due pannelli
+        # sono allineate e il riquadro dell'ultima estrazione ha gli estremi laterali della scheda del gioco.
+        self.box_ultima = UltimaEstrazione(g)
+        col = QVBoxLayout()
+        col.setSpacing(10)
+        col.addStretch()
+        col.addWidget(self.box_ultima)
+        col.addWidget(self.p_sx)
+        h.addWidget(self.p_dx, 0, Qt.AlignBottom)
+        h.addLayout(col)
         h.addStretch()
         self.setCentralWidget(w)
 
@@ -715,8 +795,8 @@ class FinestraPrincipale(QMainWindow):
         if not riga:
             self.l_jackpot.setVisible(False)
             return
-        self.l_jackpot.setText(f"<span style='font-size:17px; font-weight:bold'>{riga}</span>"
-                               + (f"<br><span style='font-size:11px'>{det}</span>" if det else ""))
+        self.l_jackpot.setText(f"<span style='font-size:23px; font-weight:bold'>{riga}</span>"
+                               + (f"<br><span style='font-size:13px'>{det}</span>" if det else ""))
         self.l_jackpot.setToolTip("Letto da Internet il " + (j.letto.replace("T", " alle ") if j.letto else ""))
         self.l_jackpot.setVisible(True)
 
@@ -729,6 +809,7 @@ class FinestraPrincipale(QMainWindow):
         n = self.arch.conta()
         u = self.arch.ultima()
         self.l_arch.setText(f"Estrazioni in archivio: {n}")
+        self.box_ultima.aggiorna(u)
         if u:
             if self.g.is_ej:
                 spec = f"  Euro {u.jolly} {u.superstar}"

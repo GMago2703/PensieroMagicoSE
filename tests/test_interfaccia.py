@@ -1223,3 +1223,32 @@ def test_quadri_speciali_e_controllo(app, tmp_path):
             e.controllo_condizioni()
         e.close()
         a.chiudi()
+
+
+def test_home_ultima_estrazione_e_disposizione(app, tmp_path):
+    """Magico Pensiero a sinistra, gioco a destra con sopra «Ultima estrazione» (palline e concorso)."""
+    from PySide6.QtWidgets import QLabel
+
+    from pmse.core.gioco import EJ, SE
+    from pmse.ui.finestra import FinestraPrincipale
+    from tests.test_sistemi import archivio_finto
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"hm_{g.codice}.db", gioco=g)
+        w = FinestraPrincipale(a, avvio_automatico=False)
+        assert "Nessuna" in w.box_ultima.l_conc.text()
+        a.unisci(archivio_finto(g, 30))
+        w.aggiorna_stato()
+        u = a.ultima()
+        assert f"Conc. n. <b>{u.concorso}</b>" in w.box_ultima.l_conc.text()
+        assert f"{u.data:%d/%m/%Y}" in w.box_ultima.l_conc.text()
+        palline = [x.text() for x in w.box_ultima.findChildren(QLabel) if x.width() == 40 or x.minimumWidth() == 40]
+        assert palline[:g.k] == [str(n) for n in u.sestina]
+        assert len(palline) >= g.k + (2 if g.is_ej else 1)
+        w.show()
+        app.processEvents()
+        assert w.p_dx.x() < w.p_sx.x()                                   # Magico Pensiero a sinistra
+        assert abs((w.p_dx.y() + w.p_dx.height()) - (w.p_sx.y() + w.p_sx.height())) <= 1   # basi allineate
+        assert w.box_ultima.y() + w.box_ultima.height() <= w.p_sx.y()    # sopra la scheda del gioco
+        assert abs(w.box_ultima.x() - w.p_sx.x()) <= 1 and abs(w.box_ultima.width() - w.p_sx.width()) <= 1
+        w.close()
+        a.chiudi()
