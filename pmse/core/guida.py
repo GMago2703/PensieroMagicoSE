@@ -13,6 +13,11 @@ def capitoli(g: Gioco) -> list[tuple[str, str, str]]:
     nome = g.nome
     extra = ("i 2 Euronumeri (da 1 a 12)" if ej else "il Jolly e il SuperStar")
     prop = ("1 cinquina + 2 Euronumeri" if ej else "3 sestine + Jolly + SuperStar")
+    pop_sez = '' if ej else """<h3>Evita le combinazioni molto giocate</h3>
+<p>Dallo studio dei vincitori dei concorsi passati il programma stima quanto è giocata ogni combinazione (date,
+sequenze, numeri «fortunati»...). Se vinci con una combinazione giocata da molti, il premio si divide. L'opzione è
+<b>attiva per impostazione predefinita</b> e ha tre intensità: <b>Bassa</b> (scarta solo le più giocate),
+<b>Moderata</b> (consigliata), <b>Forte</b> (tiene solo le meno giocate). Si regola nelle stesse impostazioni.</p>"""
     c = []
 
     c.append(("inizio", "1. Per cominciare", f"""
@@ -153,11 +158,7 @@ e verifiche restano coerenti.</p>
 <p>Il pulsante <b>Rigenera il mio codice</b> cambia tutte le colonne future (quelle già salvate restano). Non cambia
 la probabilità di vincere, che è identica per ogni colonna: riduce solo la probabilità di dividere il premio con altri
 utenti del programma.</p>
-{'' if ej else """<h3>Evita le combinazioni molto giocate</h3>
-<p>Dallo studio dei vincitori dei concorsi passati il programma stima quanto è giocata ogni combinazione (date,
-sequenze, numeri «fortunati»...). Se vinci con una combinazione giocata da molti, il premio si divide. L'opzione è
-<b>attiva per impostazione predefinita</b> e ha tre intensità: <b>Bassa</b> (scarta solo le più giocate),
-<b>Moderata</b> (consigliata), <b>Forte</b> (tiene solo le meno giocate). Si regola nelle stesse impostazioni.</p>"""}
+{pop_sez}
 <div class='av'>Come leggere la verifica storica: un piccolo vantaggio sul caso può essere pura fortuna. Fidati
 di scarti che restano su centinaia di concorsi, non di una serie fortunata.</div>
 """))
