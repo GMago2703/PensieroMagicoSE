@@ -133,8 +133,15 @@ class SchedaQuadri(QDialog):
             self.gruppi.append(self._vuoto())
         self.corrente = 0
         self.setWindowTitle("Quadro")
-        adatta_schermo(self, 1240, 900)
-        v = QVBoxLayout(self)
+        adatta_schermo(self, 1240, 820)
+        esterno = QVBoxLayout(self)
+        scorri = QScrollArea()                       # se lo schermo è basso, tutta la scheda scorre
+        scorri.setWidgetResizable(True)
+        scorri.setFrameShape(QFrame.NoFrame)
+        contenuto = QWidget()
+        scorri.setWidget(contenuto)
+        esterno.addWidget(scorri, 1)
+        v = QVBoxLayout(contenuto)
 
         alto = QHBoxLayout()
         box = QGroupBox("Relazione tra le condizioni")
@@ -245,7 +252,7 @@ class SchedaQuadri(QDialog):
 
         self.area = QScrollArea()
         self.area.setWidgetResizable(True)
-        self.area.setMinimumHeight(250)
+        self.area.setMinimumHeight(230)
         v.addWidget(self.area, 1)
         self.l_info = QLabel()
         self.l_info.setWordWrap(True)
@@ -257,7 +264,7 @@ class SchedaQuadri(QDialog):
             b = QPushButton(testo)
             b.clicked.connect(f)
             fondo.addWidget(b)
-        v.addLayout(fondo)
+        esterno.addLayout(fondo)
 
         if attuale and attuale.codice == "quadri":
             i = self.c_regola.findData(attuale.regola)
@@ -654,7 +661,14 @@ class SchedaQuadriSpeciali(QDialog):
                         x.update(v)
         self.setWindowTitle("Quadri speciali")
         adatta_schermo(self, 1100, 760)
-        v = QVBoxLayout(self)
+        esterno = QVBoxLayout(self)
+        scorri = QScrollArea()
+        scorri.setWidgetResizable(True)
+        scorri.setFrameShape(QFrame.NoFrame)
+        contenuto = QWidget()
+        scorri.setWidget(contenuto)
+        esterno.addWidget(scorri, 1)
+        v = QVBoxLayout(contenuto)
         s = QLabel("<b>Quadri speciali</b> – tre quadri sugli archivi. In ognuno scegli quanti numeri in comune "
                    "con le combinazioni di quell'archivio sono <b>ammessi</b> oppure <b>non ammessi</b> nelle "
                    "colonne sviluppate (con «fino a 2» si intendono 0, 1 o 2 numeri in comune).")
@@ -714,7 +728,7 @@ class SchedaQuadriSpeciali(QDialog):
             b = QPushButton(testo)
             b.clicked.connect(f)
             h.addWidget(b)
-        v.addLayout(h)
+        esterno.addLayout(h)
 
     def _analisi(self, quale, tabella, ris, cbs):
         if self.ctx is None or not self.ctx.estrazioni:
