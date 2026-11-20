@@ -708,7 +708,11 @@ class EditorSistema(QDialog):
         menu.addAction("Combinazioni filtro", lambda: self._gruppo("filtro"))
         menu.addAction("Gruppi tra (più gruppi di numeri del sistema)", lambda: self.apri_condizione("gruppi_tra"))
         menu.addAction("Quadri (gruppi scelti da me, con regola)", lambda: self.apri_condizione("quadri"))
+        menu.addAction("Quadri speciali (archivio completo / vincenti / senza vincenti)",
+                       lambda: self.apri_condizione("quadri_speciali"))
         menu.addAction("Numeri scelti da me (insieme personale)", self._insieme_personale)
+        menu.addSeparator()
+        menu.addAction("Controllo condizioni (quali lavorano davvero)", self.controllo_condizioni)
         self.m_mie = menu.addMenu("Le mie condizioni salvate")
         self.m_mie.aboutToShow.connect(self._riempi_mie)
         menu.addAction("Gestisci Le mie condizioni...", self._gestisci_mie)
@@ -776,6 +780,9 @@ class EditorSistema(QDialog):
             d = SchedaGruppo(self.g, codice, attuale, self)
         elif codice == "gruppi_tra":
             d = SchedaGruppiTra(self.g, self.ctx, sorted(self.griglia.selezionati), attuale, self)
+        elif codice == "quadri_speciali":
+            from .condizioni_utente import SchedaQuadriSpeciali
+            d = SchedaQuadriSpeciali(self.g, self.ctx, attuale, self)
         elif codice == "quadri":
             from .condizioni_utente import SchedaQuadri
             d = SchedaQuadri(self.g, self.ctx, sorted(self.griglia.selezionati), attuale, self, self.arch)
@@ -790,6 +797,13 @@ class EditorSistema(QDialog):
                 d.risultato.attiva = conds[indice].attiva
                 conds[indice] = d.risultato
             self._salva_conds(conds)
+
+    def controllo_condizioni(self):
+        if self.s.tipo not in ("condizionato", "condizionato_ridotto"):
+            QMessageBox.information(self, "Condizioni", "Le condizioni si usano nei sistemi condizionati.")
+            return
+        from .condizioni_utente import FinestraControllo
+        FinestraControllo(self.g, self.ctx, self._raccogli(), self).exec()
 
     def _insieme_personale(self):
         if self.s.tipo not in ("condizionato", "condizionato_ridotto"):

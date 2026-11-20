@@ -226,6 +226,8 @@ class FinestraPrincipale(QMainWindow):
                        ("Combinazioni speciali: numeri primi", "primi", ""),
                        ("Combinazioni filtro", "filtro", "Ctrl+F"), ("Sequele", "gruppo", ""),
                        ("Gruppi tra", "gruppi_tra", "Ctrl+G"), ("Quadri (gruppi scelti da me, con regola)", "quadri", ""),
+                      ("Quadri speciali (3 archivi)", "quadri_speciali", ""),
+                      ("Controllo condizioni (quali lavorano davvero)", "controllo", ""),
                        ("Popolarità (quanto è giocata)", "popolarita", "")]
 
     def _menu_sistemi(self):
@@ -312,6 +314,8 @@ class FinestraPrincipale(QMainWindow):
             e = self.nuovo_sistema("condizionato")
         if codice in ("gruppo", "filtro"):
             e._gruppo(codice)
+        elif codice == "controllo":
+            e.controllo_condizioni()
         else:
             e.apri_condizione(codice)
 

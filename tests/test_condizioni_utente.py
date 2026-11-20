@@ -103,3 +103,49 @@ def test_condizione_personale_nei_sistemi(tmp_path):
     s.condizioni = cnd.a_json([q])
     assert s.lista_condizioni()[0].nome == "Finali" and s.lista_condizioni()[0].regola == "almeno_n"
     a.chiudi()
+
+
+def test_quadri_speciali(tmp_path):
+    for g in (SE, EJ):
+        a = _arch(tmp_path, g)
+        ctx = sis.contesto_da_archivio(a)
+        ctx.vincenti = {e.data for e in ctx.estrazioni[::10]}          # finte vincenti: una ogni dieci
+        for quale in cnd.ARCHIVI_SPECIALI:
+            an = cnd.analizza_speciale(ctx, quale)
+            assert an.estrazioni == len(ctx.estrazioni) and sum(r[1] for r in an.righe) == an.estrazioni
+        assert len(ctx.righe_archivio("vincenti")) + len(ctx.righe_archivio("senza_vincenti")) == len(ctx.estrazioni)
+        # una colonna identica a un'estrazione ha tutti i numeri in comune con l'archivio completo
+        C = np.array([ctx.ultime[5], ctx.ultime[0]], dtype=np.int64)
+        assert cnd.massimo_in_comune(C, ctx, "completo").tolist() == [g.k, g.k]
+        voci = cnd.voci_speciali_vuote()
+        assert cnd.quadri_speciali(voci).rispetta(C, ctx).all()             # nessun quadro attivo: accetta tutto
+        voci[0].update(attivo=True, modo="non_ammessi", valori=[g.k])       # niente colonne già uscite
+        c = cnd.quadri_speciali(voci)
+        assert not c.rispetta(C, ctx).any() and "NON ammessi" in c.descrivi()
+        voci[0].update(modo="ammessi", valori=[g.k])
+        assert cnd.quadri_speciali(voci).rispetta(C, ctx).all()
+        c2 = cnd.da_json(cnd.a_json([cnd.quadri_speciali(voci, "x")]))[0]
+        assert c2.codice == "quadri_speciali" and c2.gruppi[0]["valori"] == [g.k]
+        a.chiudi()
+
+
+def test_controllo_condizioni(tmp_path):
+    a = _arch(tmp_path, SE)
+    ctx = sis.contesto_da_archivio(a)
+    rng = np.random.default_rng(3)
+    C = np.sort(np.argsort(rng.random((5000, 90)), axis=1)[:, :6] + 1, axis=1)
+    larga = cnd.gruppo(list(range(1, 91)), 0, 6)                   # sempre rispettata -> inoperante
+    forte = cnd.gruppo(list(range(1, 31)), 3, 6)                   # scarta molte colonne
+    inclusa = cnd.gruppo(list(range(1, 31)), 2, 6)                 # scarta un sottoinsieme di quelle di 'forte'
+    spenta = cnd.gruppo([1, 2, 3], 3, 3)
+    spenta.attiva = False
+    r = cnd.controllo(C, [larga, forte, inclusa, spenta], ctx)
+    st = {x.indice: x for x in r.righe}
+    assert st[0].stato == "inoperante" and st[0].escluse == 0
+    assert st[1].stato == "operante" and st[1].uniche > 0
+    assert st[2].stato == "assorbita" and st[2].assorbita_da and st[2].uniche == 0
+    assert st[3].stato == "disattivata"
+    assert r.ammesse == int(cnd.filtra(C, [larga, forte, inclusa], ctx).sum())
+    assert st[2].nuove_in_sequenza == 0 and st[1].nuove_in_sequenza == st[1].escluse
+    assert "ASSORBITA" in cnd.testo_controllo(r)
+    a.chiudi()

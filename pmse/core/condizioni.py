@@ -30,6 +30,7 @@ class Contesto:
     gioco: Gioco = SE
     estrazioni: list = field(default_factory=list)       # Estrazione in ordine di data
     popolarita: object = None                             # ModelloPopolarita (solo SE) o None
+    vincenti: set = field(default_factory=set)            # date delle estrazioni in cui è stato vinto il jackpot
     _sotto: dict = field(default_factory=dict)
 
     @property
@@ -43,6 +44,25 @@ class Contesto:
             righe = self.ultime[-finestra:] if finestra else self.ultime
             codici = set()
             for r in righe:
+                for s in combinations(r, t):
+                    codici.add(_codice(s))
+            self._sotto[chiave] = np.fromiter(codici, dtype=np.int64, count=len(codici))
+        return self._sotto[chiave]
+
+    def righe_archivio(self, quale: str) -> list:
+        """Le combinazioni di uno dei tre archivi: 'completo', 'vincenti' (solo quelle che hanno vinto il
+        jackpot) o 'senza_vincenti' (l'archivio completo meno le vincenti)."""
+        if quale == "completo":
+            return self.ultime
+        if quale == "vincenti":
+            return [sorted(e.numeri) for e in self.estrazioni if e.data in self.vincenti]
+        return [sorted(e.numeri) for e in self.estrazioni if e.data not in self.vincenti]
+
+    def sottoinsiemi_di(self, t: int, quale: str) -> np.ndarray:
+        chiave = (t, "arch", quale)
+        if chiave not in self._sotto:
+            codici = set()
+            for r in self.righe_archivio(quale):
                 for s in combinations(r, t):
                     codici.add(_codice(s))
             self._sotto[chiave] = np.fromiter(codici, dtype=np.int64, count=len(codici))
@@ -285,6 +305,8 @@ class Condizione:
         return f"«{self.nome}»: {testo}" if self.nome else testo
 
     def _descrivi(self) -> str:
+        if self.codice == "quadri_speciali":
+            return descrivi_speciali(self.gruppi, 6)
         if self.codice == "quadri":
             n = len(self.gruppi)
             parti = [f"{LETTERE[i]}{(' ' + gr['nome']) if gr.get('nome') else ''}: "
@@ -311,6 +333,8 @@ class Condizione:
         return f"{t.nome if t else self.codice}{par}: {', '.join(map(str, sorted(self.valori)))}"
 
     def rispetta(self, C: np.ndarray, ctx: Contesto) -> np.ndarray:
+        if self.codice == "quadri_speciali":
+            return rispetta_speciali(C, ctx, self.gruppi)
         if self.codice in ("gruppi_tra", "quadri"):
             if not self.gruppi:
                 return np.ones(len(C), dtype=bool)
@@ -508,6 +532,182 @@ def analizza_gruppo(numeri, ctx: Contesto, ultime: int = 0, copertura: float = 0
 def gruppo(numeri, minimo, massimo) -> Condizione:
     """Fisse / Sequele: un gruppo di numeri di cui ne devono essere presenti da minimo a massimo."""
     return Condizione("gruppo", numeri=sorted(numeri), minimo=minimo, massimo=massimo)
+
+
+# ------------------------------------------------------------------ Quadri speciali (tre archivi)
+ARCHIVI_SPECIALI = {"completo": "Archivio completo",
+                    "vincenti": "Archivio delle sole combinazioni vincenti",
+                    "senza_vincenti": "Archivio completo senza le combinazioni vincenti"}
+
+
+def massimo_in_comune(C: np.ndarray, ctx: Contesto, quale: str) -> np.ndarray:
+    """Per ogni colonna, il massimo di numeri in comune con una qualsiasi combinazione dell'archivio scelto.
+    Il valore minimo riportato è 2, che significa 'al massimo 2'."""
+    k = C.shape[1]
+    out = np.full(len(C), min(2, k), dtype=int)
+    for t in range(3, k + 1):
+        sotto = ctx.sottoinsiemi_di(t, quale)
+        if len(sotto):
+            out[np.isin(_codici_sotto(C, t), sotto).any(axis=1)] = t
+    return out
+
+
+def quadri_speciali(voci: list[dict], nome: str = "") -> Condizione:
+    """Tre quadri, uno per archivio. Ogni voce: {"archivio", "attivo", "modo": "ammessi"|"non_ammessi",
+    "valori": [quantità di numeri in comune]}."""
+    return Condizione("quadri_speciali", gruppi=[dict(v) for v in voci], nome=nome)
+
+
+def voci_speciali_vuote() -> list[dict]:
+    return [{"archivio": a, "attivo": False, "modo": "ammessi", "valori": []} for a in ARCHIVI_SPECIALI]
+
+
+def _ammessi_speciale(voce: dict, k: int) -> list[int]:
+    val = set(voce.get("valori", []))
+    tutti = set(range(min(2, k), k + 1))
+    return sorted(val if voce.get("modo", "ammessi") == "ammessi" else tutti - val)
+
+
+def rispetta_speciali(C: np.ndarray, ctx: Contesto, voci: list[dict]) -> np.ndarray:
+    ok = np.ones(len(C), dtype=bool)
+    for voce in voci:
+        if not voce.get("attivo") or not voce.get("valori"):
+            continue
+        v = massimo_in_comune(C, ctx, voce["archivio"])
+        ok &= np.isin(v, _ammessi_speciale(voce, C.shape[1]))
+    return ok
+
+
+def descrivi_speciali(voci: list[dict], k: int) -> str:
+    parti = []
+    for v in voci:
+        if v.get("attivo") and v.get("valori"):
+            q = ", ".join(("fino a 2" if x == 2 else str(x)) for x in sorted(v["valori"]))
+            parti.append(f"{ARCHIVI_SPECIALI[v['archivio']]}: numeri in comune {q} "
+                         f"{'ammessi' if v.get('modo') == 'ammessi' else 'NON ammessi'}")
+    return "Quadri speciali – " + ("; ".join(parti) if parti else "nessun quadro attivo")
+
+
+def analizza_speciale(ctx: Contesto, quale: str) -> AnalisiCondizione:
+    """Quante volte ogni estrazione ha avuto N numeri in comune con le combinazioni PRECEDENTI dello stesso archivio
+    (per 'vincenti' e 'senza_vincenti' si contano solo le precedenti appartenenti a quell'archivio)."""
+    k = ctx.gioco.k
+    insiemi = {t: set() for t in range(3, k + 1)}
+    vincenti = ctx.vincenti
+    valori = []
+    for e in ctx.estrazioni:
+        r = sorted(e.numeri)
+        m = min(2, k)
+        for t in range(3, k + 1):
+            if any(_codice(x) in insiemi[t] for x in combinations(r, t)):
+                m = t
+        valori.append(m)
+        vinta = e.data in vincenti
+        if quale == "completo" or (quale == "vincenti") == vinta:
+            for t in range(3, k + 1):
+                insiemi[t].update(_codice(x) for x in combinations(r, t))
+    v = np.array(valori, dtype=int)
+    n = len(v)
+    righe = [(x, int((v == x).sum()), float((v == x).mean() * 100) if n else 0.0, float("nan"))
+             for x in range(min(2, k), k + 1)]
+    piu = max(righe, key=lambda r: r[1])[0] if righe else 0
+    ordinati = sorted(righe, key=lambda r: -r[1])
+    acc, scelti = 0, []
+    for r in ordinati:
+        if n and acc >= 0.8 * n:
+            break
+        scelti.append(r[0])
+        acc += r[1]
+    sugg = (f"Con {ARCHIVI_SPECIALI[quale].lower()}, il caso più comune è {piu} numeri in comune. "
+            f"I valori {', '.join(map(str, sorted(scelti)))} coprono il {acc / n * 100 if n else 0:.0f}% delle "
+            "estrazioni." + (" Nessuna combinazione vincente nell'archivio: scarica i vincitori del 6."
+                             if quale == "vincenti" and not vincenti else ""))
+    return AnalisiCondizione("quadri_speciali", ARCHIVI_SPECIALI[quale], n, righe, piu,
+                             (min(scelti, default=0), max(scelti, default=0)), sorted(scelti), sugg)
+
+
+# ------------------------------------------------------------------ Controllo condizioni
+@dataclass
+class RigaControllo:
+    indice: int
+    descrizione: str
+    attiva: bool
+    escluse: int            # colonne che questa condizione, da sola, non rispetta
+    uniche: int             # colonne che tornerebbero ammesse togliendo SOLO questa condizione
+    nuove_in_sequenza: int  # colonne in più scartate rispetto alle condizioni che la precedono nell'elenco
+    stato: str              # "operante" | "inoperante" | "assorbita" | "disattivata"
+    assorbita_da: list[str]
+    nota: str
+
+
+@dataclass
+class RapportoControllo:
+    totale: int
+    ammesse: int
+    righe: list[RigaControllo]
+    campione: bool = False
+
+
+def controllo(C: np.ndarray, condizioni: list[Condizione], ctx: Contesto, errori_min: int = 0,
+              errori_max: int = 0, campione: bool = False) -> RapportoControllo:
+    """Verifica quali condizioni lavorano davvero sulle colonne C: quante ne scartano da sole, quante solo
+    loro, quante in più rispetto alle precedenti, e quali sono inoperanti o assorbite da altre."""
+    n = len(C)
+    rispetti = [(c.rispetta(C, ctx) if c.attiva else np.ones(n, dtype=bool)) for c in condizioni]
+    attive = [i for i, c in enumerate(condizioni) if c.attiva]
+    errori = np.zeros(n, dtype=np.int16)
+    for i in attive:
+        errori += ~rispetti[i]
+    base = (errori >= errori_min) & (errori <= errori_max)
+    righe = []
+    prec = np.ones(n, dtype=bool) if not attive else None
+    cum = np.zeros(n, dtype=np.int16)
+    ammesse_prec = np.ones(n, dtype=bool)
+    for i, c in enumerate(condizioni):
+        if not c.attiva:
+            righe.append(RigaControllo(i, c.descrivi(), False, 0, 0, 0, "disattivata", [], "Disattivata."))
+            continue
+        fallisce = ~rispetti[i]
+        senza = errori - fallisce.astype(np.int16)
+        ammesse_senza = (senza >= errori_min) & (senza <= errori_max)
+        uniche = int((ammesse_senza & ~base).sum())
+        cum += fallisce
+        ammesse_ora = (cum >= errori_min) & (cum <= errori_max)
+        nuove = int((ammesse_prec & ~ammesse_ora).sum())
+        ammesse_prec = ammesse_ora
+        escluse = int(fallisce.sum())
+        assorb = []
+        if escluse and not uniche:
+            for j in attive:
+                if j != i and ((~rispetti[j]) & fallisce).sum() / escluse >= 0.5:
+                    assorb.append(f"{condizioni[j].descrivi()} ({((~rispetti[j]) & fallisce).sum() / escluse * 100:.0f}%)")
+        if not escluse:
+            stato, nota = "inoperante", "Non scarta nessuna colonna: è sempre rispettata, quindi è inutile."
+        elif not uniche:
+            stato = "assorbita"
+            nota = ("Le colonne che scarta sono già scartate da altre condizioni: toglierla non cambia il "
+                    "risultato." if errori_max == 0 else
+                    "Con gli errori ammessi, toglierla non cambia le colonne accettate.")
+        else:
+            stato, nota = "operante", f"Scarta davvero {uniche} colonne che nessun'altra condizione scarta."
+        righe.append(RigaControllo(i, c.descrivi(), True, escluse, uniche, nuove, stato, assorb, nota))
+    return RapportoControllo(n, int(base.sum()), righe, campione)
+
+
+def testo_controllo(r: RapportoControllo) -> str:
+    def p(x):
+        return f"{x / r.totale * 100:.1f}%" if r.totale else "-"
+    out = [f"Colonne esaminate: {r.totale}{' (campione casuale)' if r.campione else ''}",
+           f"Colonne ammesse da tutte le condizioni: {r.ammesse} ({p(r.ammesse)}); scartate {r.totale - r.ammesse}", ""]
+    for x in r.righe:
+        out.append(f"{x.indice + 1}. {x.descrizione}")
+        if x.attiva:
+            out.append(f"   da sola scarta {x.escluse} ({p(x.escluse)}); solo lei {x.uniche}; "
+                       f"in più delle precedenti {x.nuove_in_sequenza} – {x.stato.upper()}")
+        out.append(f"   {x.nota}")
+        for a in x.assorbita_da:
+            out.append(f"   coperta da: {a}")
+    return "\n".join(out)
 
 
 def filtra(C: np.ndarray, condizioni: list[Condizione], ctx: Contesto, errori_min: int = 0,

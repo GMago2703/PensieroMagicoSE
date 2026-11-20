@@ -19,7 +19,7 @@ import json
 import math
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from itertools import combinations, islice
 from math import comb
 
@@ -401,6 +401,12 @@ def contesto_da_archivio(archivio) -> cnd.Contesto:
         ctx.popolarita = popolarita.per_archivio(archivio)
     except Exception:
         ctx.popolarita = None
+    try:
+        cat = "5+2" if archivio.gioco.is_ej else "6"
+        ctx.vincenti = {date.fromisoformat(r[0]) for r in archivio.con.execute(
+            "SELECT data FROM quote WHERE categoria=? AND vincitori>0", (cat,))}
+    except Exception:
+        ctx.vincenti = set()
     return ctx
 
 

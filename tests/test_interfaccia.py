@@ -1072,26 +1072,47 @@ def test_quadri_e_le_mie_condizioni(app, tmp_path):
         assert not any("in preparazione" in t for m in menu.values() for t in [x.text() for x in m.actions()])
         ctx = sis.contesto_da_archivio(a)
         d = SchedaQuadri(g, ctx, [], None, w, a)
+        assert len(d.gruppi) == 7 and len(d.liste) == 7 and d.corrente == 0     # sette colonne vuote come nel modello
         d.barra.metti("Finale 1")
-        d._aggiungi()
-        assert len(d.gruppi) == 1 and d.gruppi[0]["nome"] == "Finale 1"
+        assert d.gruppi[0]["nome"] == "Finale 1" and d.gruppi[0]["numeri"] == [x for x in range(1, g.n + 1) if x % 10 == 1]
+        d._seleziona(1)
+        d._clic(5)
+        d._clic(6)
+        assert d.gruppi[1]["numeri"] == [5, 6] and d.gruppi[1]["massimo"] == 2
+        d._clic(6)
+        assert d.gruppi[1]["numeri"] == [5]
         d._crea_tutti(cnd.decine(g))
-        assert len(d.gruppi) == (g.n + 9) // 10
-        d.t.selectRow(0)
+        assert len([x for x in d.gruppi if x["numeri"]]) == (g.n + 9) // 10
+        d._seleziona(0)
         d._copia_gruppo()
+        d._seleziona(1)
         d._incolla_gruppo()
+        assert d.gruppi[1]["numeri"] == d.gruppi[0]["numeri"]
         d._duplica_gruppo()
         d._sposta(1)
         n = len(d.gruppi)
         d._taglia_gruppo()
-        assert len(d.gruppi) == n - 1
+        assert not d.gruppi[d.corrente]["numeri"] and len(d.gruppi) == n
+        d._aggiungi_colonna()
+        d._elimina_colonna()
         d.c_regola.setCurrentIndex(d.c_regola.findData("almeno_n"))
         d.s_n.setValue(2)
-        assert d.s_gmin.value() == 2 and d.s_gmax.value() == len(d.gruppi) and not d.s_gmin.isEnabled()
+        piene = len([x for x in d.gruppi if x["numeri"]])
+        assert d.s_gmin.value() == 2 and d.s_gmax.value() == piene and not d.s_gmin.isEnabled()
+        d.radio["una_sola"].setChecked(True)
+        assert d.c_regola.currentData() == "una_sola"
+        d.c_regola.setCurrentIndex(d.c_regola.findData("almeno_n"))
+        assert not any(r.isChecked() for r in d.radio.values())
+        d.s_n.setValue(2)
         d.e_nome.setText("Mio quadro")
+        d.r_disattivo.setChecked(True)
         d._ok()
         c = d.risultato
         assert c.codice == "quadri" and c.regola == "almeno_n" and c.nome == "Mio quadro" and c.minimo == 2
+        assert not c.attiva and len(c.gruppi) == piene
+        with mock.patch("pmse.ui.condizioni_utente.QDialog.exec"):
+            d._archivio()
+            d._analisi()
         with mock.patch("pmse.ui.condizioni_utente.QInputDialog.getText", return_value=("Mio quadro", True)), \
                 mock.patch("pmse.ui.condizioni_utente.QMessageBox.information"):
             d._salva_quadro()
@@ -1099,9 +1120,11 @@ def test_quadri_e_le_mie_condizioni(app, tmp_path):
         d2 = SchedaQuadri(g, ctx, [], None, w, a)
         with mock.patch("pmse.ui.condizioni_utente.QInputDialog.getItem", return_value=("Mio quadro", True)):
             d2._carica_quadro()
-        assert len(d2.gruppi) == len(c.gruppi) and d2.c_regola.currentData() == "almeno_n"
+        assert len([x for x in d2.gruppi if x["numeri"]]) == len(c.gruppi)
+        assert d2.c_regola.currentData() == "almeno_n"
         d3 = SchedaQuadri(g, ctx, [], c, w, a)                       # riapertura di una condizione esistente
-        assert len(d3.gruppi) == len(c.gruppi) and d3.s_n.value() == 2
+        assert len([x for x in d3.gruppi if x["numeri"]]) == len(c.gruppi) and d3.s_n.value() == 2
+        assert not d3.r_attivo.isChecked()
         di = SchedaInsieme(g, ctx, None, w)
         di.barra.metti("Pari")
         di.e_nome.setText("Pari miei")
@@ -1145,3 +1168,58 @@ def test_icone_dei_pulsanti(app):
     app.processEvents()
     assert [x.property("_icona") for x in bs] == ["↩️", "✅", "▶️"]
     w.close()
+
+
+def test_quadri_speciali_e_controllo(app, tmp_path):
+    """Quadri speciali (tre archivi) e finestra Controllo condizioni, in SE ed EJ."""
+    from unittest import mock
+
+    from pmse.core import condizioni as cnd
+    from pmse.core import sistemi as sis
+    from pmse.core.gioco import EJ, SE
+    from pmse.ui.condizioni_utente import FinestraControllo, SchedaQuadriSpeciali
+    from pmse.ui.finestra import FinestraPrincipale
+    from tests.test_sistemi import archivio_finto
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"qs_{g.codice}.db", gioco=g)
+        a.unisci(archivio_finto(g, 120))
+        w = FinestraPrincipale(a, avvio_automatico=False)
+        menu = {x.text().replace("&", ""): x.menu() for x in w.menuBar().actions() if x.menu() is not None}
+        voci = [x.text() for x in menu["Condizioni"].actions()]
+        assert any("Quadri speciali" in t for t in voci) and any("Controllo condizioni" in t for t in voci)
+        ctx = sis.contesto_da_archivio(a)
+        ctx.vincenti = {e.data for e in ctx.estrazioni[::9]}
+        d = SchedaQuadriSpeciali(g, ctx, None, w)
+        assert len(d.pannelli) == 3
+        quale, attivo, ammessi, cbs = d.pannelli[0]
+        assert quale == "completo" and list(cbs)[0] == 2 and list(cbs)[-1] == g.k
+        attivo.setChecked(True)
+        cbs[g.k].setChecked(True)
+        cbs[g.k - 1].setChecked(True)
+        ammessi.setChecked(False)                                   # non ammessi
+        d.e_nome.setText("Mai usciti")
+        d._ok()
+        c = d.risultato
+        assert c.codice == "quadri_speciali" and c.nome == "Mai usciti"
+        assert c.gruppi[0]["modo"] == "non_ammessi" and sorted(c.gruppi[0]["valori"]) == [g.k - 1, g.k]
+        assert "NON ammessi" in c.descrivi()
+        t = d.findChildren(__import__("PySide6.QtWidgets", fromlist=["QTableWidget"]).QTableWidget)[0]
+        d._analisi("vincenti", t, d.findChildren(__import__("PySide6.QtWidgets", fromlist=["QLabel"]).QLabel)[-1], cbs)
+        assert t.rowCount() == g.k - 1
+        d2 = SchedaQuadriSpeciali(g, ctx, c, w)                    # riapertura
+        assert d2.pannelli[0][1].isChecked() and not d2.pannelli[0][2].isChecked() and d2.pannelli[0][3][g.k].isChecked()
+        s = sis.Sistema(tipo="condizionato", gioco=g.codice, numeri=list(range(1, 17)), garanzia=0)
+        s.condizioni = cnd.a_json([cnd.gruppo(list(range(1, 17)), 0, g.k), cnd.gruppo(list(range(1, 9)), 3, g.k),
+                                   cnd.gruppo(list(range(1, 9)), 2, g.k), c])
+        f = FinestraControllo(g, ctx, s, w)
+        f.calcola()
+        r = f.rapporto
+        assert r.totale == sis.numero_integrale(16, g.k, 0) and f.t.rowCount() == 4
+        assert [x.stato for x in r.righe][:3] == ["inoperante", "operante", "assorbita"]
+        f._dettaglio()
+        f._copia()
+        e = w.nuovo_sistema("condizionato")
+        with mock.patch("pmse.ui.condizioni_utente.FinestraControllo.exec"):
+            e.controllo_condizioni()
+        e.close()
+        a.chiudi()

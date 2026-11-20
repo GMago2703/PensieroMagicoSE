@@ -35,6 +35,7 @@ REGOLE: list[tuple[str, str]] = [
     (r"^(genera casuali|usa le combinazioni della macchina)\b", "🎲"),
     (r"^(genera|chiedi)\b", "✨"),
     (r"^(registra)\b", "📝"),
+    (r"^(mostra l'analisi)", "📊"),
     (r"^(analizza|analisi|rendimento|esegui analisi|statistic)", "📊"),
     (r"^(verifica|prova|avvia il laboratorio)\b", "🧪"),
     (r"^(avvia|esegui|sviluppa|simula|allena)\b", "▶️"),
@@ -47,6 +48,12 @@ REGOLE: list[tuple[str, str]] = [
     (r"^(sposta su)\b", "⬆️"),
     (r"^(sposta giù|sposta giu)\b", "⬇️"),
     (r"^(vedi|mostra)\b", "👁️"),
+    (r"^(aiuto|guida)\b", "❓"),
+    (r"^(archivio)\b", "🗃️"),
+    (r"^(controllo)\b", "🩺"),
+    (r"^(ricalcola)\b", "🔄"),
+    (r"^sposta ▶", "➡️"),
+    (r"^sposta$", "⬅️"),
 ]
 _COMPILATE = [(re.compile(r), e) for r, e in REGOLE]
 _INIZIO = re.compile(r"^[^\w«\"'(]+", re.UNICODE)

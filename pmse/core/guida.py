@@ -234,27 +234,59 @@ l'80%): così scarti le colonne dalla forma insolita senza perdere quasi nessuna
 perse.</li>
 </ul>
 <h3>Quadri: gruppi di numeri scelti da te</h3>
-<p>Dal menu <i>Condizioni → Quadri</i> (o <i>Aggiungi condizione</i> nell'editor di un sistema) crei <b>uno o più
-gruppi di numeri</b>. Un gruppo è <i>verificato</i> se la colonna ne contiene da un minimo a un massimo (per esempio
-«almeno 1 numero della decina 1-10»).</p>
+<p>Dal menu <i>Condizioni → Quadri</i> (o <i>Aggiungi condizione</i> nell'editor di un sistema) si apre la scheda
+<b>Quadro</b>: una fila di <b>colonne verticali numerate</b> (001, 002, 003…). Ogni colonna è un <b>gruppo di numeri</b>;
+un gruppo è <i>verificato</i> se la colonna sviluppata ne contiene da un minimo a un massimo (i campi <i>da</i> e
+<i>a</i> sotto la colonna).</p>
 <ul>
-<li><b>Gruppi comuni con un clic:</b> decine, finali (numeri che terminano con 0, 1, 2…), pari, dispari, bassi, alti,
-primi, multipli e quadrati. Con «Aggiungi ai numeri già scelti» li sommi alla tua selezione invece di sostituirla.
-<i>Le decine</i> e <i>I finali 0-9</i> creano tutti i gruppi in un colpo.</li>
-<li><b>Numeri tuoi:</b> clicca i numeri uno a uno; poi <i>Aggiungi gruppo</i>. Ogni gruppo ha il suo colore e un nome.</li>
-<li><b>Taglia, copia, incolla</b> sia i numeri scelti sia interi gruppi; poi <b>Duplica gruppo</b>,
-<b>Modifica numeri del gruppo</b>, <b>Sposta su/giù</b>, <b>Elimina</b>, <b>Svuota tutto</b>, <b>Inverti</b>.</li>
-<li><b>La regola</b> decide quanti gruppi devono essere verificati: <b>tutti</b>; <b>almeno uno</b>; <b>uno solo</b>;
-<b>nessuno</b>; <b>tutti tranne uno</b>; <b>almeno N</b>; <b>esattamente N</b>; <b>al massimo N</b>; un
-<b>numero pari</b> o <b>dispari</b> di gruppi; oppure <b>personalizzata</b> (scegli tu da quanti a quanti).</li>
-<li><b>Analisi:</b> la tabella mostra, sull'archivio, quante estrazioni hanno avuto 0, 1, 2… gruppi verificati, con
-un suggerimento sull'intervallo che copre la maggior parte dei casi.</li>
-<li><b>Salva questo quadro / Carica un mio quadro:</b> conservi i quadri e li riusi in altri sistemi.</li>
+<li><b>Come si riempie una colonna:</b> clicca l'intestazione (001…) per selezionarla, poi clicca i numeri del
+sistema per metterli o toglierli. La colonna selezionata ha il bordo giallo.</li>
+<li><b>Gruppi comuni, con un clic</b> (pulsanti separati sopra la griglia): Decine, Finali (numeri che terminano con
+0, 1, 2…), Pari, Dispari, Bassi, Alti, Primi, Altri (multipli, quadrati, doppi). Mettono i numeri nella colonna
+selezionata; con «Aggiungi ai numeri già scelti» si sommano invece di sostituire.</li>
+<li><b>Crea tutte le colonne in un colpo:</b> <i>Le decine</i> e <i>I finali 0-9</i>.</li>
+<li><b>Taglia, copia, incolla</b> sia i numeri sia l'intera colonna; inoltre <b>Duplica colonna</b>, <b>◀ Sposta / Sposta
+▶</b>, <b>Aggiungi colonna</b> (fino a 26), <b>Elimina colonna</b> e <b>Azzera</b> (svuota tutto), <b>Inverti</b>.</li>
+<li><b>Relazione tra le condizioni:</b> <b>AND</b> (tutti i gruppi verificati), <b>OR</b> (almeno uno), <b>XOR</b>
+(soltanto uno), <b>NOT</b> (nessuno). In <i>Altre regole</i> trovi: tutti tranne uno, almeno / esattamente / al
+massimo N, numero pari o dispari di gruppi, oppure <i>personalizzata</i> (da quanti a quanti gruppi scegli tu).</li>
+<li><b>Stato:</b> <i>Attivato</i> o <i>Disattivato</i> (disattivata la condizione resta nell'elenco ma non filtra).</li>
+<li><b>Archivio:</b> mostra le ultime estrazioni con i gruppi che avrebbero verificato e se il quadro sarebbe stato
+rispettato. <b>Analisi:</b> quanti gruppi verificati hanno avuto le estrazioni dell'archivio, con un
+intervallo consigliato, e il comportamento di ogni colonna.</li>
+<li><b>Carica / Salva:</b> conservi il quadro con un nome tra <i>Le mie condizioni</i> e lo ricarichi quando serve.
+<b>Aiuto</b> apre questa guida; <b>OK</b> conferma, <b>Annulla</b> esce.</li>
 </ul>
+<h3>Quadri speciali: i tre archivi</h3>
+<p>Da <i>Condizioni → Quadri speciali</i>. Sono <b>tre quadri</b>, uno per archivio:</p>
+<ol>
+<li><b>Archivio completo</b> (tutte le combinazioni uscite);</li>
+<li><b>Archivio delle sole combinazioni vincenti</b> (i concorsi in cui è stato vinto il jackpot);</li>
+<li><b>Archivio completo senza le combinazioni vincenti</b>.</li>
+</ol>
+<p>In ciascuno scegli <b>quanti numeri in comune</b> con le combinazioni di quell'archivio sono <b>ammessi</b> oppure
+<b>non ammessi</b> nelle colonne del sistema (per ogni colonna conta il massimo in comune con una qualunque combinazione
+dell'archivio; «fino a 2» vuol dire 0, 1 o 2). Per esempio: <i>archivio completo, non ammessi {'5' if ej else '6'}</i> scarta
+le colonne già uscite. <b>Mostra l'analisi</b> indica quante volte, nel passato, un'estrazione ha avuto N numeri in comune
+con le precedenti. Per avere le vincenti nel {'Eurojackpot' if ej else 'SuperEnalotto'} servono i dati dei vincitori
+({'già scaricati con gli aggiornamenti' if ej else 'menu Internet → Aggiorna i vincitori del 6'}).</p>
+<h3>Controllo condizioni</h3>
+<p>Dal menu <i>Condizioni → Controllo condizioni</i> (o dal menu <i>Aggiungi condizione</i> dell'editor) vedi se le condizioni
+attive del sistema <b>lavorano davvero</b>. Il programma sviluppa i numeri del sistema (o un campione casuale se sono
+troppi) e per ogni condizione mostra:</p>
+<ul>
+<li><b>Scarta da sola:</b> quante colonne non la rispettano;</li>
+<li><b>Solo lei:</b> quante colonne tornerebbero ammesse se la togliessi, cioè il suo effetto reale;</li>
+<li><b>In più delle precedenti:</b> quante colonne scarta in aggiunta alle condizioni sopra di lei nell'elenco;</li>
+<li><b>Stato:</b> <b>OPERANTE</b>; <b>INOPERANTE</b> (non scarta nulla: è sempre rispettata); <b>ASSORBITA</b> (le sue colonne
+sono già scartate da altre, e il rapporto dice da quali); <b>DISATTIVATA</b>.</li>
+</ul>
+<p>In alto trovi quante colonne sono ammesse da tutte le condizioni insieme. Una condizione inoperante o assorbita si
+può togliere senza cambiare il sistema.</p>
 <h3>Le mie condizioni (condizioni personalizzate)</h3>
 <p>Oltre a quelle standard puoi crearne di tue e attivarle come le altre. Menu <i>Condizioni → Crea e gestisci le mie
 condizioni</i>. Si possono creare: <b>Numeri scelti da me</b> (quanti numeri della colonna sono tra quelli che
-scegli), <b>Quadri</b>, oppure una <b>condizione standard con i tuoi valori</b>, da salvare con un nome.</p>
+scegli), <b>Quadri</b>, <b>Quadri speciali</b>, oppure una <b>condizione standard con i tuoi valori</b>, da salvare con un nome.</p>
 <ul>
 <li><b>Nuova, Modifica, Duplica, Rinomina, Elimina</b> per gestirle; <b>Aggiungi al sistema</b> per usarle subito.</li>
 <li>Nell'editor di un sistema: <i>Aggiungi condizione → Le mie condizioni salvate</i>; dal pulsante
@@ -264,7 +296,7 @@ finiscono nelle copie dei dati.</li>
 </ul>
 <h3>Le icone dei pulsanti</h3>
 <p>Ogni pulsante ha una <b>piccola icona colorata</b> che ne richiama la funzione, uguale in tutto il programma:
-✅ conferma, ↩️ annulla, 💾 salva, 📂 carica, 🗑️ elimina, ✂️ taglia, 📋 incolla, ▶️ sviluppa, 🖨️ stampa…</p>
+✅ conferma, ↩️ annulla, 💾 salva, 📂 carica, 🗑️ elimina, 🧹 azzera, ✂️ taglia, 📋 incolla, 📊 analisi, 🗃️ archivio, ❓ aiuto, ▶️ sviluppa, 🖨️ stampa…</p>
 <div class='av'>Le condizioni non aumentano la probabilità di vincere: tolgono colonne <i>statisticamente rare</i>, quindi
 ti fanno spendere meno per coprire quasi gli stessi scenari.</div>
 """))
