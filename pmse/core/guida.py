@@ -233,6 +233,38 @@ l'80%): così scarti le colonne dalla forma insolita senza perdere quasi nessuna
 <li><b>Rendimento delle condizioni:</b> quanto ogni condizione riduce le colonne e quanto «costa» in estrazioni
 perse.</li>
 </ul>
+<h3>Quadri: gruppi di numeri scelti da te</h3>
+<p>Dal menu <i>Condizioni → Quadri</i> (o <i>Aggiungi condizione</i> nell'editor di un sistema) crei <b>uno o più
+gruppi di numeri</b>. Un gruppo è <i>verificato</i> se la colonna ne contiene da un minimo a un massimo (per esempio
+«almeno 1 numero della decina 1-10»).</p>
+<ul>
+<li><b>Gruppi comuni con un clic:</b> decine, finali (numeri che terminano con 0, 1, 2…), pari, dispari, bassi, alti,
+primi, multipli e quadrati. Con «Aggiungi ai numeri già scelti» li sommi alla tua selezione invece di sostituirla.
+<i>Le decine</i> e <i>I finali 0-9</i> creano tutti i gruppi in un colpo.</li>
+<li><b>Numeri tuoi:</b> clicca i numeri uno a uno; poi <i>Aggiungi gruppo</i>. Ogni gruppo ha il suo colore e un nome.</li>
+<li><b>Taglia, copia, incolla</b> sia i numeri scelti sia interi gruppi; poi <b>Duplica gruppo</b>,
+<b>Modifica numeri del gruppo</b>, <b>Sposta su/giù</b>, <b>Elimina</b>, <b>Svuota tutto</b>, <b>Inverti</b>.</li>
+<li><b>La regola</b> decide quanti gruppi devono essere verificati: <b>tutti</b>; <b>almeno uno</b>; <b>uno solo</b>;
+<b>nessuno</b>; <b>tutti tranne uno</b>; <b>almeno N</b>; <b>esattamente N</b>; <b>al massimo N</b>; un
+<b>numero pari</b> o <b>dispari</b> di gruppi; oppure <b>personalizzata</b> (scegli tu da quanti a quanti).</li>
+<li><b>Analisi:</b> la tabella mostra, sull'archivio, quante estrazioni hanno avuto 0, 1, 2… gruppi verificati, con
+un suggerimento sull'intervallo che copre la maggior parte dei casi.</li>
+<li><b>Salva questo quadro / Carica un mio quadro:</b> conservi i quadri e li riusi in altri sistemi.</li>
+</ul>
+<h3>Le mie condizioni (condizioni personalizzate)</h3>
+<p>Oltre a quelle standard puoi crearne di tue e attivarle come le altre. Menu <i>Condizioni → Crea e gestisci le mie
+condizioni</i>. Si possono creare: <b>Numeri scelti da me</b> (quanti numeri della colonna sono tra quelli che
+scegli), <b>Quadri</b>, oppure una <b>condizione standard con i tuoi valori</b>, da salvare con un nome.</p>
+<ul>
+<li><b>Nuova, Modifica, Duplica, Rinomina, Elimina</b> per gestirle; <b>Aggiungi al sistema</b> per usarle subito.</li>
+<li>Nell'editor di un sistema: <i>Aggiungi condizione → Le mie condizioni salvate</i>; dal pulsante
+<b>Salva come mia condizione</b> conservi una condizione già impostata.</li>
+<li>Sono conservate nell'archivio del programma, <b>separate per {'Eurojackpot' if ej else 'SuperEnalotto'}</b>, e
+finiscono nelle copie dei dati.</li>
+</ul>
+<h3>Le icone dei pulsanti</h3>
+<p>Ogni pulsante ha una <b>piccola icona colorata</b> che ne richiama la funzione, uguale in tutto il programma:
+✅ conferma, ↩️ annulla, 💾 salva, 📂 carica, 🗑️ elimina, ✂️ taglia, 📋 incolla, ▶️ sviluppa, 🖨️ stampa…</p>
 <div class='av'>Le condizioni non aumentano la probabilità di vincere: tolgono colonne <i>statisticamente rare</i>, quindi
 ti fanno spendere meno per coprire quasi gli stessi scenari.</div>
 """))

@@ -15,6 +15,8 @@ def main():
     app.setStyle("Fusion")
     from pmse.ui.stile import applica
     applica(app)
+    from pmse.ui.icone import installa
+    installa(app)
     from pathlib import Path
 
     from PySide6.QtGui import QIcon

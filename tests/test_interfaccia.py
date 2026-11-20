@@ -1049,3 +1049,99 @@ def test_impostazioni_colonne_personali(app, tmp_path):
         if not g.is_ej:
             assert imp.soglia_popolari == personale.POPOLARI["forte"] and imp.evita_popolari
         a.chiudi()
+
+
+def test_quadri_e_le_mie_condizioni(app, tmp_path):
+    """Quadri (gruppi a un clic, regola, copia/incolla, salvataggio), insieme personale e Le mie condizioni."""
+    from unittest import mock
+
+    from pmse.core import condizioni as cnd
+    from pmse.core import condizioni_utente as cu
+    from pmse.core import sistemi as sis
+    from pmse.core.gioco import EJ, SE
+    from pmse.ui.condizioni_utente import FinestraMieCondizioni, SchedaInsieme, SchedaQuadri
+    from pmse.ui.finestra import FinestraPrincipale
+    from tests.test_sistemi import archivio_finto
+    for g in (SE, EJ):
+        a = Archivio(tmp_path / f"qd_{g.codice}.db", gioco=g)
+        a.unisci(archivio_finto(g, 150))
+        w = FinestraPrincipale(a, avvio_automatico=False)
+        menu = {x.text().replace("&", ""): x.menu() for x in w.menuBar().actions() if x.menu() is not None}
+        voci = [x.text() for x in menu["Condizioni"].actions()]
+        assert any("Quadri" in t for t in voci) and any("Le mie condizioni" in t for t in voci)
+        assert not any("in preparazione" in t for m in menu.values() for t in [x.text() for x in m.actions()])
+        ctx = sis.contesto_da_archivio(a)
+        d = SchedaQuadri(g, ctx, [], None, w, a)
+        d.barra.metti("Finale 1")
+        d._aggiungi()
+        assert len(d.gruppi) == 1 and d.gruppi[0]["nome"] == "Finale 1"
+        d._crea_tutti(cnd.decine(g))
+        assert len(d.gruppi) == (g.n + 9) // 10
+        d.t.selectRow(0)
+        d._copia_gruppo()
+        d._incolla_gruppo()
+        d._duplica_gruppo()
+        d._sposta(1)
+        n = len(d.gruppi)
+        d._taglia_gruppo()
+        assert len(d.gruppi) == n - 1
+        d.c_regola.setCurrentIndex(d.c_regola.findData("almeno_n"))
+        d.s_n.setValue(2)
+        assert d.s_gmin.value() == 2 and d.s_gmax.value() == len(d.gruppi) and not d.s_gmin.isEnabled()
+        d.e_nome.setText("Mio quadro")
+        d._ok()
+        c = d.risultato
+        assert c.codice == "quadri" and c.regola == "almeno_n" and c.nome == "Mio quadro" and c.minimo == 2
+        with mock.patch("pmse.ui.condizioni_utente.QInputDialog.getText", return_value=("Mio quadro", True)), \
+                mock.patch("pmse.ui.condizioni_utente.QMessageBox.information"):
+            d._salva_quadro()
+        assert [v["nome"] for v in cu.carica(a, ("quadri",))] == ["Mio quadro"]
+        d2 = SchedaQuadri(g, ctx, [], None, w, a)
+        with mock.patch("pmse.ui.condizioni_utente.QInputDialog.getItem", return_value=("Mio quadro", True)):
+            d2._carica_quadro()
+        assert len(d2.gruppi) == len(c.gruppi) and d2.c_regola.currentData() == "almeno_n"
+        d3 = SchedaQuadri(g, ctx, [], c, w, a)                       # riapertura di una condizione esistente
+        assert len(d3.gruppi) == len(c.gruppi) and d3.s_n.value() == 2
+        di = SchedaInsieme(g, ctx, None, w)
+        di.barra.metti("Pari")
+        di.e_nome.setText("Pari miei")
+        di._ok()
+        assert di.risultato.nome == "Pari miei" and di.risultato.codice == "gruppo"
+        cu.aggiungi(a, "Pari miei", di.risultato)
+        presi = []
+        f = FinestraMieCondizioni(a, w, presi.append)
+        assert f.lista.count() == 2
+        f.lista.setCurrentRow(0)
+        f.aggiungi_al_sistema()
+        f.duplica()
+        assert f.lista.count() == 3 and len(presi) == 1 and presi[0].nome
+        e = w.nuovo_sistema("condizionato")
+        e.aggiungi_condizione(presi[0])
+        assert len(e._conds()) == 1 and e._conds()[0].nome == presi[0].nome
+        e.close()
+        a.chiudi()
+
+
+def test_icone_dei_pulsanti(app):
+    """Ogni funzione ha la stessa icona colorata ovunque; i pulsanti si decorano da soli quando compaiono."""
+    from PySide6.QtWidgets import QPushButton, QWidget
+
+    from pmse.ui import icone
+    b = QPushButton("💾 Salva")
+    assert icone.decora(b) and b.text() == "Salva" and not b.icon().isNull() and b.property("_icona") == "💾"
+    assert icone.emoji_per("Elimina gruppo") == icone.emoji_per("🗑 Scarta") == "🗑️"
+    assert icone.emoji_per("Taglia gruppo") == "✂️" and icone.emoji_per("Incolla numeri") == "📋"
+    assert icone.emoji_per("12") is None and icone.emoji_per("Qualcosa di nuovo") is None
+    lato = QPushButton("📚  Archivio")
+    lato.setProperty("class", "lato")
+    assert not icone.decora(lato) and lato.text() == "📚  Archivio"
+    icone.installa(app)
+    w = QWidget()
+    w.setLayout(__import__("PySide6.QtWidgets", fromlist=["QVBoxLayout"]).QVBoxLayout())
+    bs = [QPushButton("Annulla"), QPushButton("✔ Usa"), QPushButton("▶ Sviluppa (F5)")]
+    for x in bs:
+        w.layout().addWidget(x)
+    w.show()
+    app.processEvents()
+    assert [x.property("_icona") for x in bs] == ["↩️", "✅", "▶️"]
+    w.close()

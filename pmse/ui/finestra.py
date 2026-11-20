@@ -225,7 +225,7 @@ class FinestraPrincipale(QMainWindow):
                        ("Combinazioni speciali: numeri alti", "alti", ""),
                        ("Combinazioni speciali: numeri primi", "primi", ""),
                        ("Combinazioni filtro", "filtro", "Ctrl+F"), ("Sequele", "gruppo", ""),
-                       ("Gruppi tra", "gruppi_tra", "Ctrl+G"),
+                       ("Gruppi tra", "gruppi_tra", "Ctrl+G"), ("Quadri (gruppi scelti da me, con regola)", "quadri", ""),
                        ("Popolarità (quanto è giocata)", "popolarita", "")]
 
     def _menu_sistemi(self):
@@ -254,6 +254,10 @@ class FinestraPrincipale(QMainWindow):
             a = m.addAction(testo, lambda c=codice: self.apri_condizione(c))
             if tasto:
                 a.setShortcut(QKeySequence(tasto))
+        m.addSeparator()
+        self.m_mie_cond = m.addMenu("🧩 Personalizzata – Le mie condizioni salvate")
+        self.m_mie_cond.aboutToShow.connect(self._riempi_mie_condizioni)
+        m.addAction("🧩 Crea e gestisci le mie condizioni...", self.mie_condizioni)
 
         m = mb.addMenu("S&viluppo")
         m.addAction("Impostazioni (prezzi)...", self._prezzi)
@@ -310,6 +314,25 @@ class FinestraPrincipale(QMainWindow):
             e._gruppo(codice)
         else:
             e.apri_condizione(codice)
+
+    def _riempi_mie_condizioni(self):
+        from ..core import condizioni_utente as cu
+        self.m_mie_cond.clear()
+        voci = cu.carica(self.arch)
+        for voce in voci:
+            self.m_mie_cond.addAction(voce["nome"], lambda v=voce: self._usa_mia_condizione(cu.condizione(v)))
+        if not voci:
+            self.m_mie_cond.addAction("(nessuna: creane una con «Crea e gestisci»)").setEnabled(False)
+
+    def _usa_mia_condizione(self, c):
+        e = self._editor_aperto()
+        if e is None or e.s.tipo not in ("condizionato", "condizionato_ridotto"):
+            e = self.nuovo_sistema("condizionato")
+        e.aggiungi_condizione(c)
+
+    def mie_condizioni(self):
+        from .condizioni_utente import FinestraMieCondizioni
+        FinestraMieCondizioni(self.arch, self, self._usa_mia_condizione).exec()
 
     def sistemi_salvati(self):
         from .sistemi import FinestraSalvati

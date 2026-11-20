@@ -273,12 +273,25 @@ class Condizione:
     # "Gruppi tra": più gruppi, ognuno {"numeri": [...], "minimo": a, "massimo": b};
     # minimo/massimo della condizione = quanti gruppi devono essere rispettati
     gruppi: list[dict] = field(default_factory=list)
+    nome: str = ""                 # nome scelto dall'utente (condizioni personalizzate e Quadri)
+    regola: str = ""               # Quadri: regola sui gruppi (vedi REGOLE_QUADRI)
 
     @property
     def tipo(self):
         return TIPI_PER_CODICE.get(self.codice)
 
     def descrivi(self) -> str:
+        testo = self._descrivi()
+        return f"«{self.nome}»: {testo}" if self.nome else testo
+
+    def _descrivi(self) -> str:
+        if self.codice == "quadri":
+            n = len(self.gruppi)
+            parti = [f"{LETTERE[i]}{(' ' + gr['nome']) if gr.get('nome') else ''}: "
+                     f"{len(gr['numeri'])} numeri, da {gr['minimo']} a {gr['massimo']}"
+                     for i, gr in enumerate(self.gruppi)]
+            return (f"Quadri ({n} gruppi) – {testo_regola(self.regola, n, self.minimo, self.massimo)}; "
+                    + "; ".join(parti))
         if self.codice == "gruppi_tra":
             parti = [f"{LETTERE[i]}: {' '.join(map(str, sorted(gr['numeri'])))} da {gr['minimo']} a {gr['massimo']}"
                      for i, gr in enumerate(self.gruppi)]
@@ -298,13 +311,17 @@ class Condizione:
         return f"{t.nome if t else self.codice}{par}: {', '.join(map(str, sorted(self.valori)))}"
 
     def rispetta(self, C: np.ndarray, ctx: Contesto) -> np.ndarray:
-        if self.codice == "gruppi_tra":
+        if self.codice in ("gruppi_tra", "quadri"):
             if not self.gruppi:
                 return np.ones(len(C), dtype=bool)
             ok = np.zeros(len(C), dtype=np.int16)
             for gr in self.gruppi:
                 v = np.isin(C, gr["numeri"]).sum(axis=1)
                 ok += (v >= gr["minimo"]) & (v <= gr["massimo"])
+            if self.regola == "pari":
+                return ok % 2 == 0
+            if self.regola == "dispari":
+                return ok % 2 == 1
             return (ok >= self.minimo) & (ok <= self.massimo)
         if self.codice == "gruppo":
             v = np.isin(C, self.numeri).sum(axis=1)
@@ -338,6 +355,122 @@ def gruppi_tra(gruppi: list[tuple[list[int], int, int]], minimo: int | None = No
     n = len(gr)
     return Condizione("gruppi_tra", gruppi=gr, minimo=n if minimo is None else minimo,
                       massimo=n if massimo is None else massimo)
+
+
+# ------------------------------------------------------------------ Quadri
+# regola -> (etichetta, serve un numero N)
+REGOLE_QUADRI = {
+    "tutte": ("Tutte le condizioni devono essere verificate", False),
+    "almeno_una": ("Almeno una condizione deve essere verificata", False),
+    "una_sola": ("Soltanto una condizione deve essere verificata", False),
+    "nessuna": ("Nessuna delle condizioni deve essere verificata", False),
+    "almeno_n": ("Almeno N condizioni devono essere verificate", True),
+    "esattamente_n": ("Esattamente N condizioni devono essere verificate", True),
+    "al_massimo_n": ("Al massimo N condizioni possono essere verificate", True),
+    "tutte_tranne_una": ("Tutte tranne una (una sola non verificata)", False),
+    "pari": ("Un numero pari di condizioni verificate", False),
+    "dispari": ("Un numero dispari di condizioni verificate", False),
+}
+
+
+def regola_intervallo(regola: str, n_gruppi: int, n: int = 1) -> tuple[int, int]:
+    """Quanti gruppi devono essere verificati (minimo, massimo) secondo la regola. 'pari'/'dispari' sono
+    approssimate dall'intervallo (la verifica esatta è in Condizione.rispetta tramite il campo regola)."""
+    G = n_gruppi
+    n = max(0, min(int(n), G))
+    return {"tutte": (G, G), "almeno_una": (min(1, G), G), "una_sola": (min(1, G), min(1, G)),
+            "nessuna": (0, 0), "almeno_n": (n, G), "esattamente_n": (n, n), "al_massimo_n": (0, n),
+            "tutte_tranne_una": (max(G - 1, 0), max(G - 1, 0)), "pari": (0, G), "dispari": (min(1, G), G)
+            }.get(regola, (G, G))
+
+
+def testo_regola(regola: str, n_gruppi: int, minimo: int, massimo: int) -> str:
+    if regola in REGOLE_QUADRI:
+        e = REGOLE_QUADRI[regola][0]
+        if REGOLE_QUADRI[regola][1]:
+            e = e.replace("N", str(minimo if regola != "al_massimo_n" else massimo), 1)
+        return e.lower()
+    return f"da {minimo} a {massimo} gruppi verificati su {n_gruppi}"
+
+
+def quadri(gruppi: list[dict], regola: str = "tutte", n: int = 1, nome: str = "") -> Condizione:
+    """Quadri: più gruppi di numeri scelti dall'utente. Ogni gruppo {"numeri", "minimo", "massimo", "nome"} è
+    «verificato» se la colonna ne contiene da minimo a massimo. La regola dice quanti gruppi devono esserlo."""
+    gr = [{"numeri": sorted(set(int(x) for x in g["numeri"])), "minimo": int(g.get("minimo", 1)),
+           "massimo": int(g.get("massimo", len(g["numeri"]))), "nome": str(g.get("nome", ""))} for g in gruppi]
+    lo, hi = regola_intervallo(regola, len(gr), n)
+    return Condizione("quadri", gruppi=gr, minimo=lo, massimo=hi, regola=regola, nome=nome)
+
+
+def verificati(C: np.ndarray, gruppi: list[dict]) -> np.ndarray:
+    """Per ogni colonna, quanti gruppi sono verificati."""
+    ok = np.zeros(len(C), dtype=np.int16)
+    for gr in gruppi:
+        v = np.isin(C, gr["numeri"]).sum(axis=1)
+        ok += (v >= gr["minimo"]) & (v <= gr["massimo"])
+    return ok
+
+
+def analizza_quadri(gruppi: list[dict], ctx: Contesto) -> AnalisiCondizione:
+    """Quanti gruppi dei Quadri sono verificati in ogni estrazione dell'archivio (con l'atteso dal caso)."""
+    g = ctx.gioco
+    n_g = len(gruppi)
+    C = np.array([sorted(e.numeri) for e in ctx.estrazioni], dtype=np.int64).reshape(-1, g.k)
+    v = verificati(C, gruppi) if len(C) else np.zeros(0, dtype=int)
+    teorico = verificati(_casuali(g), gruppi)
+    n = len(v)
+    righe = []
+    for x in range(0, n_g + 1):
+        c = int((v == x).sum())
+        righe.append((x, c, c / n * 100 if n else 0.0, float((teorico == x).mean() * 100)))
+    piu = max(righe, key=lambda r: r[1])[0] if n else 0
+    ordine = sorted(righe, key=lambda r: -r[1])
+    scelti, acc = [], 0.0
+    for r in ordine:
+        scelti.append(r[0])
+        acc += r[2]
+        if acc >= 80:
+            break
+    lo, hi = (min(scelti), max(scelti)) if scelti else (0, n_g)
+    sug = (f"Il numero di gruppi verificati più comune è {piu} ({ordine[0][2]:.1f}% delle estrazioni). Con da {lo} "
+           f"a {hi} gruppi verificati si copre il {sum(r[2] for r in righe if lo <= r[0] <= hi):.0f}% delle "
+           "estrazioni.") if n else "Archivio vuoto: nessuna analisi."
+    return AnalisiCondizione("quadri", f"Quadri ({n_g} gruppi)", n, righe, piu, (lo, hi), sorted(scelti), sug)
+
+
+def insiemi_comuni(g: Gioco) -> dict[str, list[int]]:
+    """Gruppi di numeri usati più spesso, per formarli con un clic (etichetta -> numeri)."""
+    N = g.n
+    tutti = list(range(1, N + 1))
+    out: dict[str, list[int]] = {}
+    for d in range(0, (N + 9) // 10):
+        nums = [x for x in tutti if (x - 1) // 10 == d]
+        out[f"Decina {d * 10 + 1}-{min(d * 10 + 10, N)}"] = nums
+    for f in range(10):
+        out[f"Finale {f}"] = [x for x in tutti if x % 10 == f]
+    out["Pari"] = [x for x in tutti if x % 2 == 0]
+    out["Dispari"] = [x for x in tutti if x % 2]
+    out[f"Bassi (1-{N // 2})"] = [x for x in tutti if x <= N // 2]
+    out[f"Alti ({N // 2 + 1}-{N})"] = [x for x in tutti if x > N // 2]
+    out["Primi"] = [x for x in tutti if x in PRIMI]
+    for m in (3, 5, 7):
+        out[f"Multipli di {m}"] = [x for x in tutti if x % m == 0]
+    out["Quadrati perfetti"] = [x for x in tutti if int(x ** 0.5) ** 2 == x]
+    out["Numeri doppi (11, 22...)"] = [x for x in tutti if x >= 11 and x % 11 == 0]
+    out["Tutti i numeri"] = tutti
+    return out
+
+
+def decine(g: Gioco) -> list[dict]:
+    """Un gruppo per ogni decina."""
+    return [{"nome": n.replace("Decina ", ""), "numeri": v, "minimo": 1, "massimo": min(len(v), g.k)}
+            for n, v in insiemi_comuni(g).items() if n.startswith("Decina")]
+
+
+def finali(g: Gioco) -> list[dict]:
+    """Un gruppo per ogni cifra finale (0-9)."""
+    return [{"nome": f"finale {n[-1]}", "numeri": v, "minimo": 1, "massimo": min(len(v), g.k)}
+            for n, v in insiemi_comuni(g).items() if n.startswith("Finale")]
 
 
 def analizza_gruppo(numeri, ctx: Contesto, ultime: int = 0, copertura: float = 0.8) -> AnalisiCondizione:

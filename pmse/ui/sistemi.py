@@ -707,6 +707,11 @@ class EditorSistema(QDialog):
         menu.addAction("Fisse / Sequele (gruppo di numeri)", lambda: self._gruppo("gruppo"))
         menu.addAction("Combinazioni filtro", lambda: self._gruppo("filtro"))
         menu.addAction("Gruppi tra (più gruppi di numeri del sistema)", lambda: self.apri_condizione("gruppi_tra"))
+        menu.addAction("Quadri (gruppi scelti da me, con regola)", lambda: self.apri_condizione("quadri"))
+        menu.addAction("Numeri scelti da me (insieme personale)", self._insieme_personale)
+        self.m_mie = menu.addMenu("Le mie condizioni salvate")
+        self.m_mie.aboutToShow.connect(self._riempi_mie)
+        menu.addAction("Gestisci Le mie condizioni...", self._gestisci_mie)
         b.setMenu(menu)
         h.addWidget(b)
         b = QPushButton("Apri scheda")
@@ -717,6 +722,9 @@ class EditorSistema(QDialog):
         h.addWidget(b)
         b = QPushButton("Elimina")
         b.clicked.connect(self._elimina)
+        h.addWidget(b)
+        b = QPushButton("Salva come mia condizione")
+        b.clicked.connect(self._salva_come_mia)
         h.addWidget(b)
         v.addLayout(h)
         h = QHBoxLayout()
@@ -758,22 +766,75 @@ class EditorSistema(QDialog):
             QMessageBox.information(self, "Condizioni", "Le condizioni si usano nei sistemi condizionati.")
             return
         conds = self._conds()
-        if indice is None and codice not in ("posizione", "gruppo", "filtro"):   # stesso tipo: si modifica
+        if indice is None and codice not in ("posizione", "gruppo", "filtro", "quadri"):   # stesso tipo: si modifica
             indice = next((i for i, c in enumerate(conds) if c.codice == codice), None)
         attuale = conds[indice] if indice is not None else None
-        if codice in ("gruppo", "filtro"):
+        if codice == "gruppo" and attuale is not None and attuale.nome:
+            from .condizioni_utente import SchedaInsieme
+            d = SchedaInsieme(self.g, self.ctx, attuale, self)
+        elif codice in ("gruppo", "filtro"):
             d = SchedaGruppo(self.g, codice, attuale, self)
         elif codice == "gruppi_tra":
             d = SchedaGruppiTra(self.g, self.ctx, sorted(self.griglia.selezionati), attuale, self)
+        elif codice == "quadri":
+            from .condizioni_utente import SchedaQuadri
+            d = SchedaQuadri(self.g, self.ctx, sorted(self.griglia.selezionati), attuale, self, self.arch)
         else:
             d = SchedaCondizione(self.ctx, codice, attuale, self)
         if d.exec() and d.risultato:
+            if attuale is not None and attuale.nome and not d.risultato.nome:
+                d.risultato.nome = attuale.nome          # una condizione dalle mie mantiene il suo nome
             if indice is None:
                 conds.append(d.risultato)
             else:
                 d.risultato.attiva = conds[indice].attiva
                 conds[indice] = d.risultato
             self._salva_conds(conds)
+
+    def _insieme_personale(self):
+        if self.s.tipo not in ("condizionato", "condizionato_ridotto"):
+            QMessageBox.information(self, "Condizioni", "Le condizioni si usano nei sistemi condizionati.")
+            return
+        from .condizioni_utente import SchedaInsieme
+        d = SchedaInsieme(self.g, self.ctx, None, self)
+        if d.exec() and d.risultato:
+            conds = self._conds()
+            conds.append(d.risultato)
+            self._salva_conds(conds)
+
+    def _riempi_mie(self):
+        from ..core import condizioni_utente as cu
+        self.m_mie.clear()
+        voci = cu.carica(self.arch)
+        for voce in voci:
+            self.m_mie.addAction(voce["nome"], lambda v=voce: self.aggiungi_condizione(cu.condizione(v)))
+        if not voci:
+            a = self.m_mie.addAction("(nessuna salvata)")
+            a.setEnabled(False)
+
+    def aggiungi_condizione(self, c):
+        """Aggiunge (una copia di) una condizione già pronta, per esempio da Le mie condizioni."""
+        if self.s.tipo not in ("condizionato", "condizionato_ridotto"):
+            QMessageBox.information(self, "Condizioni", "Le condizioni si usano nei sistemi condizionati.")
+            return
+        conds = self._conds()
+        conds.append(c)
+        self._salva_conds(conds)
+
+    def _gestisci_mie(self):
+        from .condizioni_utente import FinestraMieCondizioni
+        FinestraMieCondizioni(self.arch, self, self.aggiungi_condizione).exec()
+
+    def _salva_come_mia(self):
+        i = self.lista.currentRow()
+        conds = self._conds()
+        if not 0 <= i < len(conds):
+            QMessageBox.information(self, "Condizioni", "Seleziona prima una condizione dell'elenco.")
+            return
+        from .condizioni_utente import salva_come_mia
+        if salva_come_mia(self, self.arch, conds[i]):
+            QMessageBox.information(self, "Le mie condizioni", "Condizione salvata: la ritrovi in «Aggiungi "
+                                                                 "condizione → Le mie condizioni salvate».")
 
     def _gruppo(self, tipo):
         if self.s.tipo not in ("condizionato", "condizionato_ridotto"):
