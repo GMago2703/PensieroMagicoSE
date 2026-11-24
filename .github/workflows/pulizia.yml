@@ -1,0 +1,45 @@
+name: Pulizia file vecchi
+
+# Dopo ogni compilazione cancella gli APK/EXE piu' vecchi di 1 giorno,
+# tenendo SEMPRE l'ultimo file di ogni tipo (APK, EXE, installer...).
+on:
+  workflow_run:
+    workflows: ["Build Android APK", "Build Windows EXE"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  pulizia:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const tipo = (n) => {
+              n = n.toLowerCase();
+              if (n.includes('log')) return 'log';
+              if (n.includes('foto')) return 'foto';
+              if (n.includes('msi')) return 'win-msi';
+              if (n.includes('portatil')) return 'win-portatile';
+              if (n.includes('installer')) return 'win-installer';
+              if (n.includes('windows') || n.includes('exe')) return 'windows';
+              return 'android';
+            };
+            const arts = (await github.paginate(github.rest.actions.listArtifactsForRepo,
+              { owner: context.repo.owner, repo: context.repo.repo, per_page: 100 }))
+              .filter(a => !a.expired)
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const ultimi = new Set();
+            const limite = Date.now() - 24 * 3600 * 1000;
+            for (const a of arts) {
+              const t = tipo(a.name);
+              if (!ultimi.has(t)) { ultimi.add(t); core.info('Tengo: ' + a.name); continue; }
+              if (new Date(a.created_at).getTime() < limite) {
+                await github.rest.actions.deleteArtifact({ owner: context.repo.owner, repo: context.repo.repo, artifact_id: a.id });
+                core.info('Eliminato: ' + a.name + ' (' + a.created_at + ')');
+              }
+            }
